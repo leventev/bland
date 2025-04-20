@@ -1,22 +1,9 @@
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
+const circuit = @import("circuit.zig");
 const sdl = global.sdl;
 
-pub const GridPosition = struct {
-    x: i32,
-    y: i32,
-
-    pub fn fromWorldPosition(pos: renderer.WorldPosition) GridPosition {
-        return GridPosition{
-            .x = @divTrunc(pos.x, global.grid_size),
-            .y = @divTrunc(pos.y, global.grid_size),
-        };
-    }
-
-    pub fn eql(self: GridPosition, other: GridPosition) bool {
-        return self.x == other.x and self.y == other.y;
-    }
-};
+const GridPosition = circuit.GridPosition;
 
 pub const ComponentInnerType = enum {
     resistor,
@@ -37,23 +24,8 @@ pub const ComponentInnerType = enum {
     }
 
     pub fn gridPositionFromMouse(self: ComponentInnerType, rotation: ComponentRotation) GridPosition {
-        var mouse_x: i32 = undefined;
-        var mouse_y: i32 = undefined;
-        _ = sdl.SDL_GetMouseState(@ptrCast(&mouse_x), @ptrCast(&mouse_y));
-
-        const world_pos = renderer.WorldPosition.fromScreenPosition(
-            renderer.ScreenPosition{ .x = mouse_x, .y = mouse_y },
-        );
-        var grid_pos = GridPosition.fromWorldPosition(world_pos);
-        grid_pos = self.centerForMouse(rotation, grid_pos);
-
-        if (@mod(mouse_x, global.grid_size) > global.grid_size / 2)
-            grid_pos.x += 1;
-
-        if (@mod(mouse_y, global.grid_size) > global.grid_size / 2)
-            grid_pos.y += 1;
-
-        return grid_pos;
+        const grid_pos = circuit.gridPositionFromMouse();
+        return self.centerForMouse(rotation, grid_pos);
     }
 };
 

@@ -38,7 +38,51 @@ fn handleKeydownEvent(event: *sdl.SDL_Event) void {
             renderer.screen_state.camera_x = 0;
             renderer.screen_state.camera_y = 0;
         },
+        sdl.SDLK_ESCAPE => circuit.placement_mode = .none,
+        sdl.SDLK_r => circuit.placement_mode = .component,
+        sdl.SDLK_w => {
+            circuit.placement_mode = .wire;
+            circuit.held_wire_p1 = null;
+        },
         else => {},
+    }
+}
+
+fn handleMouseDownEvent(event: *sdl.SDL_Event) !void {
+    if (event.button.button != sdl.SDL_BUTTON_LEFT) return;
+
+    if (circuit.placement_mode == .component) {
+        const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
+        if (circuit.canPlace(grid_pos, circuit.held_component_rotation)) {
+            try circuit.components.append(component.Component{
+                .pos = grid_pos,
+                .inner = .{ .resistor = 0 },
+                .rotation = circuit.held_component_rotation,
+            });
+        }
+    } else if (circuit.placement_mode == .wire) {
+        if (circuit.held_wire_p1) |p1| {
+            const p2 = circuit.gridPositionFromMouse();
+            const xlen = @abs(p2.x - p1.x);
+            const ylen = @abs(p2.y - p1.y);
+
+            const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
+                .direction = .horizontal,
+                .length = p2.x - p1.x,
+                .pos = p1,
+            } else circuit.Wire{
+                .direction = .vertical,
+                .length = p2.y - p1.y,
+                .pos = p1,
+            };
+
+            if (wire.length != 0) {
+                try circuit.wires.append(wire);
+                circuit.held_wire_p1 = null;
+            }
+        } else {
+            circuit.held_wire_p1 = circuit.gridPositionFromMouse();
+        }
     }
 }
 
@@ -82,7 +126,9 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     circuit.components = std.ArrayList(component.Component).init(allocator);
+    circuit.wires = std.ArrayList(circuit.Wire).init(allocator);
     defer circuit.components.deinit();
+    defer circuit.wires.deinit();
 
     var event: sdl.SDL_Event = undefined;
     while (sdl.SDL_WaitEvent(@ptrCast(&event)) != 0) {
@@ -97,18 +143,7 @@ pub fn main() !void {
                 handleKeydownEvent(&event);
             },
             sdl.SDL_MOUSEBUTTONDOWN => {
-                if (event.button.button == sdl.SDL_BUTTON_LEFT) {
-                    if (circuit.held_component) |comp| {
-                        const grid_pos = comp.gridPositionFromMouse(circuit.held_component_rotation);
-                        if (circuit.canPlace(grid_pos, circuit.held_component_rotation)) {
-                            try circuit.components.append(component.Component{
-                                .pos = grid_pos,
-                                .inner = .{ .resistor = 0 },
-                                .rotation = circuit.held_component_rotation,
-                            });
-                        }
-                    }
-                }
+                try handleMouseDownEvent(&event);
             },
             sdl.SDL_MOUSEMOTION => {
                 if (event.motion.state & sdl.SDL_BUTTON_MMASK != 0) {

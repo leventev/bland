@@ -5,6 +5,8 @@ const component = @import("component.zig");
 const circuit = @import("circuit.zig");
 const sdl = global.sdl;
 
+const GridPosition = circuit.GridPosition;
+
 pub var screen_state: ScreenState = .{};
 pub var window: *sdl.SDL_Window = undefined;
 pub var renderer: *sdl.SDL_Renderer = undefined;
@@ -53,7 +55,7 @@ pub const WorldPosition = struct {
     x: i32,
     y: i32,
 
-    pub fn fromGridPosition(pos: component.GridPosition) WorldPosition {
+    pub fn fromGridPosition(pos: GridPosition) WorldPosition {
         return WorldPosition{
             .x = pos.x * global.grid_size,
             .y = pos.y * global.grid_size,
@@ -118,7 +120,7 @@ fn renderColors(render_type: ComponentRenderType) struct { u32, u32 } {
     }
 }
 
-pub fn renderResistor(pos: component.GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
+pub fn renderResistor(pos: GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
     const resistor_length = 2 * global.grid_size - 2 * global.component_wire_len;
     const resistor_width = 28;
 
@@ -207,6 +209,58 @@ pub fn renderResistor(pos: component.GridPosition, rot: component.ComponentRotat
     }
 }
 
+pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
+    const wire_color, _ = renderColors(render_type);
+
+    const world_pos = WorldPosition.fromGridPosition(wire.pos);
+    const coords = ScreenPosition.fromWorldPosition(world_pos);
+
+    const length: i32 = wire.length * global.grid_size;
+
+    setColor(wire_color);
+
+    if (render_type == .holding) {
+        const rect = sdl.SDL_Rect{
+            .x = coords.x - 3,
+            .y = coords.y - 3,
+            .w = 6,
+            .h = 6,
+        };
+        drawRect(rect);
+    }
+
+    switch (wire.direction) {
+        .horizontal => {
+            drawLine(
+                coords.x,
+                coords.y - 1,
+                coords.x + length,
+                coords.y - 1,
+            );
+            drawLine(
+                coords.x,
+                coords.y,
+                coords.x + length,
+                coords.y,
+            );
+        },
+        .vertical => {
+            drawLine(
+                coords.x - 1,
+                coords.y,
+                coords.x - 1,
+                coords.y + length,
+            );
+            drawLine(
+                coords.x,
+                coords.y,
+                coords.x,
+                coords.y + length,
+            );
+        },
+    }
+}
+
 pub fn render() void {
     _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
     _ = sdl.SDL_RenderClear(renderer);
@@ -245,11 +299,32 @@ pub fn render() void {
         comp.render();
     }
 
-    if (circuit.held_component) |comp| {
-        const grid_pos = comp.gridPositionFromMouse(circuit.held_component_rotation);
+    for (circuit.wires.items) |wire| {
+        renderWire(wire, .normal);
+    }
+
+    if (circuit.placement_mode == .component) {
+        const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
         const can_place = circuit.canPlace(grid_pos, circuit.held_component_rotation);
         const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
         renderResistor(grid_pos, circuit.held_component_rotation, render_type);
+    } else if (circuit.placement_mode == .wire) {
+        if (circuit.held_wire_p1) |p1| {
+            const p2 = circuit.gridPositionFromMouse();
+            const xlen = @abs(p2.x - p1.x);
+            const ylen = @abs(p2.y - p1.y);
+
+            const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
+                .direction = .horizontal,
+                .length = p2.x - p1.x,
+                .pos = p1,
+            } else circuit.Wire{
+                .direction = .vertical,
+                .length = p2.y - p1.y,
+                .pos = p1,
+            };
+            renderWire(wire, .holding);
+        }
     }
 
     _ = sdl.SDL_RenderPresent(renderer);
