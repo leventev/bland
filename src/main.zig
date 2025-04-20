@@ -1,90 +1,44 @@
-const sdl = @cImport(@cInclude("SDL2/SDL.h"));
+const std = @import("std");
 
-const DEFAULT_WINDOW_WIDTH = 1024;
-const DEFAULT_WINDOW_HEIGHT = 768;
+const global = @import("global.zig");
+const renderer = @import("renderer.zig");
+const component = @import("component.zig");
+const circuit = @import("circuit.zig");
+const sdl = global.sdl;
 
-const GRID_SIZE = 32;
-
-const ScreenState = struct {
-    camera_x: i32 = 0,
-    camera_y: i32 = 0,
-    window_x: i32 = 0,
-    window_y: i32 = 0,
-    width: i32 = 0,
-    height: i32 = 0,
-    scale: f32 = 1,
-
-    fn cameraWidth(self: ScreenState) i32 {
-        return @intFromFloat(@as(f32, @floatFromInt(DEFAULT_WINDOW_WIDTH)) * self.scale);
-    }
-
-    fn cameraHeight(self: ScreenState) i32 {
-        return @intFromFloat(@as(f32, @floatFromInt(DEFAULT_WINDOW_HEIGHT)) * self.scale);
-    }
-
-    fn xscale(self: ScreenState) f32 {
-        return @as(f32, @floatFromInt(self.width)) / @as(f32, @floatFromInt(DEFAULT_WINDOW_WIDTH));
-    }
-
-    fn yscale(self: ScreenState) f32 {
-        return @as(f32, @floatFromInt(self.height)) / @as(f32, @floatFromInt(DEFAULT_WINDOW_HEIGHT));
-    }
-};
-
-var screen_state: ScreenState = .{};
-var window: *sdl.SDL_Window = undefined;
-var renderer: *sdl.SDL_Renderer = undefined;
-
-fn render() void {
-    _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
-    _ = sdl.SDL_RenderClear(renderer);
-
-    const offset_x: u32 = @mod(@abs(screen_state.camera_x), GRID_SIZE);
-    const offset_y: u32 = @mod(@abs(screen_state.camera_y), GRID_SIZE);
-
-    const count_x: usize = @intCast(@divTrunc(screen_state.cameraWidth(), GRID_SIZE) + 1);
-    const count_y: usize = @intCast(@divTrunc(screen_state.cameraHeight(), GRID_SIZE) + 1);
-
-    _ = sdl.SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-
-    for (0..count_x) |i| {
-        for (0..count_y) |j| {
-            const camera_x: i32 = @as(i32, @intCast(offset_x)) + @as(i32, @intCast(i)) * GRID_SIZE;
-            const camera_y: i32 = @as(i32, @intCast(offset_y)) + @as(i32, @intCast(j)) * GRID_SIZE;
-            const screen_x: i32 = @intFromFloat(@as(f32, @floatFromInt(camera_x)) * screen_state.xscale());
-            const screen_y: i32 = @intFromFloat(@as(f32, @floatFromInt(camera_y)) * screen_state.yscale());
-
-            _ = sdl.SDL_RenderFillRect(renderer, @ptrCast(&sdl.SDL_Rect{
-                .x = screen_x - 1,
-                .y = screen_y - 2,
-                .w = 2,
-                .h = 4,
-            }));
-            _ = sdl.SDL_RenderFillRect(renderer, @ptrCast(&sdl.SDL_Rect{
-                .x = screen_x - 2,
-                .y = screen_y - 1,
-                .w = 4,
-                .h = 2,
-            }));
-        }
-    }
-
-    _ = sdl.SDL_RenderPresent(renderer);
-}
-
-fn handle_window_event(event: *sdl.SDL_Event) void {
+fn handleWindowEvent(event: *sdl.SDL_Event) void {
     switch (event.window.event) {
         sdl.SDL_WINDOWEVENT_SIZE_CHANGED => {
-            screen_state.width = event.window.data1;
-            screen_state.height = event.window.data2;
+            renderer.screen_state.width = event.window.data1;
+            renderer.screen_state.height = event.window.data2;
         },
         sdl.SDL_WINDOWEVENT_MOVED => {
-            screen_state.window_x = event.window.data1;
-            screen_state.window_y = event.window.data2;
+            renderer.screen_state.window_x = event.window.data1;
+            renderer.screen_state.window_y = event.window.data2;
         },
         else => {
             std.log.debug("unhandled window event: {}", .{event.window.type});
         },
+    }
+}
+
+fn handleKeydownEvent(event: *sdl.SDL_Event) void {
+    if (event.key.repeat != 0) return;
+
+    switch (event.key.keysym.sym) {
+        sdl.SDLK_t => {
+            circuit.held_component_rotation = switch (circuit.held_component_rotation) {
+                .right => component.ComponentRotation.bottom,
+                .bottom => component.ComponentRotation.left,
+                .left => component.ComponentRotation.top,
+                .top => component.ComponentRotation.right,
+            };
+        },
+        sdl.SDLK_k => {
+            renderer.screen_state.camera_x = 0;
+            renderer.screen_state.camera_y = 0;
+        },
+        else => {},
     }
 }
 
@@ -99,30 +53,36 @@ pub fn main() !void {
     sdl.SDL_GetVersion(&version);
     std.log.info("initialized SDL{}.{}.{}", .{ version.major, version.minor, version.patch });
 
-    window = sdl.SDL_CreateWindow(
+    renderer.window = sdl.SDL_CreateWindow(
         "bland",
         sdl.SDL_WINDOWPOS_CENTERED,
         sdl.SDL_WINDOWPOS_CENTERED,
-        DEFAULT_WINDOW_WIDTH,
-        DEFAULT_WINDOW_HEIGHT,
+        global.default_window_width,
+        global.default_window_height,
         sdl.SDL_WINDOW_RESIZABLE,
     ) orelse {
         std.log.err("failed to create window", .{});
         return error.FailedToCreateWindow;
     };
-    defer sdl.SDL_DestroyWindow(window);
+    defer sdl.SDL_DestroyWindow(renderer.window);
 
-    screen_state.width = DEFAULT_WINDOW_WIDTH;
-    screen_state.height = DEFAULT_WINDOW_HEIGHT;
-    screen_state.camera_x = 0 - DEFAULT_WINDOW_WIDTH / 2;
-    screen_state.camera_y = 0 - DEFAULT_WINDOW_HEIGHT / 2;
-    std.log.info("created {}x{} pixel window", .{ screen_state.width, screen_state.height });
+    renderer.screen_state.width = global.default_window_width;
+    renderer.screen_state.height = global.default_window_height;
+    renderer.screen_state.camera_x = 0;
+    renderer.screen_state.camera_y = 0;
+    std.log.info("created {}x{} pixel window", .{ renderer.screen_state.width, renderer.screen_state.height });
 
-    renderer = sdl.SDL_CreateRenderer(window, -1, 0) orelse {
+    renderer.renderer = sdl.SDL_CreateRenderer(renderer.window, -1, 0) orelse {
         std.log.err("failed to create renderer", .{});
         return error.FailedToCreateRenderer;
     };
-    defer sdl.SDL_DestroyRenderer(renderer);
+    defer sdl.SDL_DestroyRenderer(renderer.renderer);
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    circuit.components = std.ArrayList(component.Component).init(allocator);
+    defer circuit.components.deinit();
 
     var event: sdl.SDL_Event = undefined;
     while (sdl.SDL_WaitEvent(@ptrCast(&event)) != 0) {
@@ -131,20 +91,33 @@ pub fn main() !void {
                 break;
             },
             sdl.SDL_WINDOWEVENT => {
-                handle_window_event(&event);
-                render();
+                handleWindowEvent(&event);
+            },
+            sdl.SDL_KEYDOWN => {
+                handleKeydownEvent(&event);
+            },
+            sdl.SDL_MOUSEBUTTONDOWN => {
+                if (event.button.button == sdl.SDL_BUTTON_LEFT) {
+                    if (circuit.held_component) |comp| {
+                        const grid_pos = comp.gridPositionFromMouse(circuit.held_component_rotation);
+                        if (circuit.canPlace(grid_pos, circuit.held_component_rotation)) {
+                            try circuit.components.append(component.Component{
+                                .pos = grid_pos,
+                                .inner = .{ .resistor = 0 },
+                                .rotation = circuit.held_component_rotation,
+                            });
+                        }
+                    }
+                }
             },
             sdl.SDL_MOUSEMOTION => {
-                if (event.motion.state & sdl.SDL_BUTTON_LMASK == 0) continue;
-                screen_state.camera_x -= event.motion.xrel;
-                screen_state.camera_y -= event.motion.yrel;
-                render();
+                if (event.motion.state & sdl.SDL_BUTTON_MMASK != 0) {
+                    renderer.screen_state.camera_x -= event.motion.xrel;
+                    renderer.screen_state.camera_y -= event.motion.yrel;
+                }
             },
-            else => {
-                render();
-            },
+            else => {},
         }
+        renderer.render();
     }
 }
-
-const std = @import("std");
