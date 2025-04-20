@@ -53,7 +53,7 @@ fn handleMouseDownEvent(event: *sdl.SDL_Event) !void {
 
     if (circuit.placement_mode == .component) {
         const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
-        if (circuit.canPlace(grid_pos, circuit.held_component_rotation)) {
+        if (circuit.canPlaceComponent(grid_pos, circuit.held_component_rotation)) {
             try circuit.components.append(component.Component{
                 .pos = grid_pos,
                 .inner = .{ .resistor = 0 },
@@ -76,7 +76,7 @@ fn handleMouseDownEvent(event: *sdl.SDL_Event) !void {
                 .pos = p1,
             };
 
-            if (wire.length != 0) {
+            if (wire.length != 0 and circuit.canPlaceWire(wire)) {
                 try circuit.wires.append(wire);
                 circuit.held_wire_p1 = null;
             }

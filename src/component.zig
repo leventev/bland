@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
@@ -29,37 +31,56 @@ pub const ComponentInnerType = enum {
     }
 };
 
-pub fn getOccupiedGridPoints(pos: GridPosition, rotation: ComponentRotation) [3]GridPosition {
+pub const OccupiedGridPoint = struct {
+    pos: GridPosition,
+    terminal: bool,
+};
+
+pub fn occupiedPointsIntersect(occupied1: []OccupiedGridPoint, occupied2: []OccupiedGridPoint) bool {
+    for (occupied1) |p1| {
+        for (occupied2) |p2| {
+            if (p1.pos.eql(p2.pos) and (!p1.terminal or !p2.terminal)) return true;
+        }
+    }
+    return false;
+}
+
+pub fn getOccupiedGridPoints(pos: GridPosition, rotation: ComponentRotation, occupied: []OccupiedGridPoint) []OccupiedGridPoint {
+    std.debug.assert(occupied.len >= 3);
     switch (rotation) {
-        .left, .right => return [3]GridPosition{
-            GridPosition{
-                .x = pos.x,
-                .y = pos.y,
-            },
-            GridPosition{
-                .x = pos.x + 1,
-                .y = pos.y,
-            },
-            GridPosition{
-                .x = pos.x + 2,
-                .y = pos.y,
-            },
+        .left, .right => {
+            occupied[0] = OccupiedGridPoint{
+                .pos = GridPosition{ .x = pos.x, .y = pos.y },
+                .terminal = true,
+            };
+            occupied[1] = OccupiedGridPoint{
+                .pos = GridPosition{ .x = pos.x + 1, .y = pos.y },
+                .terminal = false,
+            };
+
+            occupied[0] = OccupiedGridPoint{
+                .pos = GridPosition{ .x = pos.x + 2, .y = pos.y },
+                .terminal = true,
+            };
         },
-        .top, .bottom => return [3]GridPosition{
-            GridPosition{
-                .x = pos.x,
-                .y = pos.y,
-            },
-            GridPosition{
-                .x = pos.x,
-                .y = pos.y + 1,
-            },
-            GridPosition{
-                .x = pos.x,
-                .y = pos.y + 2,
-            },
+        .top, .bottom => {
+            occupied[0] = OccupiedGridPoint{
+                .pos = GridPosition{ .x = pos.x, .y = pos.y },
+                .terminal = true,
+            };
+            occupied[1] = OccupiedGridPoint{
+                .pos = GridPosition{ .x = pos.x, .y = pos.y + 1 },
+                .terminal = false,
+            };
+
+            occupied[0] = OccupiedGridPoint{
+                .pos = GridPosition{ .x = pos.x, .y = pos.y + 2 },
+                .terminal = true,
+            };
         },
     }
+
+    return occupied[0..2];
 }
 
 pub const ComponentInner = union(ComponentInnerType) {
@@ -84,16 +105,9 @@ pub const Component = struct {
         }
     }
 
-    // TODO: handle 2 port networks
-    pub fn intersects(self: Component, positions: [3]GridPosition) bool {
-        const self_positons = getOccupiedGridPoints(self.pos, self.rotation);
-
-        // 2-terminal components only interesct when the middle grid point is shared with another component
-        if (self_positons[1].eql(positions[0]) or self_positons[1].eql(positions[1]) or self_positons[1].eql(positions[2]))
-            return true;
-        if (positions[1].eql(self_positons[0]) or positions[1].eql(self_positons[2]))
-            return true;
-
-        return false;
+    pub fn intersects(self: Component, positions: []OccupiedGridPoint) bool {
+        var buffer: [100]OccupiedGridPoint = undefined;
+        const self_positons = getOccupiedGridPoints(self.pos, self.rotation, buffer[0..]);
+        return occupiedPointsIntersect(self_positons, positions);
     }
 };

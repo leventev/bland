@@ -220,13 +220,24 @@ pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
     setColor(wire_color);
 
     if (render_type == .holding) {
-        const rect = sdl.SDL_Rect{
+        const rect1 = sdl.SDL_Rect{
             .x = coords.x - 3,
             .y = coords.y - 3,
             .w = 6,
             .h = 6,
         };
-        drawRect(rect);
+        drawRect(rect1);
+
+        const world_pos2 = WorldPosition.fromGridPosition(wire.end());
+        const coords2 = ScreenPosition.fromWorldPosition(world_pos2);
+
+        const rect2 = sdl.SDL_Rect{
+            .x = coords2.x - 3,
+            .y = coords2.y - 3,
+            .w = 6,
+            .h = 6,
+        };
+        drawRect(rect2);
     }
 
     switch (wire.direction) {
@@ -305,7 +316,7 @@ pub fn render() void {
 
     if (circuit.placement_mode == .component) {
         const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
-        const can_place = circuit.canPlace(grid_pos, circuit.held_component_rotation);
+        const can_place = circuit.canPlaceComponent(grid_pos, circuit.held_component_rotation);
         const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
         renderResistor(grid_pos, circuit.held_component_rotation, render_type);
     } else if (circuit.placement_mode == .wire) {
@@ -323,7 +334,10 @@ pub fn render() void {
                 .length = p2.y - p1.y,
                 .pos = p1,
             };
-            renderWire(wire, .holding);
+
+            const can_place = circuit.canPlaceWire(wire);
+            const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
+            renderWire(wire, render_type);
         }
     }
 
