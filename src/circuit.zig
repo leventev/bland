@@ -62,9 +62,9 @@ pub var held_wire_p1: ?GridPosition = null;
 pub var components: std.ArrayList(component.Component) = undefined;
 pub var wires: std.ArrayList(Wire) = undefined;
 
-pub fn canPlaceComponent(pos: GridPosition, rotation: component.ComponentRotation) bool {
+pub fn canPlaceComponent(comp_type: component.ComponentInnerType, pos: GridPosition, rotation: component.ComponentRotation) bool {
     var buffer: [100]component.OccupiedGridPoint = undefined;
-    const positions = component.getOccupiedGridPoints(pos, rotation, buffer[0..]);
+    const positions = comp_type.getOccupiedGridPoints(pos, rotation, buffer[0..]);
     for (components.items) |comp| {
         if (comp.intersects(positions)) return false;
     }

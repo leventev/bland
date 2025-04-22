@@ -9,10 +9,12 @@ const GridPosition = circuit.GridPosition;
 
 pub const ComponentInnerType = enum {
     resistor,
+    voltage_source,
+    ground,
 
     fn centerForMouse(self: ComponentInnerType, rotation: ComponentRotation, pos: GridPosition) GridPosition {
         switch (self) {
-            .resistor => {
+            .resistor, .voltage_source => {
                 switch (rotation) {
                     .top, .bottom => {
                         return GridPosition{ .x = pos.x, .y = pos.y - 1 };
@@ -22,6 +24,86 @@ pub const ComponentInnerType = enum {
                     },
                 }
             },
+            .ground => return pos,
+        }
+    }
+
+    pub fn defaultValue(self: ComponentInnerType) ComponentInner {
+        switch (self) {
+            .resistor => return ComponentInner{ .resistor = 1 },
+            .voltage_source => return ComponentInner{ .voltage_source = 1 },
+            .ground => return ComponentInner{ .ground = {} },
+        }
+    }
+
+    pub fn getOccupiedGridPoints(self: ComponentInnerType, pos: GridPosition, rotation: ComponentRotation, occupied: []OccupiedGridPoint) []OccupiedGridPoint {
+        switch (self) {
+            .ground => {
+                std.debug.assert(occupied.len >= 2);
+                occupied[0] = OccupiedGridPoint{
+                    .pos = GridPosition{ .x = pos.x, .y = pos.y },
+                    .terminal = true,
+                };
+                switch (rotation) {
+                    .left => {
+                        occupied[1] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x - 1, .y = pos.y },
+                            .terminal = false,
+                        };
+                    },
+                    .right => {
+                        occupied[1] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x + 1, .y = pos.y },
+                            .terminal = false,
+                        };
+                    },
+                    .top => {
+                        occupied[1] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x, .y = pos.y - 1 },
+                            .terminal = false,
+                        };
+                    },
+                    .bottom => {
+                        occupied[1] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x, .y = pos.y + 1 },
+                            .terminal = false,
+                        };
+                    },
+                }
+                return occupied[0..2];
+            },
+            .resistor, .voltage_source => {
+                std.debug.assert(occupied.len >= 3);
+                occupied[0] = OccupiedGridPoint{
+                    .pos = GridPosition{ .x = pos.x, .y = pos.y },
+                    .terminal = true,
+                };
+                switch (rotation) {
+                    .left, .right => {
+                        occupied[1] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x + 1, .y = pos.y },
+                            .terminal = false,
+                        };
+
+                        occupied[2] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x + 2, .y = pos.y },
+                            .terminal = true,
+                        };
+                    },
+                    .top, .bottom => {
+                        occupied[1] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x, .y = pos.y + 1 },
+                            .terminal = false,
+                        };
+
+                        occupied[2] = OccupiedGridPoint{
+                            .pos = GridPosition{ .x = pos.x, .y = pos.y + 2 },
+                            .terminal = true,
+                        };
+                    },
+                }
+                return occupied[0..3];
+            },
         }
     }
 
@@ -30,6 +112,14 @@ pub const ComponentInnerType = enum {
         return self.centerForMouse(rotation, grid_pos);
     }
 };
+
+pub fn renderComponent(comp: ComponentInnerType, pos: GridPosition, rot: ComponentRotation, render_type: renderer.ComponentRenderType) void {
+    switch (comp) {
+        .resistor => renderer.renderResistor(pos, rot, render_type),
+        .voltage_source => renderer.renderVoltageSource(pos, rot, render_type),
+        .ground => renderer.renderGround(pos, rot, render_type),
+    }
+}
 
 pub const OccupiedGridPoint = struct {
     pos: GridPosition,
@@ -45,46 +135,10 @@ pub fn occupiedPointsIntersect(occupied1: []OccupiedGridPoint, occupied2: []Occu
     return false;
 }
 
-pub fn getOccupiedGridPoints(pos: GridPosition, rotation: ComponentRotation, occupied: []OccupiedGridPoint) []OccupiedGridPoint {
-    std.debug.assert(occupied.len >= 3);
-    switch (rotation) {
-        .left, .right => {
-            occupied[0] = OccupiedGridPoint{
-                .pos = GridPosition{ .x = pos.x, .y = pos.y },
-                .terminal = true,
-            };
-            occupied[1] = OccupiedGridPoint{
-                .pos = GridPosition{ .x = pos.x + 1, .y = pos.y },
-                .terminal = false,
-            };
-
-            occupied[0] = OccupiedGridPoint{
-                .pos = GridPosition{ .x = pos.x + 2, .y = pos.y },
-                .terminal = true,
-            };
-        },
-        .top, .bottom => {
-            occupied[0] = OccupiedGridPoint{
-                .pos = GridPosition{ .x = pos.x, .y = pos.y },
-                .terminal = true,
-            };
-            occupied[1] = OccupiedGridPoint{
-                .pos = GridPosition{ .x = pos.x, .y = pos.y + 1 },
-                .terminal = false,
-            };
-
-            occupied[0] = OccupiedGridPoint{
-                .pos = GridPosition{ .x = pos.x, .y = pos.y + 2 },
-                .terminal = true,
-            };
-        },
-    }
-
-    return occupied[0..2];
-}
-
 pub const ComponentInner = union(ComponentInnerType) {
-    resistor: u32,
+    resistor: f32,
+    voltage_source: f32,
+    ground: void,
 };
 
 pub const ComponentRotation = enum {
@@ -100,14 +154,17 @@ pub const Component = struct {
     inner: ComponentInner,
 
     pub fn render(self: Component) void {
-        switch (self.inner) {
-            .resistor => renderer.renderResistor(self.pos, self.rotation, .normal),
-        }
+        renderComponent(self.inner, self.pos, self.rotation, .normal);
     }
 
     pub fn intersects(self: Component, positions: []OccupiedGridPoint) bool {
         var buffer: [100]OccupiedGridPoint = undefined;
-        const self_positons = getOccupiedGridPoints(self.pos, self.rotation, buffer[0..]);
+
+        const self_positons = @as(ComponentInnerType, self.inner).getOccupiedGridPoints(
+            self.pos,
+            self.rotation,
+            buffer[0..],
+        );
         return occupiedPointsIntersect(self_positons, positions);
     }
 };

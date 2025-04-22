@@ -16,9 +16,7 @@ fn handleWindowEvent(event: *sdl.SDL_Event) void {
             renderer.screen_state.window_x = event.window.data1;
             renderer.screen_state.window_y = event.window.data2;
         },
-        else => {
-            std.log.debug("unhandled window event: {}", .{event.window.type});
-        },
+        else => {},
     }
 }
 
@@ -39,7 +37,18 @@ fn handleKeydownEvent(event: *sdl.SDL_Event) void {
             renderer.screen_state.camera_y = 0;
         },
         sdl.SDLK_ESCAPE => circuit.placement_mode = .none,
-        sdl.SDLK_r => circuit.placement_mode = .component,
+        sdl.SDLK_g => {
+            circuit.placement_mode = .component;
+            circuit.held_component = .ground;
+        },
+        sdl.SDLK_r => {
+            circuit.placement_mode = .component;
+            circuit.held_component = .resistor;
+        },
+        sdl.SDLK_v => {
+            circuit.placement_mode = .component;
+            circuit.held_component = .voltage_source;
+        },
         sdl.SDLK_w => {
             circuit.placement_mode = .wire;
             circuit.held_wire_p1 = null;
@@ -53,10 +62,10 @@ fn handleMouseDownEvent(event: *sdl.SDL_Event) !void {
 
     if (circuit.placement_mode == .component) {
         const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
-        if (circuit.canPlaceComponent(grid_pos, circuit.held_component_rotation)) {
+        if (circuit.canPlaceComponent(circuit.held_component, grid_pos, circuit.held_component_rotation)) {
             try circuit.components.append(component.Component{
                 .pos = grid_pos,
-                .inner = .{ .resistor = 0 },
+                .inner = circuit.held_component.defaultValue(),
                 .rotation = circuit.held_component_rotation,
             });
         }

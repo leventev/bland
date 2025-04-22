@@ -105,7 +105,7 @@ fn drawLine(x1: i32, y1: i32, x2: i32, y2: i32) void {
     _ = sdl.SDL_RenderDrawLine(renderer, scaled_x1, scaled_y1, scaled_x2, scaled_y2);
 }
 
-const ComponentRenderType = enum {
+pub const ComponentRenderType = enum {
     normal,
     holding,
     unable_to_place,
@@ -120,46 +120,258 @@ fn renderColors(render_type: ComponentRenderType) struct { u32, u32 } {
     }
 }
 
+const TerminalWire = struct {
+    pos: ScreenPosition,
+    pixel_length: i32,
+    direction: circuit.Wire.Direction,
+};
+
+fn renderTerminalWire(wire: TerminalWire, render_type: ComponentRenderType) void {
+    const pos = wire.pos;
+    const wire_color, _ = renderColors(render_type);
+
+    setColor(wire_color);
+    switch (wire.direction) {
+        .horizontal => {
+            drawLine(
+                pos.x,
+                pos.y - 1,
+                pos.x + wire.pixel_length,
+                pos.y - 1,
+            );
+
+            drawLine(
+                pos.x,
+                pos.y,
+                pos.x + wire.pixel_length,
+                pos.y,
+            );
+        },
+        .vertical => {
+            drawLine(
+                pos.x - 1,
+                pos.y,
+                pos.x - 1,
+                pos.y + wire.pixel_length,
+            );
+
+            drawLine(
+                pos.x,
+                pos.y,
+                pos.x,
+                pos.y + wire.pixel_length,
+            );
+        },
+    }
+}
+
+fn renderTerminalWires(wires: []TerminalWire, render_type: ComponentRenderType) void {
+    for (wires) |wire| {
+        renderTerminalWire(wire, render_type);
+    }
+}
+
+pub fn renderGround(pos: GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
+    const wire_pixel_len = 16;
+
+    const world_pos = WorldPosition.fromGridPosition(pos);
+    const coords = ScreenPosition.fromWorldPosition(world_pos);
+
+    _, const gnd_color = renderColors(render_type);
+
+    const triangle_side = 45;
+    const triangle_height = 39;
+
+    switch (rot) {
+        .right, .left => {
+            const wire_off: i32 = if (rot == .right) wire_pixel_len else -wire_pixel_len;
+            renderTerminalWire(TerminalWire{
+                .direction = .horizontal,
+                .pos = coords,
+                .pixel_length = wire_off,
+            }, render_type);
+
+            const x_off: i32 = if (rot == .right) triangle_height else -triangle_height;
+
+            setColor(gnd_color);
+            drawLine(
+                coords.x + wire_off,
+                coords.y - triangle_side / 2,
+                coords.x + wire_off,
+                coords.y + triangle_side / 2,
+            );
+
+            drawLine(
+                coords.x + wire_off,
+                coords.y - triangle_side / 2,
+                coords.x + wire_off + x_off,
+                coords.y,
+            );
+
+            drawLine(
+                coords.x + wire_off,
+                coords.y + triangle_side / 2,
+                coords.x + wire_off + x_off,
+                coords.y,
+            );
+        },
+        .top, .bottom => {
+            const wire_off: i32 = if (rot == .bottom) wire_pixel_len else -wire_pixel_len;
+            renderTerminalWire(TerminalWire{
+                .direction = .vertical,
+                .pos = coords,
+                .pixel_length = wire_off,
+            }, render_type);
+
+            const y_off: i32 = if (rot == .bottom) triangle_height else -triangle_height;
+
+            setColor(gnd_color);
+            drawLine(
+                coords.x - triangle_side / 2,
+                coords.y + wire_off,
+                coords.x + triangle_side / 2,
+                coords.y + wire_off,
+            );
+
+            drawLine(
+                coords.x - triangle_side / 2,
+                coords.y + wire_off,
+                coords.x,
+                coords.y + wire_off + y_off,
+            );
+
+            drawLine(
+                coords.x + triangle_side / 2,
+                coords.y + wire_off,
+                coords.x,
+                coords.y + wire_off + y_off,
+            );
+        },
+    }
+}
+
+pub fn renderVoltageSource(pos: GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
+    const world_pos = WorldPosition.fromGridPosition(pos);
+    const coords = ScreenPosition.fromWorldPosition(world_pos);
+
+    const total_len = 2 * global.grid_size;
+    const middle_len = 16;
+    const middle_width = 4;
+    const wire_len = (total_len - middle_len) / 2;
+
+    const positive_side_len = 48;
+    const negative_side_len = 32;
+
+    _, const vs_color = renderColors(render_type);
+
+    switch (rot) {
+        .left, .right => {
+            renderTerminalWire(TerminalWire{
+                .pos = coords,
+                .direction = .horizontal,
+                .pixel_length = wire_len,
+            }, render_type);
+            renderTerminalWire(TerminalWire{
+                .pos = ScreenPosition{
+                    .x = coords.x + global.grid_size * 2,
+                    .y = coords.y,
+                },
+                .direction = .horizontal,
+                .pixel_length = -wire_len,
+            }, render_type);
+
+            var rect1 = sdl.SDL_Rect{
+                .x = coords.x + wire_len,
+                .y = coords.y - positive_side_len / 2,
+                .w = middle_width,
+                .h = positive_side_len,
+            };
+            var rect2 = sdl.SDL_Rect{
+                .x = coords.x + wire_len + middle_len - middle_width,
+                .y = coords.y - negative_side_len / 2,
+                .w = middle_width,
+                .h = negative_side_len,
+            };
+
+            if (rot == .left) {
+                const tmp = rect1.x;
+                rect1.x = rect2.x;
+                rect2.x = tmp;
+            }
+
+            setColor(vs_color);
+            drawRect(rect1);
+            drawRect(rect2);
+        },
+        .top, .bottom => {
+            renderTerminalWire(TerminalWire{
+                .pos = coords,
+                .direction = .vertical,
+                .pixel_length = wire_len,
+            }, render_type);
+            renderTerminalWire(TerminalWire{
+                .pos = ScreenPosition{
+                    .x = coords.x,
+                    .y = coords.y + global.grid_size * 2,
+                },
+                .direction = .vertical,
+                .pixel_length = -wire_len,
+            }, render_type);
+
+            var rect1 = sdl.SDL_Rect{
+                .x = coords.x - positive_side_len / 2,
+                .y = coords.y + wire_len,
+                .w = positive_side_len,
+                .h = middle_width,
+            };
+            var rect2 = sdl.SDL_Rect{
+                .x = coords.x - negative_side_len / 2,
+                .y = coords.y + wire_len + middle_len - middle_width,
+                .w = negative_side_len,
+                .h = middle_width,
+            };
+
+            if (rot == .top) {
+                const tmp = rect1.y;
+                rect1.y = rect2.y;
+                rect2.y = tmp;
+            }
+
+            setColor(vs_color);
+            drawRect(rect1);
+            drawRect(rect2);
+        },
+    }
+}
+
 pub fn renderResistor(pos: GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
-    const resistor_length = 2 * global.grid_size - 2 * global.component_wire_len;
+    const wire_pixel_len = 16;
+    const resistor_length = 2 * global.grid_size - 2 * wire_pixel_len;
     const resistor_width = 28;
 
     const world_pos = WorldPosition.fromGridPosition(pos);
     const coords = ScreenPosition.fromWorldPosition(world_pos);
 
-    const wire_color, const resistor_color = renderColors(render_type);
+    _, const resistor_color = renderColors(render_type);
 
     switch (rot) {
         .left, .right => {
-            setColor(wire_color);
-            drawLine(
-                coords.x,
-                coords.y - 1,
-                coords.x + global.component_wire_len,
-                coords.y - 1,
-            );
-            drawLine(
-                coords.x,
-                coords.y,
-                coords.x + global.component_wire_len,
-                coords.y,
-            );
-
-            drawLine(
-                coords.x + global.component_wire_len + resistor_length,
-                coords.y - 1,
-                coords.x + resistor_length + 2 * global.component_wire_len,
-                coords.y - 1,
-            );
-            drawLine(
-                coords.x + global.component_wire_len + resistor_length,
-                coords.y,
-                coords.x + resistor_length + 2 * global.component_wire_len,
-                coords.y,
-            );
+            renderTerminalWire(TerminalWire{
+                .pos = coords,
+                .direction = .horizontal,
+                .pixel_length = wire_pixel_len,
+            }, render_type);
+            renderTerminalWire(TerminalWire{
+                .pos = ScreenPosition{
+                    .x = coords.x + global.grid_size * 2,
+                    .y = coords.y,
+                },
+                .direction = .horizontal,
+                .pixel_length = -wire_pixel_len,
+            }, render_type);
 
             const rect = sdl.SDL_Rect{
-                .x = coords.x + global.component_wire_len,
+                .x = coords.x + wire_pixel_len,
                 .y = coords.y - resistor_width / 2,
                 .w = resistor_length,
                 .h = resistor_width,
@@ -169,36 +381,23 @@ pub fn renderResistor(pos: GridPosition, rot: component.ComponentRotation, rende
             drawRect(rect);
         },
         .bottom, .top => {
-            setColor(wire_color);
-            drawLine(
-                coords.x - 1,
-                coords.y,
-                coords.x - 1,
-                coords.y + global.component_wire_len,
-            );
-            drawLine(
-                coords.x,
-                coords.y,
-                coords.x,
-                coords.y + global.component_wire_len,
-            );
-
-            drawLine(
-                coords.x - 1,
-                coords.y + global.component_wire_len + resistor_length,
-                coords.x - 1,
-                coords.y + resistor_length + 2 * global.component_wire_len,
-            );
-            drawLine(
-                coords.x,
-                coords.y + global.component_wire_len + resistor_length,
-                coords.x,
-                coords.y + resistor_length + 2 * global.component_wire_len,
-            );
+            renderTerminalWire(TerminalWire{
+                .pos = coords,
+                .direction = .vertical,
+                .pixel_length = wire_pixel_len,
+            }, render_type);
+            renderTerminalWire(TerminalWire{
+                .pos = ScreenPosition{
+                    .x = coords.x,
+                    .y = coords.y + global.grid_size * 2,
+                },
+                .direction = .vertical,
+                .pixel_length = -wire_pixel_len,
+            }, render_type);
 
             const rect = sdl.SDL_Rect{
                 .x = coords.x - resistor_width / 2,
-                .y = coords.y + global.component_wire_len,
+                .y = coords.y + wire_pixel_len,
                 .w = resistor_width,
                 .h = resistor_length,
             };
@@ -316,9 +515,9 @@ pub fn render() void {
 
     if (circuit.placement_mode == .component) {
         const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
-        const can_place = circuit.canPlaceComponent(grid_pos, circuit.held_component_rotation);
+        const can_place = circuit.canPlaceComponent(circuit.held_component, grid_pos, circuit.held_component_rotation);
         const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-        renderResistor(grid_pos, circuit.held_component_rotation, render_type);
+        component.renderComponent(circuit.held_component, grid_pos, circuit.held_component_rotation, render_type);
     } else if (circuit.placement_mode == .wire) {
         if (circuit.held_wire_p1) |p1| {
             const p2 = circuit.gridPositionFromMouse();
