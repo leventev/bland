@@ -20,7 +20,7 @@ fn handleWindowEvent(event: *sdl.SDL_Event) void {
     }
 }
 
-fn handleKeydownEvent(event: *sdl.SDL_Event) void {
+fn handleKeydownEvent(allocator: std.mem.Allocator, event: *sdl.SDL_Event) void {
     if (event.key.repeat != 0) return;
 
     switch (event.key.keysym.sym) {
@@ -53,11 +53,14 @@ fn handleKeydownEvent(event: *sdl.SDL_Event) void {
             circuit.placement_mode = .wire;
             circuit.held_wire_p1 = null;
         },
+        sdl.SDLK_a => {
+            circuit.analyse(allocator);
+        },
         else => {},
     }
 }
 
-fn handleMouseDownEvent(event: *sdl.SDL_Event) !void {
+fn handleMouseDownEvent(allocator: std.mem.Allocator, event: *sdl.SDL_Event) !void {
     if (event.button.button != sdl.SDL_BUTTON_LEFT) return;
 
     if (circuit.placement_mode == .component) {
@@ -67,6 +70,7 @@ fn handleMouseDownEvent(event: *sdl.SDL_Event) !void {
                 .pos = grid_pos,
                 .inner = circuit.held_component.defaultValue(),
                 .rotation = circuit.held_component_rotation,
+                .name = try circuit.held_component.getNewComponentName(allocator),
             });
         }
     } else if (circuit.placement_mode == .wire) {
@@ -119,6 +123,14 @@ pub fn main() !void {
     };
     defer sdl.SDL_DestroyWindow(renderer.window);
 
+    _ = sdl.TTF_Init();
+
+    // TODO: better font handling
+    renderer.font = sdl.TTF_OpenFont("ttf/JuliaMono-Regular.ttf", 16) orelse {
+        std.log.err("failed to open font", .{});
+        return error.FailedToTopenFont;
+    };
+
     renderer.screen_state.width = global.default_window_width;
     renderer.screen_state.height = global.default_window_height;
     renderer.screen_state.camera_x = 0;
@@ -149,10 +161,10 @@ pub fn main() !void {
                 handleWindowEvent(&event);
             },
             sdl.SDL_KEYDOWN => {
-                handleKeydownEvent(&event);
+                handleKeydownEvent(allocator, &event);
             },
             sdl.SDL_MOUSEBUTTONDOWN => {
-                try handleMouseDownEvent(&event);
+                try handleMouseDownEvent(allocator, &event);
             },
             sdl.SDL_MOUSEMOTION => {
                 if (event.motion.state & sdl.SDL_BUTTON_MMASK != 0) {

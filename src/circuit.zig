@@ -166,3 +166,106 @@ pub fn gridPositionFromMouse() GridPosition {
 
     return grid_pos;
 }
+
+// TODO: use u32 instead of usize for IDs?
+const NetList = struct {
+    allocator: std.mem.Allocator,
+    nodes: std.ArrayListUnmanaged(Node),
+
+    const Terminal = struct {
+        component_id: usize,
+        terminal_id: usize,
+    };
+
+    const Node = struct {
+        id: usize,
+        connected_terminals: std.ArrayListUnmanaged(Terminal),
+    };
+
+    fn deinit(self: *NetList) void {
+        for (self.nodes.items) |*node| {
+            node.connected_terminals.deinit(self.allocator);
+        }
+        self.nodes.deinit(self.allocator);
+        self.* = undefined;
+    }
+};
+
+const TerminalWithPos = struct {
+    term: NetList.Terminal,
+    pos: GridPosition,
+};
+
+fn buildNetList(allocator: std.mem.Allocator) !NetList {
+    const terminal_count_approx = components.items.len * 2;
+
+    var remaining_terminals = try std.ArrayListUnmanaged(TerminalWithPos).initCapacity(
+        allocator,
+        terminal_count_approx,
+    );
+    defer remaining_terminals.deinit(allocator);
+
+    // get all terminals
+    for (components.items, 0..) |comp, comp_id| {
+        // TODO: get terminal count for specific component
+        var buffer: [16]GridPosition = undefined;
+        const terminals = comp.terminals(buffer[0..]);
+        for (terminals, 0..) |pos, term_id| {
+            try remaining_terminals.append(allocator, TerminalWithPos{
+                .term = NetList.Terminal{
+                    .component_id = comp_id,
+                    .terminal_id = term_id,
+                },
+                .pos = pos,
+            });
+        }
+    }
+
+    var nodes = std.ArrayListUnmanaged(NetList.Node){};
+    errdefer nodes.deinit(allocator);
+
+    // find all direct connections
+    while (remaining_terminals.pop()) |selected_terminal| {
+        var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
+        try connected_terminals.append(allocator, selected_terminal.term);
+
+        while (getLastConnected(selected_terminal.pos, &remaining_terminals)) |other_term| {
+            try connected_terminals.append(allocator, other_term.term);
+        }
+        try nodes.append(allocator, NetList.Node{
+            .id = nodes.items.len,
+            .connected_terminals = connected_terminals,
+        });
+    }
+
+    return NetList{
+        .allocator = allocator,
+        .nodes = nodes,
+    };
+}
+
+fn getLastConnected(pos: GridPosition, terms: *std.ArrayListUnmanaged(TerminalWithPos)) ?TerminalWithPos {
+    for (0..terms.items.len) |i| {
+        if (pos.eql(terms.items[i].pos)) {
+            // swapRemove should be safe to use here
+            return terms.swapRemove(i);
+        }
+    }
+
+    return null;
+}
+
+pub fn analyse(allocator: std.mem.Allocator) void {
+    var netlist = buildNetList(allocator) catch {
+        std.log.err("Failed to build netlist", .{});
+        return;
+    };
+    defer netlist.deinit();
+
+    for (netlist.nodes.items) |node| {
+        std.log.debug("node #{}", .{node.id});
+        for (node.connected_terminals.items) |term| {
+            std.log.debug("     {s}.{}", .{ components.items[term.component_id].name, term.terminal_id });
+        }
+    }
+}

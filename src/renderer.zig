@@ -7,9 +7,12 @@ const sdl = global.sdl;
 
 const GridPosition = circuit.GridPosition;
 
+const white_color = sdl.SDL_Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
+
 pub var screen_state: ScreenState = .{};
 pub var window: *sdl.SDL_Window = undefined;
 pub var renderer: *sdl.SDL_Renderer = undefined;
+pub var font: *sdl.TTF_Font = undefined;
 
 const ScreenState = struct {
     camera_x: i32 = 0,
@@ -69,6 +72,26 @@ pub const WorldPosition = struct {
         };
     }
 };
+
+fn renderCenteredText(x: i32, y: i32, color: sdl.SDL_Color, text: [:0]const u8) void {
+    const surface = sdl.TTF_RenderUTF8_Blended(font, text.ptr, color);
+    const texture = sdl.SDL_CreateTextureFromSurface(renderer, surface);
+    defer sdl.SDL_FreeSurface(surface);
+    defer sdl.SDL_DestroyTexture(texture);
+
+    var width: i32 = undefined;
+    var height: i32 = undefined;
+    _ = sdl.SDL_QueryTexture(texture, 0, 0, @ptrCast(&width), @ptrCast(&height));
+
+    const rect = sdl.SDL_Rect{
+        .x = x - @divTrunc(width, 2),
+        .y = y - @divTrunc(height, 2),
+        .w = width,
+        .h = height,
+    };
+
+    _ = sdl.SDL_RenderCopy(renderer, texture, 0, &rect);
+}
 
 fn drawRect(rect: sdl.SDL_Rect) void {
     const transformed_rect = sdl.SDL_Rect{
@@ -250,7 +273,12 @@ pub fn renderGround(pos: GridPosition, rot: component.ComponentRotation, render_
     }
 }
 
-pub fn renderVoltageSource(pos: GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
+pub fn renderVoltageSource(
+    pos: GridPosition,
+    rot: component.ComponentRotation,
+    name: ?[:0]const u8,
+    render_type: ComponentRenderType,
+) void {
     const world_pos = WorldPosition.fromGridPosition(pos);
     const coords = ScreenPosition.fromWorldPosition(world_pos);
 
@@ -263,6 +291,12 @@ pub fn renderVoltageSource(pos: GridPosition, rot: component.ComponentRotation, 
     const negative_side_len = 32;
 
     _, const vs_color = renderColors(render_type);
+
+    var buff: [256]u8 = undefined;
+    const value = component.ComponentInnerType.voltage_source.formatValue(
+        1,
+        buff[0..],
+    ) catch unreachable;
 
     switch (rot) {
         .left, .right => {
@@ -302,6 +336,24 @@ pub fn renderVoltageSource(pos: GridPosition, rot: component.ComponentRotation, 
             setColor(vs_color);
             drawRect(rect1);
             drawRect(rect2);
+
+            if (name) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size / 2,
+                    coords.y + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
+
+            if (value) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size + global.grid_size / 2,
+                    coords.y + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
         },
         .top, .bottom => {
             renderTerminalWire(TerminalWire{
@@ -340,11 +392,33 @@ pub fn renderVoltageSource(pos: GridPosition, rot: component.ComponentRotation, 
             setColor(vs_color);
             drawRect(rect1);
             drawRect(rect2);
+            if (name) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size / 2,
+                    coords.y + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
+
+            if (value) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size / 2,
+                    coords.y + global.grid_size + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
         },
     }
 }
 
-pub fn renderResistor(pos: GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
+pub fn renderResistor(
+    pos: GridPosition,
+    rot: component.ComponentRotation,
+    name: ?[:0]const u8,
+    render_type: ComponentRenderType,
+) void {
     const wire_pixel_len = 16;
     const resistor_length = 2 * global.grid_size - 2 * wire_pixel_len;
     const resistor_width = 28;
@@ -353,6 +427,12 @@ pub fn renderResistor(pos: GridPosition, rot: component.ComponentRotation, rende
     const coords = ScreenPosition.fromWorldPosition(world_pos);
 
     _, const resistor_color = renderColors(render_type);
+
+    var buff: [256]u8 = undefined;
+    const value = component.ComponentInnerType.resistor.formatValue(
+        1,
+        buff[0..],
+    ) catch unreachable;
 
     switch (rot) {
         .left, .right => {
@@ -379,6 +459,23 @@ pub fn renderResistor(pos: GridPosition, rot: component.ComponentRotation, rende
 
             setColor(resistor_color);
             drawRect(rect);
+            if (name) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size / 2,
+                    coords.y + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
+
+            if (value) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size + global.grid_size / 2,
+                    coords.y + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
         },
         .bottom, .top => {
             renderTerminalWire(TerminalWire{
@@ -404,6 +501,23 @@ pub fn renderResistor(pos: GridPosition, rot: component.ComponentRotation, rende
 
             setColor(resistor_color);
             drawRect(rect);
+            if (name) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size / 2,
+                    coords.y + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
+
+            if (value) |str| {
+                renderCenteredText(
+                    coords.x + global.grid_size / 2,
+                    coords.y + global.grid_size + global.grid_size / 2,
+                    white_color,
+                    str,
+                );
+            }
         },
     }
 }
@@ -515,9 +629,19 @@ pub fn render() void {
 
     if (circuit.placement_mode == .component) {
         const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
-        const can_place = circuit.canPlaceComponent(circuit.held_component, grid_pos, circuit.held_component_rotation);
+        const can_place = circuit.canPlaceComponent(
+            circuit.held_component,
+            grid_pos,
+            circuit.held_component_rotation,
+        );
         const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-        component.renderComponent(circuit.held_component, grid_pos, circuit.held_component_rotation, render_type);
+        component.renderComponent(
+            circuit.held_component,
+            grid_pos,
+            circuit.held_component_rotation,
+            null,
+            render_type,
+        );
     } else if (circuit.placement_mode == .wire) {
         if (circuit.held_wire_p1) |p1| {
             const p2 = circuit.gridPositionFromMouse();
@@ -539,6 +663,13 @@ pub fn render() void {
             renderWire(wire, render_type);
         }
     }
+
+    renderCenteredText(50, 50, sdl.SDL_Color{
+        .r = 255,
+        .g = 255,
+        .b = 255,
+        .a = 255,
+    }, "hello world");
 
     _ = sdl.SDL_RenderPresent(renderer);
 }

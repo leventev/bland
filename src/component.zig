@@ -36,6 +36,69 @@ pub const ComponentInnerType = enum {
         }
     }
 
+    pub fn getNewComponentName(self: ComponentInnerType, allocator: std.mem.Allocator) ![:0]const u8 {
+        switch (self) {
+            .resistor => {
+                const str = try std.fmt.allocPrintZ(allocator, "R{}", .{resistor_counter});
+                resistor_counter += 1;
+                return str;
+            },
+            .voltage_source => {
+                const str = try std.fmt.allocPrintZ(allocator, "V{}", .{voltage_source_counter});
+                voltage_source_counter += 1;
+                return str;
+            },
+            .ground => {
+                const str = try std.fmt.allocPrintZ(allocator, "G{}", .{ground_counter});
+                ground_counter += 1;
+                return str;
+            },
+        }
+    }
+
+    // TODO: value
+    pub fn formatValue(self: ComponentInnerType, value: u32, buf: []u8) !?[:0]const u8 {
+        // https://juliamono.netlify.app/glyphs/
+        const big_omega = '\u{03A9}';
+        switch (self) {
+            .resistor => {
+                return try std.fmt.bufPrintZ(buf, "{}{u}", .{ value, big_omega });
+            },
+            .voltage_source => {
+                return try std.fmt.bufPrintZ(buf, "{}V", .{value});
+            },
+            .ground => {
+                return null;
+            },
+        }
+    }
+
+    pub fn getTerminals(self: ComponentInnerType, pos: GridPosition, rotation: ComponentRotation, terminals: []GridPosition) []GridPosition {
+        switch (self) {
+            .ground => {
+                std.debug.assert(terminals.len >= 1);
+                terminals[0] = GridPosition{
+                    .x = pos.x,
+                    .y = pos.y,
+                };
+                return terminals[0..1];
+            },
+            .resistor, .voltage_source => {
+                std.debug.assert(terminals.len >= 3);
+                terminals[0] = GridPosition{ .x = pos.x, .y = pos.y };
+                switch (rotation) {
+                    .left, .right => {
+                        terminals[1] = GridPosition{ .x = pos.x + 2, .y = pos.y };
+                    },
+                    .top, .bottom => {
+                        terminals[1] = GridPosition{ .x = pos.x, .y = pos.y + 2 };
+                    },
+                }
+                return terminals[0..2];
+            },
+        }
+    }
+
     pub fn getOccupiedGridPoints(self: ComponentInnerType, pos: GridPosition, rotation: ComponentRotation, occupied: []OccupiedGridPoint) []OccupiedGridPoint {
         switch (self) {
             .ground => {
@@ -113,10 +176,16 @@ pub const ComponentInnerType = enum {
     }
 };
 
-pub fn renderComponent(comp: ComponentInnerType, pos: GridPosition, rot: ComponentRotation, render_type: renderer.ComponentRenderType) void {
+pub fn renderComponent(
+    comp: ComponentInnerType,
+    pos: GridPosition,
+    rot: ComponentRotation,
+    name: ?[:0]const u8,
+    render_type: renderer.ComponentRenderType,
+) void {
     switch (comp) {
-        .resistor => renderer.renderResistor(pos, rot, render_type),
-        .voltage_source => renderer.renderVoltageSource(pos, rot, render_type),
+        .resistor => renderer.renderResistor(pos, rot, name, render_type),
+        .voltage_source => renderer.renderVoltageSource(pos, rot, name, render_type),
         .ground => renderer.renderGround(pos, rot, render_type),
     }
 }
@@ -148,13 +217,27 @@ pub const ComponentRotation = enum {
     top,
 };
 
+pub var resistor_counter: usize = 1;
+pub var voltage_source_counter: usize = 1;
+pub var ground_counter: usize = 1;
+
 pub const Component = struct {
     pos: GridPosition,
     rotation: ComponentRotation,
     inner: ComponentInner,
+    // null terminated strings so they are easier to pass to SDL
+    name: [:0]const u8,
+
+    pub fn terminals(self: Component, buffer: []GridPosition) []GridPosition {
+        return @as(ComponentInnerType, self.inner).getTerminals(
+            self.pos,
+            self.rotation,
+            buffer[0..],
+        );
+    }
 
     pub fn render(self: Component) void {
-        renderComponent(self.inner, self.pos, self.rotation, .normal);
+        renderComponent(self.inner, self.pos, self.rotation, self.name, .normal);
     }
 
     pub fn intersects(self: Component, positions: []OccupiedGridPoint) bool {
