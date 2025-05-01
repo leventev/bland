@@ -107,13 +107,8 @@ fn drawRect(rect: sdl.SDL_Rect) void {
     );
 }
 
-fn setColor(color: u32) void {
-    const r: u8 = @intCast(color >> 24);
-    const g: u8 = @intCast((color >> 16) & 0xFF);
-    const b: u8 = @intCast((color >> 8) & 0xFF);
-    const a: u8 = @intCast(color & 0xFF);
-
-    _ = sdl.SDL_SetRenderDrawColor(renderer, r, g, b, a);
+fn setColor(color: sdl.SDL_Color) void {
+    _ = sdl.SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
 }
 
 fn drawLine(x1: i32, y1: i32, x2: i32, y2: i32) void {
@@ -134,12 +129,21 @@ pub const ComponentRenderType = enum {
     unable_to_place,
 };
 
-fn renderColors(render_type: ComponentRenderType) struct { u32, u32 } {
+fn colorFromHex(color: u32) sdl.SDL_Color {
+    return sdl.SDL_Color{
+        .r = @intCast(color >> 24),
+        .g = @intCast((color >> 16) & 0xFF),
+        .b = @intCast((color >> 8) & 0xFF),
+        .a = @intCast(color & 0xFF),
+    };
+}
+
+fn renderColors(render_type: ComponentRenderType) struct { sdl.SDL_Color, sdl.SDL_Color } {
     // first is the wire color, second is the component color
     switch (render_type) {
-        .normal => return .{ 0x32f032ff, 0xb428e6ff },
-        .holding => return .{ 0x999999ff, 0x999999ff },
-        .unable_to_place => return .{ 0xbb4040ff, 0xbb4040ff },
+        .normal => return .{ colorFromHex(0x32f032ff), colorFromHex(0xb428e6ff) },
+        .holding => return .{ colorFromHex(0x999999ff), colorFromHex(0x999999ff) },
+        .unable_to_place => return .{ colorFromHex(0xbb4040ff), colorFromHex(0xbb4040ff) },
     }
 }
 
@@ -294,7 +298,7 @@ pub fn renderVoltageSource(
 
     var buff: [256]u8 = undefined;
     const value = component.ComponentInnerType.voltage_source.formatValue(
-        1,
+        230,
         buff[0..],
     ) catch unreachable;
 
@@ -340,7 +344,7 @@ pub fn renderVoltageSource(
             if (name) |str| {
                 renderCenteredText(
                     coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size / 2,
+                    coords.y - global.grid_size / 4,
                     white_color,
                     str,
                 );
@@ -349,11 +353,15 @@ pub fn renderVoltageSource(
             if (value) |str| {
                 renderCenteredText(
                     coords.x + global.grid_size + global.grid_size / 2,
-                    coords.y + global.grid_size / 2,
+                    coords.y - global.grid_size / 4,
                     white_color,
                     str,
                 );
             }
+
+            const sign: i32 = if (rot == .right) -1 else 1;
+            renderCenteredText(coords.x + global.grid_size + sign * 20, coords.y + global.grid_size / 4, vs_color, "+");
+            renderCenteredText(coords.x + global.grid_size - sign * 20, coords.y + global.grid_size / 4, vs_color, "-");
         },
         .top, .bottom => {
             renderTerminalWire(TerminalWire{
@@ -395,7 +403,7 @@ pub fn renderVoltageSource(
             if (name) |str| {
                 renderCenteredText(
                     coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size / 2,
+                    coords.y + global.grid_size - (global.font_size + 2),
                     white_color,
                     str,
                 );
@@ -404,11 +412,15 @@ pub fn renderVoltageSource(
             if (value) |str| {
                 renderCenteredText(
                     coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size + global.grid_size / 2,
+                    coords.y + global.grid_size + (global.font_size + 2),
                     white_color,
                     str,
                 );
             }
+
+            const sign: i32 = if (rot == .bottom) -1 else 1;
+            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size + sign * 20, vs_color, "+");
+            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size - sign * 20, vs_color, "-");
         },
     }
 }
@@ -430,7 +442,7 @@ pub fn renderResistor(
 
     var buff: [256]u8 = undefined;
     const value = component.ComponentInnerType.resistor.formatValue(
-        1,
+        123,
         buff[0..],
     ) catch unreachable;
 
@@ -461,8 +473,8 @@ pub fn renderResistor(
             drawRect(rect);
             if (name) |str| {
                 renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size / 2,
+                    coords.x + global.grid_size,
+                    coords.y - (resistor_width / 2 + global.font_size / 2 + 2),
                     white_color,
                     str,
                 );
@@ -470,8 +482,8 @@ pub fn renderResistor(
 
             if (value) |str| {
                 renderCenteredText(
-                    coords.x + global.grid_size + global.grid_size / 2,
-                    coords.y + global.grid_size / 2,
+                    coords.x + global.grid_size,
+                    coords.y + resistor_width / 2 + global.font_size / 2 + 2,
                     white_color,
                     str,
                 );
@@ -504,7 +516,7 @@ pub fn renderResistor(
             if (name) |str| {
                 renderCenteredText(
                     coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size / 2,
+                    coords.y + global.grid_size - (global.font_size / 2 + 8),
                     white_color,
                     str,
                 );
@@ -513,7 +525,7 @@ pub fn renderResistor(
             if (value) |str| {
                 renderCenteredText(
                     coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size + global.grid_size / 2,
+                    coords.y + global.grid_size + (global.font_size / 2 + 8),
                     white_color,
                     str,
                 );

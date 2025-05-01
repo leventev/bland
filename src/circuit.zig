@@ -50,6 +50,48 @@ pub const Wire = struct {
             },
         }
     }
+
+    const WireIterator = struct {
+        wire: Wire,
+        idx: u32,
+
+        pub fn next(self: *WireIterator) ?GridPosition {
+            if (self.idx > @abs(self.wire.length)) return null;
+            const sign: i32 = if (self.wire.length > 0) 1 else -1;
+            const increment: i32 = @as(i32, @intCast(self.idx)) * sign;
+            self.idx += 1;
+            switch (self.wire.direction) {
+                .horizontal => return GridPosition{
+                    .x = self.wire.pos.x + increment,
+                    .y = self.wire.pos.y,
+                },
+                .vertical => return GridPosition{
+                    .x = self.wire.pos.x,
+                    .y = self.wire.pos.y + increment,
+                },
+            }
+        }
+    };
+
+    pub fn iterator(self: Wire) WireIterator {
+        return WireIterator{
+            .wire = self,
+            .idx = 0,
+        };
+    }
+
+    pub fn intersectsWire(self: Wire, other: Wire) bool {
+        // TODO: optimize
+        var it1 = self.iterator();
+        while (it1.next()) |pos1| {
+            var it2 = other.iterator();
+            while (it2.next()) |pos2| {
+                if (pos1.eql(pos2)) return true;
+            }
+        }
+
+        return false;
+    }
 };
 
 pub var placement_mode: PlacementMode = .none;
@@ -224,6 +266,8 @@ fn buildNetList(allocator: std.mem.Allocator) !NetList {
     var nodes = std.ArrayListUnmanaged(NetList.Node){};
     errdefer nodes.deinit(allocator);
 
+    try traverseWiresForNodes(allocator, &remaining_terminals, &nodes);
+
     // find all direct connections
     while (remaining_terminals.pop()) |selected_terminal| {
         var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
@@ -242,6 +286,140 @@ fn buildNetList(allocator: std.mem.Allocator) !NetList {
         .allocator = allocator,
         .nodes = nodes,
     };
+}
+
+fn getNextConnectedTerminalToWire(
+    wire: Wire,
+    remaining_terminals: *std.ArrayListUnmanaged(TerminalWithPos),
+) ?NetList.Terminal {
+    var i = remaining_terminals.items.len;
+    while (i > 0) {
+        i -= 1;
+        const term = remaining_terminals.items[i];
+
+        var it = wire.iterator();
+        var connected = false;
+        while (it.next()) |pos| {
+            if (term.pos.eql(pos)) {
+                connected = true;
+                break;
+            }
+        }
+
+        if (connected) {
+            return remaining_terminals.swapRemove(i).term;
+        }
+    }
+
+    return null;
+}
+
+// TODO: optimize this although i doubt this has a non negligible performance impact
+fn traverseWiresForNodes(
+    allocator: std.mem.Allocator,
+    remaining_terminals: *std.ArrayListUnmanaged(TerminalWithPos),
+    nodes: *std.ArrayListUnmanaged(NetList.Node),
+) !void {
+    var connected_wire_buffer = try allocator.alloc(usize, wires.items.len);
+    defer allocator.free(connected_wire_buffer);
+
+    var remaining_wires = try allocator.dupe(Wire, wires.items);
+    var rem: usize = remaining_wires.len;
+
+    while (rem > 0) {
+        var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
+        const connected_wires = getConnectedWires(
+            remaining_wires,
+            remaining_wires.len - 1,
+            connected_wire_buffer[0..],
+        );
+
+        for (connected_wires) |wire_idx| {
+            const wire = remaining_wires[wire_idx];
+            while (getNextConnectedTerminalToWire(wire, remaining_terminals)) |term| {
+                try connected_terminals.append(allocator, term);
+            }
+        }
+
+        rem = remaining_wires.len - connected_wires.len;
+        if (rem == 0) {
+            allocator.free(remaining_wires);
+        } else {
+            var new_remaining_wires = try allocator.alloc(Wire, rem);
+            var idx: usize = 0;
+            for (0..remaining_wires.len) |i| {
+                var should_remove = false;
+                for (connected_wires) |j| {
+                    if (i == j) {
+                        should_remove = true;
+                        break;
+                    }
+                }
+                if (should_remove) continue;
+                new_remaining_wires[idx] = remaining_wires[i];
+                idx += 1;
+            }
+            allocator.free(remaining_wires);
+            remaining_wires = new_remaining_wires;
+        }
+
+        try nodes.append(allocator, NetList.Node{
+            .id = nodes.items.len,
+            .connected_terminals = connected_terminals,
+        });
+    }
+}
+
+fn getConnectedWires(ws: []const Wire, wire_id: usize, connected_wires: []usize) []usize {
+    std.debug.assert(connected_wires.len > 0);
+    connected_wires[0] = wire_id;
+    var i: usize = 0;
+    var wire_count: usize = 1;
+    while (i < wire_count) : (i += 1) {
+        const directly_connected = getDirectlyConnectedWires(
+            ws,
+            connected_wires[i],
+            connected_wires[0..wire_count],
+            connected_wires[wire_count..],
+        );
+        wire_count += directly_connected.len;
+    }
+
+    return connected_wires[0..wire_count];
+}
+
+fn getDirectlyConnectedWires(ws: []const Wire, wire_id: usize, already_found_wires: []usize, connected_wires: []usize) []usize {
+    var count: usize = 0;
+    for (0..ws.len) |i| {
+        if (wire_id == i) continue;
+
+        var already_found = false;
+        for (already_found_wires) |j| {
+            if (i == j) {
+                already_found = true;
+                break;
+            }
+        }
+        if (already_found) continue;
+
+        if (ws[wire_id].intersectsWire(ws[i])) {
+            std.debug.assert(connected_wires.len > count);
+            connected_wires[count] = i;
+            count += 1;
+        }
+    }
+    return connected_wires[0..count];
+}
+
+fn getNextConnectedWire(wire: Wire, ws: *std.ArrayList(Wire)) ?Wire {
+    for (0..ws.items.len) |i| {
+        const w = ws.items[i];
+        if (wire.intersectsWire(w)) {
+            return ws.swapRemove(i);
+        }
+    }
+
+    return null;
 }
 
 fn getLastConnected(pos: GridPosition, terms: *std.ArrayListUnmanaged(TerminalWithPos)) ?TerminalWithPos {

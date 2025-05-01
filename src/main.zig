@@ -126,7 +126,7 @@ pub fn main() !void {
     _ = sdl.TTF_Init();
 
     // TODO: better font handling
-    renderer.font = sdl.TTF_OpenFont("ttf/JuliaMono-Regular.ttf", 16) orelse {
+    renderer.font = sdl.TTF_OpenFont(global.font_path, global.font_size) orelse {
         std.log.err("failed to open font", .{});
         return error.FailedToTopenFont;
     };

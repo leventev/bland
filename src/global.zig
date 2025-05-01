@@ -9,3 +9,6 @@ pub const default_window_width = 1024;
 pub const default_window_height = 768;
 
 pub const grid_size = 64;
+
+pub const font_path = "ttf/JuliaMono-Regular.ttf";
+pub const font_size = 15;
