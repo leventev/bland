@@ -1,0 +1,14 @@
+[X] matrix struct
+[X] input the nodal equations into a matrix
+[X] implement gauss-jordan elimination for matrices
+[ ] support voltage sources between 2 unknown voltage nodes(supernodes)
+[ ] add current sources
+[ ] while hovering over a wire highlight all other wires connected to it
+[ ] be able to change the resistance of a resistor
+[ ] add capacitors
+[ ] add inductors
+[ ] be able to solve DAEs
+[ ] display voltage/current-time graphs
+[ ] be able to save and load circuits
+[ ] more complex analysis methods
+[ ] be able to delete, move, copy, paste elements of the circuit

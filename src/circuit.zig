@@ -3,6 +3,7 @@ const std = @import("std");
 const component = @import("component.zig");
 const renderer = @import("renderer.zig");
 const global = @import("global.zig");
+const matrix = @import("matrix.zig");
 const sdl = global.sdl;
 
 pub const PlacementMode = enum {
@@ -222,6 +223,7 @@ const NetList = struct {
     const Node = struct {
         id: usize,
         connected_terminals: std.ArrayListUnmanaged(Terminal),
+        voltage: ?f32,
     };
 
     fn deinit(self: *NetList) void {
@@ -239,15 +241,114 @@ const TerminalWithPos = struct {
 };
 
 fn buildNetList(allocator: std.mem.Allocator) !NetList {
-    const terminal_count_approx = components.items.len * 2;
+    var node_terminals = std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)){};
+    defer node_terminals.deinit(allocator);
 
+    var remaining_terminals = try getRemainingTerminals(allocator);
+    defer remaining_terminals.deinit(allocator);
+
+    try traverseWiresForNodes(allocator, &remaining_terminals, &node_terminals);
+    try findAllDirectConnections(allocator, &remaining_terminals, &node_terminals);
+
+    var nodes = try mergeGroundNodes(allocator, node_terminals.items);
+
+    setKnownVoltages(&nodes);
+
+    return NetList{
+        .allocator = allocator,
+        .nodes = nodes,
+    };
+}
+
+fn checkForKnownVoltage(nodes: *std.ArrayListUnmanaged(NetList.Node)) bool {
+    for (nodes.items) |*node| {
+        if (node.voltage != null) continue;
+
+        for (node.connected_terminals.items) |term| {
+            const comp = components.items[term.component_id];
+            if (@as(component.ComponentInnerType, comp.inner) != component.ComponentInnerType.voltage_source)
+                continue;
+
+            const pos_node_id = comp.terminal_node_ids[0];
+            const neg_node_id = comp.terminal_node_ids[1];
+            const add = pos_node_id == node.id;
+            const other_node_id = if (add) neg_node_id else pos_node_id;
+
+            const other_node = nodes.items[other_node_id];
+            if (other_node.voltage) |other_voltage| {
+                // TODO: polarity
+                const voltage = comp.inner.voltage_source;
+                node.voltage = other_voltage + if (add) voltage else -voltage;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+fn setKnownVoltages(nodes: *std.ArrayListUnmanaged(NetList.Node)) void {
+    nodes.items[0].voltage = 0;
+    while (checkForKnownVoltage(nodes)) {}
+}
+
+fn mergeGroundNodes(
+    allocator: std.mem.Allocator,
+    node_terminals: []std.ArrayListUnmanaged(NetList.Terminal),
+) !std.ArrayListUnmanaged(NetList.Node) {
+    var nodes = std.ArrayListUnmanaged(NetList.Node){};
+
+    // add ground node
+    try nodes.append(allocator, NetList.Node{
+        .id = 0,
+        .connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){},
+        .voltage = null,
+    });
+
+    for (node_terminals) |*terminals| {
+        if (nodeHasGround(terminals.items)) {
+            // the terminals are added to the ground node's list of terminals
+            // so we can deinit the list containing them
+            for (terminals.items) |term| {
+                components.items[term.component_id].terminal_node_ids[term.terminal_id] = 0;
+                try nodes.items[0].connected_terminals.append(allocator, term);
+            }
+            terminals.deinit(allocator);
+        } else {
+            const node_id = nodes.items.len;
+            // if the node doesnt have a GND component connected to it
+            // then create its own node
+            try nodes.append(allocator, NetList.Node{
+                .id = node_id,
+                .connected_terminals = terminals.*,
+                .voltage = null,
+            });
+            for (terminals.items) |term| {
+                components.items[term.component_id].terminal_node_ids[term.terminal_id] = node_id;
+            }
+        }
+    }
+
+    return nodes;
+}
+
+fn nodeHasGround(terminals: []const NetList.Terminal) bool {
+    for (terminals) |term| {
+        const comp = components.items[term.component_id];
+        if (@as(component.ComponentInnerType, comp.inner) == component.ComponentInnerType.ground) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+fn getRemainingTerminals(allocator: std.mem.Allocator) !std.ArrayListUnmanaged(TerminalWithPos) {
+    const terminal_count_approx = components.items.len * 2;
     var remaining_terminals = try std.ArrayListUnmanaged(TerminalWithPos).initCapacity(
         allocator,
         terminal_count_approx,
     );
-    defer remaining_terminals.deinit(allocator);
 
-    // get all terminals
     for (components.items, 0..) |comp, comp_id| {
         // TODO: get terminal count for specific component
         var buffer: [16]GridPosition = undefined;
@@ -263,29 +364,23 @@ fn buildNetList(allocator: std.mem.Allocator) !NetList {
         }
     }
 
-    var nodes = std.ArrayListUnmanaged(NetList.Node){};
-    errdefer nodes.deinit(allocator);
+    return remaining_terminals;
+}
 
-    try traverseWiresForNodes(allocator, &remaining_terminals, &nodes);
-
-    // find all direct connections
+fn findAllDirectConnections(
+    allocator: std.mem.Allocator,
+    remaining_terminals: *std.ArrayListUnmanaged(TerminalWithPos),
+    nodes: *std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)),
+) !void {
     while (remaining_terminals.pop()) |selected_terminal| {
         var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
         try connected_terminals.append(allocator, selected_terminal.term);
 
-        while (getLastConnected(selected_terminal.pos, &remaining_terminals)) |other_term| {
+        while (getLastConnected(selected_terminal.pos, remaining_terminals)) |other_term| {
             try connected_terminals.append(allocator, other_term.term);
         }
-        try nodes.append(allocator, NetList.Node{
-            .id = nodes.items.len,
-            .connected_terminals = connected_terminals,
-        });
+        try nodes.append(allocator, connected_terminals);
     }
-
-    return NetList{
-        .allocator = allocator,
-        .nodes = nodes,
-    };
 }
 
 fn getNextConnectedTerminalToWire(
@@ -318,7 +413,7 @@ fn getNextConnectedTerminalToWire(
 fn traverseWiresForNodes(
     allocator: std.mem.Allocator,
     remaining_terminals: *std.ArrayListUnmanaged(TerminalWithPos),
-    nodes: *std.ArrayListUnmanaged(NetList.Node),
+    nodes: *std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)),
 ) !void {
     var connected_wire_buffer = try allocator.alloc(usize, wires.items.len);
     defer allocator.free(connected_wire_buffer);
@@ -363,10 +458,7 @@ fn traverseWiresForNodes(
             remaining_wires = new_remaining_wires;
         }
 
-        try nodes.append(allocator, NetList.Node{
-            .id = nodes.items.len,
-            .connected_terminals = connected_terminals,
-        });
+        try nodes.append(allocator, connected_terminals);
     }
 }
 
@@ -422,7 +514,10 @@ fn getNextConnectedWire(wire: Wire, ws: *std.ArrayList(Wire)) ?Wire {
     return null;
 }
 
-fn getLastConnected(pos: GridPosition, terms: *std.ArrayListUnmanaged(TerminalWithPos)) ?TerminalWithPos {
+fn getLastConnected(
+    pos: GridPosition,
+    terms: *std.ArrayListUnmanaged(TerminalWithPos),
+) ?TerminalWithPos {
     for (0..terms.items.len) |i| {
         if (pos.eql(terms.items[i].pos)) {
             // swapRemove should be safe to use here
@@ -433,6 +528,62 @@ fn getLastConnected(pos: GridPosition, terms: *std.ArrayListUnmanaged(TerminalWi
     return null;
 }
 
+fn constructAugmentedMatrix(
+    allocator: std.mem.Allocator,
+    nodes: std.ArrayListUnmanaged(NetList.Node),
+) !matrix.Matrix(f32) {
+    var mat = try matrix.Matrix(f32).init(
+        allocator,
+        nodes.items.len,
+        nodes.items.len + 1,
+    );
+
+    for (0.., nodes.items) |row, node| {
+        if (node.voltage) |voltage| {
+            // set the coefficient associated with the node to 1
+            // and the rightmost column to the known voltage
+            // all other columns are 0
+            for (0..nodes.items.len) |col| {
+                mat.data[row][col] = 0;
+            }
+            mat.data[row][row] = 1;
+            mat.data[row][nodes.items.len] = voltage;
+        } else {
+            for (0..nodes.items.len + 1) |col| {
+                mat.data[row][col] = 0;
+            }
+
+            var total_conductance: f32 = 0;
+
+            for (node.connected_terminals.items) |terminal| {
+                const comp = components.items[terminal.component_id];
+                switch (comp.inner) {
+                    .resistor => |resistance| {
+                        const conductance = 1 / resistance;
+                        total_conductance += conductance;
+
+                        const other_node_id = if (comp.terminal_node_ids[0] == node.id)
+                            comp.terminal_node_ids[1]
+                        else
+                            comp.terminal_node_ids[0];
+
+                        // set the coefficient for the other node
+                        // we add the conductance instead of just setting it
+                        // because of parallel resistances
+                        mat.data[row][other_node_id] += -conductance;
+                    },
+                    else => @panic("TODO"),
+                }
+            }
+
+            // set the coefficient for the current node
+            mat.data[row][node.id] = total_conductance;
+        }
+    }
+
+    return mat;
+}
+
 pub fn analyse(allocator: std.mem.Allocator) void {
     var netlist = buildNetList(allocator) catch {
         std.log.err("Failed to build netlist", .{});
@@ -440,10 +591,42 @@ pub fn analyse(allocator: std.mem.Allocator) void {
     };
     defer netlist.deinit();
 
+    var unknown_count: usize = 0;
     for (netlist.nodes.items) |node| {
-        std.log.debug("node #{}", .{node.id});
+        if (node.voltage) |voltage| {
+            std.log.debug("node #{} {}V", .{ node.id, voltage });
+        } else {
+            unknown_count += 1;
+            std.log.debug("node #{}", .{node.id});
+        }
         for (node.connected_terminals.items) |term| {
             std.log.debug("     {s}.{}", .{ components.items[term.component_id].name, term.terminal_id });
+        }
+    }
+
+    var augmented_matrix = constructAugmentedMatrix(allocator, netlist.nodes) catch {
+        std.log.err("Failed to construct augmented matrix", .{});
+        return;
+    };
+    defer augmented_matrix.deinit(allocator);
+    augmented_matrix.gaussJordanElimination();
+
+    for (0..netlist.nodes.items.len) |i| {
+        const voltage = augmented_matrix.data[i][netlist.nodes.items.len];
+        netlist.nodes.items[i].voltage = voltage;
+        std.log.debug("node #{} voltage: {}V", .{ i, voltage });
+    }
+
+    for (components.items) |comp| {
+        switch (comp.inner) {
+            .resistor => |resistance| {
+                const node1 = netlist.nodes.items[comp.terminal_node_ids[0]];
+                const node2 = netlist.nodes.items[comp.terminal_node_ids[1]];
+                const voltage = node2.voltage.? - node1.voltage.?;
+                const current = @abs(voltage / resistance);
+                std.log.debug("{s} current: {}A", .{ comp.name, current });
+            },
+            else => {},
         }
     }
 }

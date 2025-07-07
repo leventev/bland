@@ -298,7 +298,7 @@ pub fn renderVoltageSource(
 
     var buff: [256]u8 = undefined;
     const value = component.ComponentInnerType.voltage_source.formatValue(
-        230,
+        5,
         buff[0..],
     ) catch unreachable;
 
@@ -431,7 +431,7 @@ pub fn renderResistor(
     name: ?[:0]const u8,
     render_type: ComponentRenderType,
 ) void {
-    const wire_pixel_len = 16;
+    const wire_pixel_len = 25;
     const resistor_length = 2 * global.grid_size - 2 * wire_pixel_len;
     const resistor_width = 28;
 
@@ -442,7 +442,7 @@ pub fn renderResistor(
 
     var buff: [256]u8 = undefined;
     const value = component.ComponentInnerType.resistor.formatValue(
-        123,
+        4,
         buff[0..],
     ) catch unreachable;
 

@@ -30,8 +30,8 @@ pub const ComponentInnerType = enum {
 
     pub fn defaultValue(self: ComponentInnerType) ComponentInner {
         switch (self) {
-            .resistor => return ComponentInner{ .resistor = 1 },
-            .voltage_source => return ComponentInner{ .voltage_source = 1 },
+            .resistor => return ComponentInner{ .resistor = 4 },
+            .voltage_source => return ComponentInner{ .voltage_source = 5 },
             .ground => return ComponentInner{ .ground = {} },
         }
     }
@@ -225,6 +225,8 @@ pub const Component = struct {
     pos: GridPosition,
     rotation: ComponentRotation,
     inner: ComponentInner,
+    // TODO: temporary
+    terminal_node_ids: [2]usize,
     // null terminated strings so they are easier to pass to SDL
     name: [:0]const u8,
 

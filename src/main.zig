@@ -71,6 +71,7 @@ fn handleMouseDownEvent(allocator: std.mem.Allocator, event: *sdl.SDL_Event) !vo
                 .inner = circuit.held_component.defaultValue(),
                 .rotation = circuit.held_component_rotation,
                 .name = try circuit.held_component.getNewComponentName(allocator),
+                .terminal_node_ids = undefined,
             });
         }
     } else if (circuit.placement_mode == .wire) {
