@@ -36,26 +36,6 @@ pub const ComponentInnerType = enum {
         }
     }
 
-    pub fn getNewComponentName(self: ComponentInnerType, allocator: std.mem.Allocator) ![:0]const u8 {
-        switch (self) {
-            .resistor => {
-                const str = try std.fmt.allocPrintZ(allocator, "R{}", .{resistor_counter});
-                resistor_counter += 1;
-                return str;
-            },
-            .voltage_source => {
-                const str = try std.fmt.allocPrintZ(allocator, "V{}", .{voltage_source_counter});
-                voltage_source_counter += 1;
-                return str;
-            },
-            .ground => {
-                const str = try std.fmt.allocPrintZ(allocator, "G{}", .{ground_counter});
-                ground_counter += 1;
-                return str;
-            },
-        }
-    }
-
     // TODO: value
     pub fn formatValue(self: ComponentInnerType, value: u32, buf: []u8) !?[:0]const u8 {
         // https://juliamono.netlify.app/glyphs/
@@ -69,6 +49,26 @@ pub const ComponentInnerType = enum {
             },
             .ground => {
                 return null;
+            },
+        }
+    }
+
+    fn setNewComponentName(self: ComponentInnerType, buff: []u8) ![]u8 {
+        switch (self) {
+            .resistor => {
+                const str = try std.fmt.bufPrint(buff, "R{}", .{resistor_counter});
+                resistor_counter += 1;
+                return str;
+            },
+            .voltage_source => {
+                const str = try std.fmt.bufPrint(buff, "V{}", .{voltage_source_counter});
+                voltage_source_counter += 1;
+                return str;
+            },
+            .ground => {
+                const str = try std.fmt.bufPrint(buff, "G{}", .{ground_counter});
+                ground_counter += 1;
+                return str;
             },
         }
     }
@@ -180,7 +180,7 @@ pub fn renderComponent(
     comp: ComponentInnerType,
     pos: GridPosition,
     rot: ComponentRotation,
-    name: ?[:0]const u8,
+    name: ?[]const u8,
     render_type: renderer.ComponentRenderType,
 ) void {
     switch (comp) {
@@ -221,14 +221,24 @@ pub var resistor_counter: usize = 1;
 pub var voltage_source_counter: usize = 1;
 pub var ground_counter: usize = 1;
 
+pub const max_component_name_length = 20;
+
 pub const Component = struct {
     pos: GridPosition,
     rotation: ComponentRotation,
     inner: ComponentInner,
     // TODO: temporary
     terminal_node_ids: [2]usize,
-    // null terminated strings so they are easier to pass to SDL
-    name: [:0]const u8,
+    // name_buffer is max_component_name_length bytes long allocated
+    name_buffer: []u8,
+    // name is a window into name_buffer
+    name: []u8,
+
+    pub fn otherNode(self: Component, node_id: usize) usize {
+        if (self.terminal_node_ids[0] == node_id) return self.terminal_node_ids[1];
+        if (self.terminal_node_ids[1] == node_id) return self.terminal_node_ids[0];
+        @panic("invalid node id");
+    }
 
     pub fn terminals(self: Component, buffer: []GridPosition) []GridPosition {
         return @as(ComponentInnerType, self.inner).getTerminals(
@@ -238,8 +248,8 @@ pub const Component = struct {
         );
     }
 
-    pub fn render(self: Component) void {
-        renderComponent(self.inner, self.pos, self.rotation, self.name, .normal);
+    pub fn render(self: Component, render_type: renderer.ComponentRenderType) void {
+        renderComponent(self.inner, self.pos, self.rotation, self.name, render_type);
     }
 
     pub fn intersects(self: Component, positions: []OccupiedGridPoint) bool {
@@ -251,5 +261,9 @@ pub const Component = struct {
             buffer[0..],
         );
         return occupiedPointsIntersect(self_positons, positions);
+    }
+
+    pub fn setNewComponentName(self: *Component) !void {
+        self.name = try @as(ComponentInnerType, self.inner).setNewComponentName(self.name_buffer);
     }
 };

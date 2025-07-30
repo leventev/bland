@@ -5,6 +5,8 @@ const component = @import("component.zig");
 const circuit = @import("circuit.zig");
 const sdl = global.sdl;
 
+const sdl_ttf = global.sdl_ttf;
+
 const GridPosition = circuit.GridPosition;
 
 const white_color = sdl.SDL_Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
@@ -12,7 +14,17 @@ const white_color = sdl.SDL_Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
 pub var screen_state: ScreenState = .{};
 pub var window: *sdl.SDL_Window = undefined;
 pub var renderer: *sdl.SDL_Renderer = undefined;
-pub var font: *sdl.TTF_Font = undefined;
+pub var font: *sdl_ttf.TTF_Font = undefined;
+
+pub var hovered_component_id: ?usize = null;
+pub var selected_component_id: ?usize = null;
+pub var selected_component_changed: bool = false;
+
+const dvui = @import("dvui");
+const SDLBackend = dvui.backend;
+comptime {
+    std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
+}
 
 const ScreenState = struct {
     camera_x: i32 = 0,
@@ -73,38 +85,45 @@ pub const WorldPosition = struct {
     }
 };
 
-fn renderCenteredText(x: i32, y: i32, color: sdl.SDL_Color, text: [:0]const u8) void {
-    const surface = sdl.TTF_RenderUTF8_Blended(font, text.ptr, color);
-    const texture = sdl.SDL_CreateTextureFromSurface(renderer, surface);
-    defer sdl.SDL_FreeSurface(surface);
-    defer sdl.SDL_DestroyTexture(texture);
+fn renderCenteredText(x: i32, y: i32, color: sdl.SDL_Color, text: []const u8) void {
+    _ = color;
 
-    var width: i32 = undefined;
-    var height: i32 = undefined;
-    _ = sdl.SDL_QueryTexture(texture, 0, 0, @ptrCast(&width), @ptrCast(&height));
-
-    const rect = sdl.SDL_Rect{
-        .x = x - @divTrunc(width, 2),
-        .y = y - @divTrunc(height, 2),
-        .w = width,
-        .h = height,
+    const f = dvui.Font{
+        .name = global.font_name,
+        .size = global.font_size,
     };
 
-    _ = sdl.SDL_RenderCopy(renderer, texture, 0, &rect);
+    const s = dvui.Font.textSize(f, text);
+
+    const r = dvui.Rect.Physical{
+        .x = @as(f32, @floatFromInt(x)) - s.w / 2,
+        .y = @as(f32, @floatFromInt(y)) - s.h / 2,
+        .w = s.w,
+        .h = s.h,
+    };
+
+    dvui.renderText(.{
+        .color = dvui.Color.white,
+        .background_color = null,
+        .debug = false,
+        .font = f,
+        .rs = .{
+            .r = r,
+        },
+        .text = text,
+    }) catch @panic("aaa");
 }
 
+// TODO: abstract away SDL
 fn drawRect(rect: sdl.SDL_Rect) void {
-    const transformed_rect = sdl.SDL_Rect{
-        .x = @intFromFloat(@as(f32, @floatFromInt(rect.x)) * screen_state.xscale()),
-        .y = @intFromFloat(@as(f32, @floatFromInt(rect.y)) * screen_state.yscale()),
-        .w = @intFromFloat(@as(f32, @floatFromInt(rect.w)) * screen_state.xscale()),
-        .h = @intFromFloat(@as(f32, @floatFromInt(rect.h)) * screen_state.yscale()),
+    const transformed_rect = sdl.SDL_FRect{
+        .x = @as(f32, @floatFromInt(rect.x)) * screen_state.xscale(),
+        .y = @as(f32, @floatFromInt(rect.y)) * screen_state.yscale(),
+        .w = @as(f32, @floatFromInt(rect.w)) * screen_state.xscale(),
+        .h = @as(f32, @floatFromInt(rect.h)) * screen_state.yscale(),
     };
 
-    _ = sdl.SDL_RenderDrawRect(
-        renderer,
-        @ptrCast(&transformed_rect),
-    );
+    _ = sdl.SDL_RenderRect(renderer, &transformed_rect);
 }
 
 fn setColor(color: sdl.SDL_Color) void {
@@ -115,19 +134,13 @@ fn drawLine(x1: i32, y1: i32, x2: i32, y2: i32) void {
     const slope_x = x2 - x1;
     const slope_y = y2 - y1;
 
-    const scaled_x1: i32 = @intFromFloat(@as(f32, @floatFromInt(x1)) * screen_state.xscale());
-    const scaled_y1: i32 = @intFromFloat(@as(f32, @floatFromInt(y1)) * screen_state.yscale());
-    const scaled_x2: i32 = scaled_x1 + @as(i32, @intFromFloat(@as(f32, @floatFromInt(slope_x)) * screen_state.xscale()));
-    const scaled_y2: i32 = scaled_y1 + @as(i32, @intFromFloat(@as(f32, @floatFromInt(slope_y)) * screen_state.yscale()));
+    const scaled_x1: f32 = @as(f32, @floatFromInt(x1)) * screen_state.xscale();
+    const scaled_y1: f32 = @as(f32, @floatFromInt(y1)) * screen_state.yscale();
+    const scaled_x2: f32 = scaled_x1 + @as(f32, @floatFromInt(slope_x)) * screen_state.xscale();
+    const scaled_y2: f32 = scaled_y1 + @as(f32, @floatFromInt(slope_y)) * screen_state.yscale();
 
-    _ = sdl.SDL_RenderDrawLine(renderer, scaled_x1, scaled_y1, scaled_x2, scaled_y2);
+    _ = sdl.SDL_RenderLine(renderer, scaled_x1, scaled_y1, scaled_x2, scaled_y2);
 }
-
-pub const ComponentRenderType = enum {
-    normal,
-    holding,
-    unable_to_place,
-};
 
 fn colorFromHex(color: u32) sdl.SDL_Color {
     return sdl.SDL_Color{
@@ -138,12 +151,26 @@ fn colorFromHex(color: u32) sdl.SDL_Color {
     };
 }
 
-fn renderColors(render_type: ComponentRenderType) struct { sdl.SDL_Color, sdl.SDL_Color } {
-    // first is the wire color, second is the component color
+pub const ComponentRenderType = enum {
+    normal,
+    holding,
+    unable_to_place,
+    hovered,
+    selected,
+};
+
+const ComponentRenderColors = struct {
+    wire_color: sdl.SDL_Color,
+    component_color: sdl.SDL_Color,
+};
+
+fn renderColors(render_type: ComponentRenderType) ComponentRenderColors {
     switch (render_type) {
-        .normal => return .{ colorFromHex(0x32f032ff), colorFromHex(0xb428e6ff) },
-        .holding => return .{ colorFromHex(0x999999ff), colorFromHex(0x999999ff) },
-        .unable_to_place => return .{ colorFromHex(0xbb4040ff), colorFromHex(0xbb4040ff) },
+        .normal => return .{ .wire_color = colorFromHex(0x32f032ff), .component_color = colorFromHex(0xb428e6ff) },
+        .holding => return .{ .wire_color = colorFromHex(0x999999ff), .component_color = colorFromHex(0x999999ff) },
+        .unable_to_place => return .{ .wire_color = colorFromHex(0xbb4040ff), .component_color = colorFromHex(0xbb4040ff) },
+        .hovered => return .{ .wire_color = colorFromHex(0x32f032ff), .component_color = colorFromHex(0x44ffffff) },
+        .selected => return .{ .wire_color = colorFromHex(0x32f032ff), .component_color = colorFromHex(0xff4444ff) },
     }
 }
 
@@ -155,7 +182,7 @@ const TerminalWire = struct {
 
 fn renderTerminalWire(wire: TerminalWire, render_type: ComponentRenderType) void {
     const pos = wire.pos;
-    const wire_color, _ = renderColors(render_type);
+    const wire_color = renderColors(render_type).wire_color;
 
     setColor(wire_color);
     switch (wire.direction) {
@@ -204,7 +231,7 @@ pub fn renderGround(pos: GridPosition, rot: component.ComponentRotation, render_
     const world_pos = WorldPosition.fromGridPosition(pos);
     const coords = ScreenPosition.fromWorldPosition(world_pos);
 
-    _, const gnd_color = renderColors(render_type);
+    const render_colors = renderColors(render_type);
 
     const triangle_side = 45;
     const triangle_height = 39;
@@ -220,7 +247,7 @@ pub fn renderGround(pos: GridPosition, rot: component.ComponentRotation, render_
 
             const x_off: i32 = if (rot == .right) triangle_height else -triangle_height;
 
-            setColor(gnd_color);
+            setColor(render_colors.component_color);
             drawLine(
                 coords.x + wire_off,
                 coords.y - triangle_side / 2,
@@ -252,7 +279,7 @@ pub fn renderGround(pos: GridPosition, rot: component.ComponentRotation, render_
 
             const y_off: i32 = if (rot == .bottom) triangle_height else -triangle_height;
 
-            setColor(gnd_color);
+            setColor(render_colors.component_color);
             drawLine(
                 coords.x - triangle_side / 2,
                 coords.y + wire_off,
@@ -280,7 +307,7 @@ pub fn renderGround(pos: GridPosition, rot: component.ComponentRotation, render_
 pub fn renderVoltageSource(
     pos: GridPosition,
     rot: component.ComponentRotation,
-    name: ?[:0]const u8,
+    name: ?[]const u8,
     render_type: ComponentRenderType,
 ) void {
     const world_pos = WorldPosition.fromGridPosition(pos);
@@ -294,7 +321,7 @@ pub fn renderVoltageSource(
     const positive_side_len = 48;
     const negative_side_len = 32;
 
-    _, const vs_color = renderColors(render_type);
+    const render_colors = renderColors(render_type);
 
     var buff: [256]u8 = undefined;
     const value = component.ComponentInnerType.voltage_source.formatValue(
@@ -337,7 +364,7 @@ pub fn renderVoltageSource(
                 rect2.x = tmp;
             }
 
-            setColor(vs_color);
+            setColor(render_colors.component_color);
             drawRect(rect1);
             drawRect(rect2);
 
@@ -360,8 +387,8 @@ pub fn renderVoltageSource(
             }
 
             const sign: i32 = if (rot == .right) -1 else 1;
-            renderCenteredText(coords.x + global.grid_size + sign * 20, coords.y + global.grid_size / 4, vs_color, "+");
-            renderCenteredText(coords.x + global.grid_size - sign * 20, coords.y + global.grid_size / 4, vs_color, "-");
+            renderCenteredText(coords.x + global.grid_size + sign * 20, coords.y + global.grid_size / 4, render_colors.component_color, "+");
+            renderCenteredText(coords.x + global.grid_size - sign * 20, coords.y + global.grid_size / 4, render_colors.component_color, "-");
         },
         .top, .bottom => {
             renderTerminalWire(TerminalWire{
@@ -397,7 +424,7 @@ pub fn renderVoltageSource(
                 rect2.y = tmp;
             }
 
-            setColor(vs_color);
+            setColor(render_colors.component_color);
             drawRect(rect1);
             drawRect(rect2);
             if (name) |str| {
@@ -419,8 +446,8 @@ pub fn renderVoltageSource(
             }
 
             const sign: i32 = if (rot == .bottom) -1 else 1;
-            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size + sign * 20, vs_color, "+");
-            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size - sign * 20, vs_color, "-");
+            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size + sign * 20, render_colors.component_color, "+");
+            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size - sign * 20, render_colors.component_color, "-");
         },
     }
 }
@@ -428,7 +455,7 @@ pub fn renderVoltageSource(
 pub fn renderResistor(
     pos: GridPosition,
     rot: component.ComponentRotation,
-    name: ?[:0]const u8,
+    name: ?[]const u8,
     render_type: ComponentRenderType,
 ) void {
     const wire_pixel_len = 25;
@@ -438,7 +465,7 @@ pub fn renderResistor(
     const world_pos = WorldPosition.fromGridPosition(pos);
     const coords = ScreenPosition.fromWorldPosition(world_pos);
 
-    _, const resistor_color = renderColors(render_type);
+    const resistor_color = renderColors(render_type).component_color;
 
     var buff: [256]u8 = undefined;
     const value = component.ComponentInnerType.resistor.formatValue(
@@ -535,7 +562,7 @@ pub fn renderResistor(
 }
 
 pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
-    const wire_color, _ = renderColors(render_type);
+    const wire_color = renderColors(render_type).wire_color;
 
     const world_pos = WorldPosition.fromGridPosition(wire.pos);
     const coords = ScreenPosition.fromWorldPosition(world_pos);
@@ -597,6 +624,141 @@ pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
     }
 }
 
+pub fn renderComponentList() void {
+    var tl = dvui.textLayout(@src(), .{}, .{
+        .color_fill = .{ .color = global.sidebar_title_bg_color },
+        .color_text = .{ .color = .white },
+        .font = global.sidebar_title_font,
+        .expand = .horizontal,
+    });
+
+    tl.addText("components", .{});
+    tl.deinit();
+
+    hovered_component_id = null;
+
+    for (0.., circuit.components.items) |i, comp| {
+        const bg = if (selected_component_id == i)
+            global.sidebar_button_selected_color
+        else
+            global.sidebar_bg_color;
+
+        const hover_bg = if (selected_component_id == i)
+            global.sidebar_button_selected_color
+        else
+            global.sidebar_button_hover_color;
+
+        var bw = dvui.ButtonWidget.init(@src(), .{}, .{
+            .id_extra = i,
+            .expand = .horizontal,
+            .color_fill = .{ .color = bg },
+            .color_fill_hover = .{ .color = hover_bg },
+            .color_fill_press = .{ .color = hover_bg },
+            .margin = dvui.Rect.all(0),
+            .corner_radius = dvui.Rect.all(0),
+        });
+
+        bw.install();
+        bw.processEvents();
+        bw.drawBackground();
+
+        dvui.labelNoFmt(@src(), comp.name, .{}, .{
+            .id_extra = 0,
+            .expand = .horizontal,
+            .color_text = .{ .color = global.sidebar_text_color_normal },
+            .font = global.sidebar_font,
+            .color_fill = .{ .color = bg },
+            .color_fill_hover = .{ .color = hover_bg },
+            .margin = dvui.Rect.all(0),
+        });
+
+        if (bw.hovered()) {
+            hovered_component_id = i;
+        }
+
+        if (bw.clicked()) {
+            if (selected_component_id != i) {
+                selected_component_changed = true;
+            }
+            selected_component_id = i;
+        }
+
+        bw.deinit();
+    }
+}
+
+pub fn renderPropertyBox() void {
+    var tl = dvui.textLayout(@src(), .{}, .{
+        .color_fill = .{ .color = global.sidebar_title_bg_color },
+        .color_text = .{ .color = .white },
+        .font = global.sidebar_title_font,
+        .expand = .horizontal,
+    });
+
+    tl.addText("properties", .{});
+    tl.deinit();
+
+    if (selected_component_id) |comp_id| {
+        var selected_comp = &circuit.components.items[comp_id];
+
+        dvui.label(@src(), "name", .{}, .{
+            .color_text = .{ .color = global.sidebar_text_color_normal },
+            .font = global.sidebar_font,
+        });
+
+        var te = dvui.textEntry(@src(), .{
+            .text = .{
+                .buffer = selected_comp.name_buffer,
+            },
+        }, .{
+            .color_fill = .{ .color = global.sidebar_title_bg_color },
+            .color_text = .{ .color = .white },
+            .font = global.sidebar_font,
+            .max_size_content = .width(100),
+        });
+
+        if (dvui.firstFrame(te.data().id) or selected_component_changed) {
+            selected_component_changed = false;
+            te.textSet(selected_comp.name, false);
+        }
+
+        selected_comp.name = te.getText();
+
+        te.deinit();
+    }
+}
+
+pub fn renderSidebar() void {
+    var menu = dvui.box(
+        @src(),
+        .vertical,
+        .{
+            .background = true,
+            .min_size_content = .{ .w = 150, .h = dvui.windowRect().h },
+            .border = .{ .w = 2 }, // right 2px
+            .color_fill = .{ .color = global.sidebar_bg_color },
+            .color_border = .{ .color = global.sidebar_border_color },
+        },
+    );
+    defer menu.deinit();
+
+    var components_box = dvui.box(@src(), .vertical, .{
+        .background = true,
+        .min_size_content = .{ .w = 150, .h = 300 },
+        .color_fill = .{ .color = global.sidebar_bg_color },
+    });
+    renderComponentList();
+    components_box.deinit();
+
+    var property_box = dvui.box(@src(), .vertical, .{
+        .background = true,
+        .min_size_content = .{ .w = 150, .h = 300 },
+        .color_fill = .{ .color = global.sidebar_bg_color },
+    });
+    renderPropertyBox();
+    property_box.deinit();
+}
+
 pub fn render() void {
     _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
     _ = sdl.SDL_RenderClear(renderer);
@@ -613,26 +775,37 @@ pub fn render() void {
         for (0..count_y) |j| {
             const camera_x: i32 = @as(i32, @intCast(offset_x)) + @as(i32, @intCast(i)) * global.grid_size;
             const camera_y: i32 = @as(i32, @intCast(offset_y)) + @as(i32, @intCast(j)) * global.grid_size;
-            const screen_x: i32 = @intFromFloat(@as(f32, @floatFromInt(camera_x)) * screen_state.xscale());
-            const screen_y: i32 = @intFromFloat(@as(f32, @floatFromInt(camera_y)) * screen_state.yscale());
+            const screen_x: f32 = @as(f32, @floatFromInt(camera_x)) * screen_state.xscale();
+            const screen_y: f32 = @as(f32, @floatFromInt(camera_y)) * screen_state.yscale();
 
-            _ = sdl.SDL_RenderFillRect(renderer, @ptrCast(&sdl.SDL_Rect{
+            const rect1 = sdl.SDL_FRect{
                 .x = screen_x - 1,
                 .y = screen_y - 2,
                 .w = 2,
                 .h = 4,
-            }));
-            _ = sdl.SDL_RenderFillRect(renderer, @ptrCast(&sdl.SDL_Rect{
+            };
+
+            const rect2 = sdl.SDL_FRect{
                 .x = screen_x - 2,
                 .y = screen_y - 1,
                 .w = 4,
                 .h = 2,
-            }));
+            };
+
+            _ = sdl.SDL_RenderFillRect(renderer, &rect1);
+            _ = sdl.SDL_RenderFillRect(renderer, &rect2);
         }
     }
 
-    for (circuit.components.items) |comp| {
-        comp.render();
+    for (0.., circuit.components.items) |i, comp| {
+        const render_type: ComponentRenderType = if (i == selected_component_id)
+            ComponentRenderType.selected
+        else if (i == hovered_component_id)
+            ComponentRenderType.hovered
+        else
+            ComponentRenderType.normal;
+
+        comp.render(render_type);
     }
 
     for (circuit.wires.items) |wire| {
@@ -676,12 +849,5 @@ pub fn render() void {
         }
     }
 
-    renderCenteredText(50, 50, sdl.SDL_Color{
-        .r = 255,
-        .g = 255,
-        .b = 255,
-        .a = 255,
-    }, "hello world");
-
-    _ = sdl.SDL_RenderPresent(renderer);
+    renderSidebar();
 }

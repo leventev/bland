@@ -191,9 +191,12 @@ pub fn canPlaceWire(wire: Wire) bool {
 }
 
 pub fn gridPositionFromMouse() GridPosition {
-    var mouse_x: i32 = undefined;
-    var mouse_y: i32 = undefined;
-    _ = sdl.SDL_GetMouseState(@ptrCast(&mouse_x), @ptrCast(&mouse_y));
+    var mouse_x_tmp: f32 = undefined;
+    var mouse_y_tmp: f32 = undefined;
+    _ = sdl.SDL_GetMouseState(&mouse_x_tmp, &mouse_y_tmp);
+
+    const mouse_x = @as(i32, @intFromFloat(mouse_x_tmp));
+    const mouse_y = @as(i32, @intFromFloat(mouse_y_tmp));
 
     const world_pos = renderer.WorldPosition.fromScreenPosition(
         renderer.ScreenPosition{ .x = mouse_x, .y = mouse_y },
@@ -528,56 +531,247 @@ fn getLastConnected(
     return null;
 }
 
+const Supernode = struct {
+    // node ids
+    nodes: std.ArrayListUnmanaged(usize),
+    // component ids
+    voltage_sources: std.ArrayListUnmanaged(usize),
+};
+
+const NodeGroup = union(enum) {
+    single: usize,
+    supernode: Supernode,
+};
+
+fn getNodeGroup(
+    allocator: std.mem.Allocator,
+    nodes: []const NetList.Node,
+    start_node_id: usize,
+) !NodeGroup {
+    var node_group = std.ArrayListUnmanaged(usize){};
+    var voltage_sources = std.ArrayListUnmanaged(usize){};
+
+    var node_queue = try std.ArrayListUnmanaged(usize).initCapacity(allocator, 4);
+    defer node_queue.deinit(allocator);
+
+    try node_queue.append(allocator, start_node_id);
+
+    while (node_queue.pop()) |node_id| {
+        const node = nodes[node_id];
+
+        // if there is a voltage source connected to a node with a known voltage
+        // then we dont need to use a supernode
+        if (node.voltage != null) {
+            node_group.deinit(allocator);
+            return NodeGroup{ .single = start_node_id };
+        }
+
+        try node_group.append(allocator, node.id);
+
+        for (node.connected_terminals.items) |terminal| {
+            const comp = components.items[terminal.component_id];
+            switch (comp.inner) {
+                else => continue,
+                .voltage_source => {
+                    // skip voltage sources already added
+                    var found = false;
+                    for (voltage_sources.items) |vs_id| {
+                        if (vs_id == terminal.component_id) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) continue;
+
+                    const other_node_id = comp.otherNode(node.id);
+
+                    try node_queue.append(allocator, other_node_id);
+                    try voltage_sources.append(allocator, terminal.component_id);
+                },
+            }
+        }
+    }
+
+    return NodeGroup{ .supernode = .{
+        .nodes = node_group,
+        .voltage_sources = voltage_sources,
+    } };
+}
+
+fn findSupernodes(
+    allocator: std.mem.Allocator,
+    nodes: []const NetList.Node,
+) !std.ArrayListUnmanaged(NodeGroup) {
+    var nodes_remaining = try allocator.alloc(bool, nodes.len);
+    defer allocator.free(nodes_remaining);
+
+    var node_groups = std.ArrayListUnmanaged(NodeGroup){};
+
+    for (0..nodes_remaining.len) |i| {
+        nodes_remaining[i] = true;
+    }
+
+    // TODO: implement a more optimal solution
+    // the current implementation keeps allocating and deallocating a buffer
+    // and traverses the same node multiple times
+    // a better solution would be finding all voltage source "groups" first
+    // and then checking whether any node connected to it has a known voltage
+    // if yes then calculate the voltages of all other nodes
+    // if not then we have to use the supernode technique
+    // but as this is not a performance critical code segment
+    // this has low priority
+
+    for (0..nodes_remaining.len) |i| {
+        if (!nodes_remaining[i]) continue;
+
+        const current_node = nodes[i];
+        // if the node voltage is known the node is normal
+        if (current_node.voltage != null) {
+            try node_groups.append(allocator, NodeGroup{ .single = i });
+            nodes_remaining[i] = false;
+        } else {
+            const group = try getNodeGroup(allocator, nodes, i);
+            try node_groups.append(allocator, group);
+            switch (group) {
+                .single => |node_id| {
+                    nodes_remaining[node_id] = false;
+                },
+                .supernode => |supernode| {
+                    for (supernode.nodes.items) |node_id| {
+                        nodes_remaining[node_id] = false;
+                    }
+                },
+            }
+        }
+    }
+
+    return node_groups;
+}
+
+fn addEquationToRow(
+    nodes: []const NetList.Node,
+    mat: *matrix.Matrix(f32),
+    current_row: usize,
+    node_id: usize,
+) void {
+    const node = nodes[node_id];
+
+    var total_conductance: f32 = 0;
+
+    for (node.connected_terminals.items) |terminal| {
+        const comp = components.items[terminal.component_id];
+        switch (comp.inner) {
+            .resistor => |resistance| {
+                const conductance = 1 / resistance;
+                total_conductance += conductance;
+
+                const other_node_id = comp.otherNode(node_id);
+
+                // set the coefficient for the other node
+                // we add the conductance instead of just setting it
+                // because of parallel resistances
+                mat.data[current_row][other_node_id] += -conductance;
+            },
+            else => continue,
+        }
+    }
+
+    // set the coefficient for the current node
+    mat.data[current_row][node.id] = total_conductance;
+}
+
+fn addSingleNodeToAugmentedMatrix(
+    nodes: []const NetList.Node,
+    mat: *matrix.Matrix(f32),
+    current_row: usize,
+    node_id: usize,
+) void {
+    const node = nodes[node_id];
+
+    if (node.voltage) |voltage| {
+        // set the coefficient associated with the node to 1
+        // and the rightmost column to the known voltage
+        // all other columns are 0
+        mat.data[current_row][node_id] = 1;
+        mat.data[current_row][nodes.len] = voltage;
+    } else {
+        addEquationToRow(nodes, mat, current_row, node_id);
+    }
+}
+
+fn addSupernodeToAugmentedMatrix(
+    nodes: []const NetList.Node,
+    mat: *matrix.Matrix(f32),
+    current_row: usize,
+    supernode: Supernode,
+) void {
+    std.log.debug("add supernode {} {} {}", .{
+        current_row,
+        supernode.nodes.items.len,
+        supernode.voltage_sources.items.len,
+    });
+    // add all equations to the same row
+    for (supernode.nodes.items) |node_id| {
+        addEquationToRow(nodes, mat, current_row, node_id);
+    }
+    for (0.., supernode.voltage_sources.items) |i, comp_id| {
+        const row = current_row + 1 + i;
+
+        const comp = components.items[comp_id];
+        const positive_node = comp.terminal_node_ids[0];
+        const negative_node = comp.terminal_node_ids[1];
+
+        for (0..nodes.len) |col| {
+            mat.data[row][col] = 0;
+        }
+        mat.data[row][positive_node] = 1;
+        mat.data[row][negative_node] = -1;
+        mat.data[row][nodes.len] = comp.inner.voltage_source;
+    }
+}
+
 fn constructAugmentedMatrix(
     allocator: std.mem.Allocator,
-    nodes: std.ArrayListUnmanaged(NetList.Node),
+    nodes: []const NetList.Node,
 ) !matrix.Matrix(f32) {
     var mat = try matrix.Matrix(f32).init(
         allocator,
-        nodes.items.len,
-        nodes.items.len + 1,
+        nodes.len,
+        nodes.len + 1,
     );
 
-    for (0.., nodes.items) |row, node| {
-        if (node.voltage) |voltage| {
-            // set the coefficient associated with the node to 1
-            // and the rightmost column to the known voltage
-            // all other columns are 0
-            for (0..nodes.items.len) |col| {
-                mat.data[row][col] = 0;
+    for (0..nodes.len) |row| {
+        for (0..nodes.len + 1) |col| {
+            mat.data[row][col] = 0;
+        }
+    }
+
+    var node_groups = try findSupernodes(allocator, nodes);
+    defer {
+        for (node_groups.items) |*node_group| {
+            switch (node_group.*) {
+                .supernode => |*supernode| {
+                    supernode.nodes.deinit(allocator);
+                    supernode.voltage_sources.deinit(allocator);
+                },
+                else => {},
             }
-            mat.data[row][row] = 1;
-            mat.data[row][nodes.items.len] = voltage;
-        } else {
-            for (0..nodes.items.len + 1) |col| {
-                mat.data[row][col] = 0;
-            }
+        }
+        node_groups.deinit(allocator);
+    }
 
-            var total_conductance: f32 = 0;
+    var current_row: usize = 0;
 
-            for (node.connected_terminals.items) |terminal| {
-                const comp = components.items[terminal.component_id];
-                switch (comp.inner) {
-                    .resistor => |resistance| {
-                        const conductance = 1 / resistance;
-                        total_conductance += conductance;
-
-                        const other_node_id = if (comp.terminal_node_ids[0] == node.id)
-                            comp.terminal_node_ids[1]
-                        else
-                            comp.terminal_node_ids[0];
-
-                        // set the coefficient for the other node
-                        // we add the conductance instead of just setting it
-                        // because of parallel resistances
-                        mat.data[row][other_node_id] += -conductance;
-                    },
-                    else => @panic("TODO"),
-                }
-            }
-
-            // set the coefficient for the current node
-            mat.data[row][node.id] = total_conductance;
+    for (node_groups.items) |node_group| {
+        switch (node_group) {
+            .single => |node_id| {
+                addSingleNodeToAugmentedMatrix(nodes, &mat, current_row, node_id);
+                current_row += 1;
+            },
+            .supernode => |supernode| {
+                addSupernodeToAugmentedMatrix(nodes, &mat, current_row, supernode);
+                current_row += supernode.nodes.items.len;
+            },
         }
     }
 
@@ -604,11 +798,14 @@ pub fn analyse(allocator: std.mem.Allocator) void {
         }
     }
 
-    var augmented_matrix = constructAugmentedMatrix(allocator, netlist.nodes) catch {
+    var augmented_matrix = constructAugmentedMatrix(allocator, netlist.nodes.items) catch {
         std.log.err("Failed to construct augmented matrix", .{});
         return;
     };
     defer augmented_matrix.deinit(allocator);
+
+    augmented_matrix.dump();
+
     augmented_matrix.gaussJordanElimination();
 
     for (0..netlist.nodes.items.len) |i| {

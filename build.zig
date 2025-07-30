@@ -15,8 +15,6 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
-    exe.linkSystemLibrary("SDL2");
-    exe.linkSystemLibrary("SDL2_ttf");
     exe.linkLibC();
 
     b.installArtifact(exe);
@@ -28,6 +26,14 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
+
+    const dvui = b.dependency("dvui", .{
+        .target = target,
+        .optimize = optimize,
+        .backend = .sdl3,
+    });
+
+    exe.root_module.addImport("dvui", dvui.module("dvui_sdl3"));
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
