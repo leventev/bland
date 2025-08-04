@@ -5,7 +5,7 @@ const SDLBackend = dvui.backend;
 comptime {
     std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
 }
-pub const sdl = SDLBackend.c;
+const sdl = SDLBackend.c;
 
 const component = @import("component.zig");
 

@@ -10,7 +10,7 @@ const SDLBackend = dvui.backend;
 comptime {
     std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
 }
-const sdl = global.sdl;
+const sdl = SDLBackend.c;
 
 fn handleWindowEvent(event: *sdl.SDL_Event) void {
     switch (event.type) {
@@ -32,10 +32,10 @@ fn handleKeydownEvent(allocator: std.mem.Allocator, event: *sdl.SDL_Event) void 
     switch (event.key.key) {
         sdl.SDLK_T => {
             circuit.held_component_rotation = switch (circuit.held_component_rotation) {
-                .right => component.ComponentRotation.bottom,
-                .bottom => component.ComponentRotation.left,
-                .left => component.ComponentRotation.top,
-                .top => component.ComponentRotation.right,
+                .right => component.Component.Rotation.bottom,
+                .bottom => component.Component.Rotation.left,
+                .left => component.Component.Rotation.top,
+                .top => component.Component.Rotation.right,
             };
         },
         sdl.SDLK_K => {

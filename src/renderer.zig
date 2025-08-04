@@ -3,28 +3,67 @@ const std = @import("std");
 const global = @import("global.zig");
 const component = @import("component.zig");
 const circuit = @import("circuit.zig");
-const sdl = global.sdl;
-
-const sdl_ttf = global.sdl_ttf;
-
-const GridPosition = circuit.GridPosition;
-
-const white_color = sdl.SDL_Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
-
-pub var screen_state: ScreenState = .{};
-pub var window: *sdl.SDL_Window = undefined;
-pub var renderer: *sdl.SDL_Renderer = undefined;
-pub var font: *sdl_ttf.TTF_Font = undefined;
-
-pub var hovered_component_id: ?usize = null;
-pub var selected_component_id: ?usize = null;
-pub var selected_component_changed: bool = false;
 
 const dvui = @import("dvui");
 const SDLBackend = dvui.backend;
 comptime {
     std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
 }
+const sdl = SDLBackend.c;
+
+const GridPosition = circuit.GridPosition;
+
+pub var screen_state: ScreenState = .{};
+pub var window: *sdl.SDL_Window = undefined;
+pub var renderer: *sdl.SDL_Renderer = undefined;
+
+pub var hovered_component_id: ?usize = null;
+pub var selected_component_id: ?usize = null;
+pub var selected_component_changed: bool = false;
+
+pub const Rect = struct {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+
+    fn toSDLFRect(self: Rect) sdl.SDL_FRect {
+        return sdl.SDL_FRect{
+            .x = @as(f32, @floatFromInt(self.x)),
+            .y = @as(f32, @floatFromInt(self.y)),
+            .w = @as(f32, @floatFromInt(self.w)),
+            .h = @as(f32, @floatFromInt(self.h)),
+        };
+    }
+};
+
+pub const Color = struct {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
+
+    pub const white = Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
+    pub const black = Color{ .r = 0, .g = 0, .b = 0, .a = 255 };
+
+    fn fromHex(color: u32) Color {
+        return Color{
+            .r = @intCast(color >> 24),
+            .g = @intCast((color >> 16) & 0xFF),
+            .b = @intCast((color >> 8) & 0xFF),
+            .a = @intCast(color & 0xFF),
+        };
+    }
+
+    fn toSDLColor(self: Color) sdl.SDL_Color {
+        return sdl.SDL_Color{
+            .r = self.r,
+            .g = self.g,
+            .b = self.b,
+            .a = self.a,
+        };
+    }
+};
 
 const ScreenState = struct {
     camera_x: i32 = 0,
@@ -85,7 +124,7 @@ pub const WorldPosition = struct {
     }
 };
 
-fn renderCenteredText(x: i32, y: i32, color: sdl.SDL_Color, text: []const u8) void {
+pub fn renderCenteredText(x: i32, y: i32, color: Color, text: []const u8) void {
     _ = color;
 
     const f = dvui.Font{
@@ -102,6 +141,7 @@ fn renderCenteredText(x: i32, y: i32, color: sdl.SDL_Color, text: []const u8) vo
         .h = s.h,
     };
 
+    // TODO: color.getDVUIColor
     dvui.renderText(.{
         .color = dvui.Color.white,
         .background_color = null,
@@ -111,26 +151,25 @@ fn renderCenteredText(x: i32, y: i32, color: sdl.SDL_Color, text: []const u8) vo
             .r = r,
         },
         .text = text,
-    }) catch @panic("aaa");
+    }) catch @panic("TODO");
 }
 
-// TODO: abstract away SDL
-fn drawRect(rect: sdl.SDL_Rect) void {
-    const transformed_rect = sdl.SDL_FRect{
-        .x = @as(f32, @floatFromInt(rect.x)) * screen_state.xscale(),
-        .y = @as(f32, @floatFromInt(rect.y)) * screen_state.yscale(),
-        .w = @as(f32, @floatFromInt(rect.w)) * screen_state.xscale(),
-        .h = @as(f32, @floatFromInt(rect.h)) * screen_state.yscale(),
-    };
-
-    _ = sdl.SDL_RenderRect(renderer, &transformed_rect);
+pub fn drawRect(rect: Rect) void {
+    const sdl_rect = rect.toSDLFRect();
+    _ = sdl.SDL_RenderRect(renderer, &sdl_rect);
 }
 
-fn setColor(color: sdl.SDL_Color) void {
-    _ = sdl.SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+pub fn fillRect(rect: Rect) void {
+    const sdl_rect = rect.toSDLFRect();
+    _ = sdl.SDL_RenderFillRect(renderer, &sdl_rect);
 }
 
-fn drawLine(x1: i32, y1: i32, x2: i32, y2: i32) void {
+pub fn setColor(color: Color) void {
+    const sdl_color = color.toSDLColor();
+    _ = sdl.SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a);
+}
+
+pub fn drawLine(x1: i32, y1: i32, x2: i32, y2: i32) void {
     const slope_x = x2 - x1;
     const slope_y = y2 - y1;
 
@@ -142,15 +181,6 @@ fn drawLine(x1: i32, y1: i32, x2: i32, y2: i32) void {
     _ = sdl.SDL_RenderLine(renderer, scaled_x1, scaled_y1, scaled_x2, scaled_y2);
 }
 
-fn colorFromHex(color: u32) sdl.SDL_Color {
-    return sdl.SDL_Color{
-        .r = @intCast(color >> 24),
-        .g = @intCast((color >> 16) & 0xFF),
-        .b = @intCast((color >> 8) & 0xFF),
-        .a = @intCast(color & 0xFF),
-    };
-}
-
 pub const ComponentRenderType = enum {
     normal,
     holding,
@@ -160,27 +190,27 @@ pub const ComponentRenderType = enum {
 };
 
 const ComponentRenderColors = struct {
-    wire_color: sdl.SDL_Color,
-    component_color: sdl.SDL_Color,
+    wire_color: Color,
+    component_color: Color,
 };
 
-fn renderColors(render_type: ComponentRenderType) ComponentRenderColors {
+pub fn renderColors(render_type: ComponentRenderType) ComponentRenderColors {
     switch (render_type) {
-        .normal => return .{ .wire_color = colorFromHex(0x32f032ff), .component_color = colorFromHex(0xb428e6ff) },
-        .holding => return .{ .wire_color = colorFromHex(0x999999ff), .component_color = colorFromHex(0x999999ff) },
-        .unable_to_place => return .{ .wire_color = colorFromHex(0xbb4040ff), .component_color = colorFromHex(0xbb4040ff) },
-        .hovered => return .{ .wire_color = colorFromHex(0x32f032ff), .component_color = colorFromHex(0x44ffffff) },
-        .selected => return .{ .wire_color = colorFromHex(0x32f032ff), .component_color = colorFromHex(0xff4444ff) },
+        .normal => return .{ .wire_color = Color.fromHex(0x32f032ff), .component_color = Color.fromHex(0xb428e6ff) },
+        .holding => return .{ .wire_color = Color.fromHex(0x999999ff), .component_color = Color.fromHex(0x999999ff) },
+        .unable_to_place => return .{ .wire_color = Color.fromHex(0xbb4040ff), .component_color = Color.fromHex(0xbb4040ff) },
+        .hovered => return .{ .wire_color = Color.fromHex(0x32f032ff), .component_color = Color.fromHex(0x44ffffff) },
+        .selected => return .{ .wire_color = Color.fromHex(0x32f032ff), .component_color = Color.fromHex(0xff4444ff) },
     }
 }
 
-const TerminalWire = struct {
+pub const TerminalWire = struct {
     pos: ScreenPosition,
     pixel_length: i32,
     direction: circuit.Wire.Direction,
 };
 
-fn renderTerminalWire(wire: TerminalWire, render_type: ComponentRenderType) void {
+pub fn renderTerminalWire(wire: TerminalWire, render_type: ComponentRenderType) void {
     const pos = wire.pos;
     const wire_color = renderColors(render_type).wire_color;
 
@@ -225,342 +255,6 @@ fn renderTerminalWires(wires: []TerminalWire, render_type: ComponentRenderType) 
     }
 }
 
-pub fn renderGround(pos: GridPosition, rot: component.ComponentRotation, render_type: ComponentRenderType) void {
-    const wire_pixel_len = 16;
-
-    const world_pos = WorldPosition.fromGridPosition(pos);
-    const coords = ScreenPosition.fromWorldPosition(world_pos);
-
-    const render_colors = renderColors(render_type);
-
-    const triangle_side = 45;
-    const triangle_height = 39;
-
-    switch (rot) {
-        .right, .left => {
-            const wire_off: i32 = if (rot == .right) wire_pixel_len else -wire_pixel_len;
-            renderTerminalWire(TerminalWire{
-                .direction = .horizontal,
-                .pos = coords,
-                .pixel_length = wire_off,
-            }, render_type);
-
-            const x_off: i32 = if (rot == .right) triangle_height else -triangle_height;
-
-            setColor(render_colors.component_color);
-            drawLine(
-                coords.x + wire_off,
-                coords.y - triangle_side / 2,
-                coords.x + wire_off,
-                coords.y + triangle_side / 2,
-            );
-
-            drawLine(
-                coords.x + wire_off,
-                coords.y - triangle_side / 2,
-                coords.x + wire_off + x_off,
-                coords.y,
-            );
-
-            drawLine(
-                coords.x + wire_off,
-                coords.y + triangle_side / 2,
-                coords.x + wire_off + x_off,
-                coords.y,
-            );
-        },
-        .top, .bottom => {
-            const wire_off: i32 = if (rot == .bottom) wire_pixel_len else -wire_pixel_len;
-            renderTerminalWire(TerminalWire{
-                .direction = .vertical,
-                .pos = coords,
-                .pixel_length = wire_off,
-            }, render_type);
-
-            const y_off: i32 = if (rot == .bottom) triangle_height else -triangle_height;
-
-            setColor(render_colors.component_color);
-            drawLine(
-                coords.x - triangle_side / 2,
-                coords.y + wire_off,
-                coords.x + triangle_side / 2,
-                coords.y + wire_off,
-            );
-
-            drawLine(
-                coords.x - triangle_side / 2,
-                coords.y + wire_off,
-                coords.x,
-                coords.y + wire_off + y_off,
-            );
-
-            drawLine(
-                coords.x + triangle_side / 2,
-                coords.y + wire_off,
-                coords.x,
-                coords.y + wire_off + y_off,
-            );
-        },
-    }
-}
-
-pub fn renderVoltageSource(
-    pos: GridPosition,
-    rot: component.ComponentRotation,
-    name: ?[]const u8,
-    render_type: ComponentRenderType,
-) void {
-    const world_pos = WorldPosition.fromGridPosition(pos);
-    const coords = ScreenPosition.fromWorldPosition(world_pos);
-
-    const total_len = 2 * global.grid_size;
-    const middle_len = 16;
-    const middle_width = 4;
-    const wire_len = (total_len - middle_len) / 2;
-
-    const positive_side_len = 48;
-    const negative_side_len = 32;
-
-    const render_colors = renderColors(render_type);
-
-    var buff: [256]u8 = undefined;
-    const value = component.ComponentInnerType.voltage_source.formatValue(
-        5,
-        buff[0..],
-    ) catch unreachable;
-
-    switch (rot) {
-        .left, .right => {
-            renderTerminalWire(TerminalWire{
-                .pos = coords,
-                .direction = .horizontal,
-                .pixel_length = wire_len,
-            }, render_type);
-            renderTerminalWire(TerminalWire{
-                .pos = ScreenPosition{
-                    .x = coords.x + global.grid_size * 2,
-                    .y = coords.y,
-                },
-                .direction = .horizontal,
-                .pixel_length = -wire_len,
-            }, render_type);
-
-            var rect1 = sdl.SDL_Rect{
-                .x = coords.x + wire_len,
-                .y = coords.y - positive_side_len / 2,
-                .w = middle_width,
-                .h = positive_side_len,
-            };
-            var rect2 = sdl.SDL_Rect{
-                .x = coords.x + wire_len + middle_len - middle_width,
-                .y = coords.y - negative_side_len / 2,
-                .w = middle_width,
-                .h = negative_side_len,
-            };
-
-            if (rot == .left) {
-                const tmp = rect1.x;
-                rect1.x = rect2.x;
-                rect2.x = tmp;
-            }
-
-            setColor(render_colors.component_color);
-            drawRect(rect1);
-            drawRect(rect2);
-
-            if (name) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y - global.grid_size / 4,
-                    white_color,
-                    str,
-                );
-            }
-
-            if (value) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size + global.grid_size / 2,
-                    coords.y - global.grid_size / 4,
-                    white_color,
-                    str,
-                );
-            }
-
-            const sign: i32 = if (rot == .right) -1 else 1;
-            renderCenteredText(coords.x + global.grid_size + sign * 20, coords.y + global.grid_size / 4, render_colors.component_color, "+");
-            renderCenteredText(coords.x + global.grid_size - sign * 20, coords.y + global.grid_size / 4, render_colors.component_color, "-");
-        },
-        .top, .bottom => {
-            renderTerminalWire(TerminalWire{
-                .pos = coords,
-                .direction = .vertical,
-                .pixel_length = wire_len,
-            }, render_type);
-            renderTerminalWire(TerminalWire{
-                .pos = ScreenPosition{
-                    .x = coords.x,
-                    .y = coords.y + global.grid_size * 2,
-                },
-                .direction = .vertical,
-                .pixel_length = -wire_len,
-            }, render_type);
-
-            var rect1 = sdl.SDL_Rect{
-                .x = coords.x - positive_side_len / 2,
-                .y = coords.y + wire_len,
-                .w = positive_side_len,
-                .h = middle_width,
-            };
-            var rect2 = sdl.SDL_Rect{
-                .x = coords.x - negative_side_len / 2,
-                .y = coords.y + wire_len + middle_len - middle_width,
-                .w = negative_side_len,
-                .h = middle_width,
-            };
-
-            if (rot == .top) {
-                const tmp = rect1.y;
-                rect1.y = rect2.y;
-                rect2.y = tmp;
-            }
-
-            setColor(render_colors.component_color);
-            drawRect(rect1);
-            drawRect(rect2);
-            if (name) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size - (global.font_size + 2),
-                    white_color,
-                    str,
-                );
-            }
-
-            if (value) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size + (global.font_size + 2),
-                    white_color,
-                    str,
-                );
-            }
-
-            const sign: i32 = if (rot == .bottom) -1 else 1;
-            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size + sign * 20, render_colors.component_color, "+");
-            renderCenteredText(coords.x - global.grid_size / 4, coords.y + global.grid_size - sign * 20, render_colors.component_color, "-");
-        },
-    }
-}
-
-pub fn renderResistor(
-    pos: GridPosition,
-    rot: component.ComponentRotation,
-    name: ?[]const u8,
-    render_type: ComponentRenderType,
-) void {
-    const wire_pixel_len = 25;
-    const resistor_length = 2 * global.grid_size - 2 * wire_pixel_len;
-    const resistor_width = 28;
-
-    const world_pos = WorldPosition.fromGridPosition(pos);
-    const coords = ScreenPosition.fromWorldPosition(world_pos);
-
-    const resistor_color = renderColors(render_type).component_color;
-
-    var buff: [256]u8 = undefined;
-    const value = component.ComponentInnerType.resistor.formatValue(
-        4,
-        buff[0..],
-    ) catch unreachable;
-
-    switch (rot) {
-        .left, .right => {
-            renderTerminalWire(TerminalWire{
-                .pos = coords,
-                .direction = .horizontal,
-                .pixel_length = wire_pixel_len,
-            }, render_type);
-            renderTerminalWire(TerminalWire{
-                .pos = ScreenPosition{
-                    .x = coords.x + global.grid_size * 2,
-                    .y = coords.y,
-                },
-                .direction = .horizontal,
-                .pixel_length = -wire_pixel_len,
-            }, render_type);
-
-            const rect = sdl.SDL_Rect{
-                .x = coords.x + wire_pixel_len,
-                .y = coords.y - resistor_width / 2,
-                .w = resistor_length,
-                .h = resistor_width,
-            };
-
-            setColor(resistor_color);
-            drawRect(rect);
-            if (name) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size,
-                    coords.y - (resistor_width / 2 + global.font_size / 2 + 2),
-                    white_color,
-                    str,
-                );
-            }
-
-            if (value) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size,
-                    coords.y + resistor_width / 2 + global.font_size / 2 + 2,
-                    white_color,
-                    str,
-                );
-            }
-        },
-        .bottom, .top => {
-            renderTerminalWire(TerminalWire{
-                .pos = coords,
-                .direction = .vertical,
-                .pixel_length = wire_pixel_len,
-            }, render_type);
-            renderTerminalWire(TerminalWire{
-                .pos = ScreenPosition{
-                    .x = coords.x,
-                    .y = coords.y + global.grid_size * 2,
-                },
-                .direction = .vertical,
-                .pixel_length = -wire_pixel_len,
-            }, render_type);
-
-            const rect = sdl.SDL_Rect{
-                .x = coords.x - resistor_width / 2,
-                .y = coords.y + wire_pixel_len,
-                .w = resistor_width,
-                .h = resistor_length,
-            };
-
-            setColor(resistor_color);
-            drawRect(rect);
-            if (name) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size - (global.font_size / 2 + 8),
-                    white_color,
-                    str,
-                );
-            }
-
-            if (value) |str| {
-                renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size + (global.font_size / 2 + 8),
-                    white_color,
-                    str,
-                );
-            }
-        },
-    }
-}
-
 pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
     const wire_color = renderColors(render_type).wire_color;
 
@@ -572,7 +266,7 @@ pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
     setColor(wire_color);
 
     if (render_type == .holding) {
-        const rect1 = sdl.SDL_Rect{
+        const rect1 = Rect{
             .x = coords.x - 3,
             .y = coords.y - 3,
             .w = 6,
@@ -583,7 +277,7 @@ pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
         const world_pos2 = WorldPosition.fromGridPosition(wire.end());
         const coords2 = ScreenPosition.fromWorldPosition(world_pos2);
 
-        const rect2 = sdl.SDL_Rect{
+        const rect2 = Rect{
             .x = coords2.x - 3,
             .y = coords2.y - 3,
             .w = 6,
@@ -628,6 +322,7 @@ pub fn renderComponentList() void {
     var tl = dvui.textLayout(@src(), .{}, .{
         .color_fill = .{ .color = global.sidebar_title_bg_color },
         .color_text = .{ .color = .white },
+        // TODO: check if coords are negative
         .font = global.sidebar_title_font,
         .expand = .horizontal,
     });

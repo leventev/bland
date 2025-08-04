@@ -4,7 +4,13 @@ const component = @import("component.zig");
 const renderer = @import("renderer.zig");
 const global = @import("global.zig");
 const matrix = @import("matrix.zig");
-const sdl = global.sdl;
+
+const dvui = @import("dvui");
+const SDLBackend = dvui.backend;
+comptime {
+    std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
+}
+const sdl = SDLBackend.c;
 
 pub const PlacementMode = enum {
     none,
@@ -97,31 +103,35 @@ pub const Wire = struct {
 
 pub var placement_mode: PlacementMode = .none;
 
-pub var held_component: component.ComponentInnerType = .resistor;
-pub var held_component_rotation: component.ComponentRotation = .right;
+pub var held_component: component.Component.InnerType = .resistor;
+pub var held_component_rotation: component.Component.Rotation = .right;
 
 pub var held_wire_p1: ?GridPosition = null;
 
 pub var components: std.ArrayList(component.Component) = undefined;
 pub var wires: std.ArrayList(Wire) = undefined;
 
-pub fn canPlaceComponent(comp_type: component.ComponentInnerType, pos: GridPosition, rotation: component.ComponentRotation) bool {
-    var buffer: [100]component.OccupiedGridPoint = undefined;
-    const positions = comp_type.getOccupiedGridPoints(pos, rotation, buffer[0..]);
+pub fn canPlaceComponent(
+    comp_type: component.Component.InnerType,
+    pos: GridPosition,
+    rotation: component.Component.Rotation,
+) bool {
+    var buffer: [100]component.OccupiedGridPosition = undefined;
+    const positions = comp_type.getOccupiedGridPositions(pos, rotation, buffer[0..]);
     for (components.items) |comp| {
         if (comp.intersects(positions)) return false;
     }
 
-    var buffer2: [100]component.OccupiedGridPoint = undefined;
+    var buffer2: [100]component.OccupiedGridPosition = undefined;
     for (wires.items) |wire| {
-        const wire_positions = getOccupiedGridPoints(wire, buffer2[0..]);
+        const wire_positions = getOccupiedGridPositions(wire, buffer2[0..]);
         if (component.occupiedPointsIntersect(positions, wire_positions)) return false;
     }
 
     return true;
 }
 
-fn getOccupiedGridPoints(wire: Wire, occupied: []component.OccupiedGridPoint) []component.OccupiedGridPoint {
+fn getOccupiedGridPositions(wire: Wire, occupied: []component.OccupiedGridPosition) []component.OccupiedGridPosition {
     const abs_len = @abs(wire.length);
     std.debug.assert(abs_len < occupied.len);
     const negative = wire.length < 0;
@@ -135,7 +145,7 @@ fn getOccupiedGridPoints(wire: Wire, occupied: []component.OccupiedGridPoint) []
             .x = wire.pos.x,
             .y = wire.pos.y + idx,
         };
-        occupied[i] = component.OccupiedGridPoint{
+        occupied[i] = component.OccupiedGridPosition{
             .pos = pos,
             .terminal = true,
         };
@@ -145,8 +155,8 @@ fn getOccupiedGridPoints(wire: Wire, occupied: []component.OccupiedGridPoint) []
 }
 
 pub fn canPlaceWire(wire: Wire) bool {
-    var buffer: [100]component.OccupiedGridPoint = undefined;
-    const positions = getOccupiedGridPoints(wire, buffer[0..]);
+    var buffer: [100]component.OccupiedGridPosition = undefined;
+    const positions = getOccupiedGridPositions(wire, buffer[0..]);
 
     for (components.items) |comp| {
         if (comp.intersects(positions)) return false;
@@ -269,7 +279,7 @@ fn checkForKnownVoltage(nodes: *std.ArrayListUnmanaged(NetList.Node)) bool {
 
         for (node.connected_terminals.items) |term| {
             const comp = components.items[term.component_id];
-            if (@as(component.ComponentInnerType, comp.inner) != component.ComponentInnerType.voltage_source)
+            if (@as(component.Component.InnerType, comp.inner) != component.Component.InnerType.voltage_source)
                 continue;
 
             const pos_node_id = comp.terminal_node_ids[0];
@@ -337,7 +347,7 @@ fn mergeGroundNodes(
 fn nodeHasGround(terminals: []const NetList.Terminal) bool {
     for (terminals) |term| {
         const comp = components.items[term.component_id];
-        if (@as(component.ComponentInnerType, comp.inner) == component.ComponentInnerType.ground) {
+        if (@as(component.Component.InnerType, comp.inner) == component.Component.InnerType.ground) {
             return true;
         }
     }
