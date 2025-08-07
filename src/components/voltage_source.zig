@@ -13,11 +13,6 @@ var voltage_source_counter: usize = 0;
 pub fn defaultValue() Component.Inner {
     return Component.Inner{ .voltage_source = 5 };
 }
-
-pub fn formatValue(value: u32, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{}V", .{value});
-}
-
 pub fn setNewComponentName(buff: []u8) ![]u8 {
     voltage_source_counter += 1;
     return std.fmt.bufPrint(buff, "V{}", .{voltage_source_counter});
@@ -43,10 +38,15 @@ pub fn centerForMouse(pos: GridPosition, rotation: Component.Rotation) GridPosit
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
+fn formatValue(value: f32, buf: []u8) !?[]const u8 {
+    return try std.fmt.bufPrint(buf, "{d}V", .{value});
+}
+
 pub fn render(
     pos: GridPosition,
     rot: component.Component.Rotation,
     name: ?[]const u8,
+    value: ?f32,
     render_type: renderer.ComponentRenderType,
 ) void {
     const world_pos = renderer.WorldPosition.fromGridPosition(pos);
@@ -63,10 +63,10 @@ pub fn render(
     const render_colors = renderer.renderColors(render_type);
 
     var buff: [256]u8 = undefined;
-    const value = formatValue(
-        5,
+    const value_str = if (value) |val| formatValue(
+        val,
         buff[0..],
-    ) catch unreachable;
+    ) catch unreachable else null;
 
     switch (rot) {
         .left, .right => {
@@ -116,7 +116,7 @@ pub fn render(
                 );
             }
 
-            if (value) |str| {
+            if (value_str) |str| {
                 renderer.renderCenteredText(
                     coords.x + global.grid_size + global.grid_size / 2,
                     coords.y - global.grid_size / 4,
@@ -175,7 +175,7 @@ pub fn render(
                 );
             }
 
-            if (value) |str| {
+            if (value_str) |str| {
                 renderer.renderCenteredText(
                     coords.x + global.grid_size / 2,
                     coords.y + global.grid_size + (global.font_size + 2),

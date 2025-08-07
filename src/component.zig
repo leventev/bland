@@ -9,20 +9,6 @@ const ground = @import("components/ground.zig");
 
 const GridPosition = circuit.GridPosition;
 
-pub fn renderComponent(
-    comp: Component.InnerType,
-    pos: GridPosition,
-    rot: Component.Rotation,
-    name: ?[]const u8,
-    render_type: renderer.ComponentRenderType,
-) void {
-    switch (comp) {
-        .resistor => resistor.render(pos, rot, name, render_type),
-        .voltage_source => voltage_source.render(pos, rot, name, render_type),
-        .ground => ground.render(pos, rot, render_type),
-    }
-}
-
 pub const OccupiedGridPosition = struct {
     pos: GridPosition,
     terminal: bool,
@@ -73,7 +59,12 @@ pub const Component = struct {
     }
 
     pub fn render(self: Component, render_type: renderer.ComponentRenderType) void {
-        renderComponent(self.inner, self.pos, self.rotation, self.name, render_type);
+        self.inner.render(
+            self.pos,
+            self.rotation,
+            self.name,
+            render_type,
+        );
     }
 
     pub fn intersects(self: Component, positions: []OccupiedGridPosition) bool {
@@ -116,15 +107,6 @@ pub const Component = struct {
             }
         }
 
-        // TODO: value
-        pub fn formatValue(self: InnerType, value: u32, buf: []u8) !?[]const u8 {
-            return switch (self) {
-                .resistor => resistor.formatValue(value, buf),
-                .voltage_source => voltage_source.formatValue(value, buf),
-                .ground => ground.formatValue(value, buf),
-            };
-        }
-
         fn setNewComponentName(self: InnerType, buff: []u8) ![]u8 {
             return switch (self) {
                 .resistor => resistor.setNewComponentName(buff),
@@ -163,11 +145,38 @@ pub const Component = struct {
             const grid_pos = circuit.gridPositionFromMouse();
             return self.centerForMouse(rotation, grid_pos);
         }
+
+        pub fn renderHolding(
+            self: Component.InnerType,
+            pos: GridPosition,
+            rot: Component.Rotation,
+            render_type: renderer.ComponentRenderType,
+        ) void {
+            switch (self) {
+                .resistor => resistor.render(pos, rot, null, null, render_type),
+                .voltage_source => voltage_source.render(pos, rot, null, null, render_type),
+                .ground => ground.render(pos, rot, render_type),
+            }
+        }
     };
 
     pub const Inner = union(InnerType) {
         resistor: f32,
         voltage_source: f32,
         ground: void,
+
+        pub fn render(
+            self: Component.Inner,
+            pos: GridPosition,
+            rot: Component.Rotation,
+            name: []const u8,
+            render_type: renderer.ComponentRenderType,
+        ) void {
+            switch (self) {
+                .resistor => |r| resistor.render(pos, rot, name, r, render_type),
+                .voltage_source => |v| voltage_source.render(pos, rot, name, v, render_type),
+                .ground => ground.render(pos, rot, render_type),
+            }
+        }
     };
 };

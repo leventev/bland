@@ -3,6 +3,7 @@ const std = @import("std");
 const global = @import("global.zig");
 const component = @import("component.zig");
 const circuit = @import("circuit.zig");
+const sidebar = @import("sidebar.zig");
 
 const dvui = @import("dvui");
 const SDLBackend = dvui.backend;
@@ -16,10 +17,6 @@ const GridPosition = circuit.GridPosition;
 pub var screen_state: ScreenState = .{};
 pub var window: *sdl.SDL_Window = undefined;
 pub var renderer: *sdl.SDL_Renderer = undefined;
-
-pub var hovered_component_id: ?usize = null;
-pub var selected_component_id: ?usize = null;
-pub var selected_component_changed: bool = false;
 
 pub const Rect = struct {
     x: i32,
@@ -46,7 +43,7 @@ pub const Color = struct {
     pub const white = Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
     pub const black = Color{ .r = 0, .g = 0, .b = 0, .a = 255 };
 
-    fn fromHex(color: u32) Color {
+    pub fn fromHex(color: u32) Color {
         return Color{
             .r = @intCast(color >> 24),
             .g = @intCast((color >> 16) & 0xFF),
@@ -55,8 +52,17 @@ pub const Color = struct {
         };
     }
 
-    fn toSDLColor(self: Color) sdl.SDL_Color {
+    pub fn toSDLColor(self: Color) sdl.SDL_Color {
         return sdl.SDL_Color{
+            .r = self.r,
+            .g = self.g,
+            .b = self.b,
+            .a = self.a,
+        };
+    }
+
+    pub fn toDVUIColor(self: Color) dvui.Color {
+        return dvui.Color{
             .r = self.r,
             .g = self.g,
             .b = self.b,
@@ -125,8 +131,6 @@ pub const WorldPosition = struct {
 };
 
 pub fn renderCenteredText(x: i32, y: i32, color: Color, text: []const u8) void {
-    _ = color;
-
     const f = dvui.Font{
         .name = global.font_name,
         .size = global.font_size,
@@ -141,9 +145,8 @@ pub fn renderCenteredText(x: i32, y: i32, color: Color, text: []const u8) void {
         .h = s.h,
     };
 
-    // TODO: color.getDVUIColor
     dvui.renderText(.{
-        .color = dvui.Color.white,
+        .color = color.toDVUIColor(),
         .background_color = null,
         .debug = false,
         .font = f,
@@ -151,7 +154,7 @@ pub fn renderCenteredText(x: i32, y: i32, color: Color, text: []const u8) void {
             .r = r,
         },
         .text = text,
-    }) catch @panic("TODO");
+    }) catch @panic("failed to render text");
 }
 
 pub fn drawRect(rect: Rect) void {
@@ -318,142 +321,6 @@ pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
     }
 }
 
-pub fn renderComponentList() void {
-    var tl = dvui.textLayout(@src(), .{}, .{
-        .color_fill = .{ .color = global.sidebar_title_bg_color },
-        .color_text = .{ .color = .white },
-        // TODO: check if coords are negative
-        .font = global.sidebar_title_font,
-        .expand = .horizontal,
-    });
-
-    tl.addText("components", .{});
-    tl.deinit();
-
-    hovered_component_id = null;
-
-    for (0.., circuit.components.items) |i, comp| {
-        const bg = if (selected_component_id == i)
-            global.sidebar_button_selected_color
-        else
-            global.sidebar_bg_color;
-
-        const hover_bg = if (selected_component_id == i)
-            global.sidebar_button_selected_color
-        else
-            global.sidebar_button_hover_color;
-
-        var bw = dvui.ButtonWidget.init(@src(), .{}, .{
-            .id_extra = i,
-            .expand = .horizontal,
-            .color_fill = .{ .color = bg },
-            .color_fill_hover = .{ .color = hover_bg },
-            .color_fill_press = .{ .color = hover_bg },
-            .margin = dvui.Rect.all(0),
-            .corner_radius = dvui.Rect.all(0),
-        });
-
-        bw.install();
-        bw.processEvents();
-        bw.drawBackground();
-
-        dvui.labelNoFmt(@src(), comp.name, .{}, .{
-            .id_extra = 0,
-            .expand = .horizontal,
-            .color_text = .{ .color = global.sidebar_text_color_normal },
-            .font = global.sidebar_font,
-            .color_fill = .{ .color = bg },
-            .color_fill_hover = .{ .color = hover_bg },
-            .margin = dvui.Rect.all(0),
-        });
-
-        if (bw.hovered()) {
-            hovered_component_id = i;
-        }
-
-        if (bw.clicked()) {
-            if (selected_component_id != i) {
-                selected_component_changed = true;
-            }
-            selected_component_id = i;
-        }
-
-        bw.deinit();
-    }
-}
-
-pub fn renderPropertyBox() void {
-    var tl = dvui.textLayout(@src(), .{}, .{
-        .color_fill = .{ .color = global.sidebar_title_bg_color },
-        .color_text = .{ .color = .white },
-        .font = global.sidebar_title_font,
-        .expand = .horizontal,
-    });
-
-    tl.addText("properties", .{});
-    tl.deinit();
-
-    if (selected_component_id) |comp_id| {
-        var selected_comp = &circuit.components.items[comp_id];
-
-        dvui.label(@src(), "name", .{}, .{
-            .color_text = .{ .color = global.sidebar_text_color_normal },
-            .font = global.sidebar_font,
-        });
-
-        var te = dvui.textEntry(@src(), .{
-            .text = .{
-                .buffer = selected_comp.name_buffer,
-            },
-        }, .{
-            .color_fill = .{ .color = global.sidebar_title_bg_color },
-            .color_text = .{ .color = .white },
-            .font = global.sidebar_font,
-            .max_size_content = .width(100),
-        });
-
-        if (dvui.firstFrame(te.data().id) or selected_component_changed) {
-            selected_component_changed = false;
-            te.textSet(selected_comp.name, false);
-        }
-
-        selected_comp.name = te.getText();
-
-        te.deinit();
-    }
-}
-
-pub fn renderSidebar() void {
-    var menu = dvui.box(
-        @src(),
-        .vertical,
-        .{
-            .background = true,
-            .min_size_content = .{ .w = 150, .h = dvui.windowRect().h },
-            .border = .{ .w = 2 }, // right 2px
-            .color_fill = .{ .color = global.sidebar_bg_color },
-            .color_border = .{ .color = global.sidebar_border_color },
-        },
-    );
-    defer menu.deinit();
-
-    var components_box = dvui.box(@src(), .vertical, .{
-        .background = true,
-        .min_size_content = .{ .w = 150, .h = 300 },
-        .color_fill = .{ .color = global.sidebar_bg_color },
-    });
-    renderComponentList();
-    components_box.deinit();
-
-    var property_box = dvui.box(@src(), .vertical, .{
-        .background = true,
-        .min_size_content = .{ .w = 150, .h = 300 },
-        .color_fill = .{ .color = global.sidebar_bg_color },
-    });
-    renderPropertyBox();
-    property_box.deinit();
-}
-
 pub fn render() void {
     _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
     _ = sdl.SDL_RenderClear(renderer);
@@ -493,9 +360,9 @@ pub fn render() void {
     }
 
     for (0.., circuit.components.items) |i, comp| {
-        const render_type: ComponentRenderType = if (i == selected_component_id)
+        const render_type: ComponentRenderType = if (i == sidebar.selected_component_id)
             ComponentRenderType.selected
-        else if (i == hovered_component_id)
+        else if (i == sidebar.hovered_component_id)
             ComponentRenderType.hovered
         else
             ComponentRenderType.normal;
@@ -515,11 +382,9 @@ pub fn render() void {
             circuit.held_component_rotation,
         );
         const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-        component.renderComponent(
-            circuit.held_component,
+        circuit.held_component.renderHolding(
             grid_pos,
             circuit.held_component_rotation,
-            null,
             render_type,
         );
     } else if (circuit.placement_mode == .wire) {
@@ -544,5 +409,5 @@ pub fn render() void {
         }
     }
 
-    renderSidebar();
+    sidebar.render();
 }
