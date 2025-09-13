@@ -200,8 +200,7 @@ pub fn canPlaceWire(wire: Wire) bool {
     return true;
 }
 
-pub fn gridPositionFromMouse(circuit_rect: dvui.Rect.Physical) GridPosition {
-    const pos = dvui.currentWindow().mouse_pt;
+pub fn gridPositionFromPos(circuit_rect: dvui.Rect.Physical, pos: dvui.Point.Physical) GridPosition {
     const rel_pos = pos.diff(circuit_rect.topLeft());
 
     var grid_pos = GridPosition{

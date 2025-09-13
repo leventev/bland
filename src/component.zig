@@ -144,8 +144,13 @@ pub const Component = struct {
             };
         }
 
-        pub fn gridPositionFromMouse(self: InnerType, circuit_rect: dvui.Rect.Physical, rotation: Rotation) GridPosition {
-            const grid_pos = circuit.gridPositionFromMouse(circuit_rect);
+        pub fn gridPositionFromScreenPos(
+            self: InnerType,
+            circuit_rect: dvui.Rect.Physical,
+            pos: dvui.Point.Physical,
+            rotation: Rotation,
+        ) GridPosition {
+            const grid_pos = circuit.gridPositionFromPos(circuit_rect, pos);
             return self.centerForMouse(rotation, grid_pos);
         }
 

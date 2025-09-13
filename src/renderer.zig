@@ -4,6 +4,7 @@ const global = @import("global.zig");
 const component = @import("component.zig");
 const circuit = @import("circuit.zig");
 const sidebar = @import("sidebar.zig");
+const circuit_widget = @import("circuit_widget.zig");
 
 const dvui = @import("dvui");
 const SDLBackend = dvui.backend;
@@ -303,116 +304,7 @@ pub fn renderWire(
     }
 }
 
-pub fn renderCircuit() void {
-    var circuit_area = dvui.box(@src(), .{
-        .dir = .horizontal,
-    }, .{
-        .color_fill = dvui.themeGet().color(.control, .fill),
-        .expand = .both,
-    });
-    defer circuit_area.deinit();
-
-    const circuit_rect = circuit_area.data().rectScale().r;
-
-    const count_x: usize = @intFromFloat(@divTrunc(circuit_rect.w, global.grid_size) + 1);
-    const count_y: usize = @intFromFloat(@divTrunc(circuit_rect.h, global.grid_size) + 1);
-
-    for (0..count_x) |i| {
-        for (0..count_y) |j| {
-            const x = circuit_rect.x + @as(f32, @floatFromInt(i)) * global.grid_size;
-            const y = circuit_rect.y + @as(f32, @floatFromInt(j)) * global.grid_size;
-
-            const rect1 = dvui.Rect.Physical{
-                .x = x - 1,
-                .y = y - 2,
-                .w = 2,
-                .h = 4,
-            };
-
-            const rect2 = dvui.Rect.Physical{
-                .x = x - 2,
-                .y = y - 1,
-                .w = 4,
-                .h = 2,
-            };
-
-            const col = dvui.Color{ .r = 100, .g = 100, .b = 100, .a = 255 };
-            dvui.Rect.fill(rect1, dvui.Rect.Physical.all(0), .{ .color = col });
-            dvui.Rect.fill(rect2, dvui.Rect.Physical.all(0), .{ .color = col });
-        }
-    }
-
-    for (0.., circuit.components.items) |i, comp| {
-        const render_type: ComponentRenderType = if (i == sidebar.selected_component_id)
-            ComponentRenderType.selected
-        else if (i == sidebar.hovered_component_id)
-            ComponentRenderType.hovered
-        else
-            ComponentRenderType.normal;
-
-        comp.render(circuit_rect, render_type);
-    }
-
-    for (circuit.wires.items) |wire| {
-        renderWire(circuit_rect, wire, .normal);
-    }
-
-    if (circuit.placement_mode == .component) {
-        const grid_pos = circuit.held_component.gridPositionFromMouse(
-            circuit_rect,
-            circuit.held_component_rotation,
-        );
-        const can_place = circuit.canPlaceComponent(
-            circuit.held_component,
-            grid_pos,
-            circuit.held_component_rotation,
-        );
-        const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-        circuit.held_component.renderHolding(
-            circuit_rect,
-            grid_pos,
-            circuit.held_component_rotation,
-            render_type,
-        );
-    } else if (circuit.placement_mode == .wire) {
-        if (circuit.held_wire_p1) |p1| {
-            const p2 = circuit.gridPositionFromMouse(circuit_rect);
-            const xlen = @abs(p2.x - p1.x);
-            const ylen = @abs(p2.y - p1.y);
-
-            const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
-                .direction = .horizontal,
-                .length = p2.x - p1.x,
-                .pos = p1,
-            } else circuit.Wire{
-                .direction = .vertical,
-                .length = p2.y - p1.y,
-                .pos = p1,
-            };
-
-            const can_place = circuit.canPlaceWire(wire);
-            const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-            renderWire(circuit_rect, wire, render_type);
-        }
-    }
-}
-
-pub fn render() void {
-    _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
-    _ = sdl.SDL_RenderClear(renderer);
-
-    var window_box = dvui.box(
-        @src(),
-        .{
-            .dir = .vertical,
-        },
-        .{
-            .expand = .both,
-            .background = true,
-        },
-    );
-    defer window_box.deinit();
-
+fn renderToolbox() bool {
     {
         var toolbox = dvui.box(@src(), .{
             .dir = .vertical,
@@ -426,15 +318,48 @@ pub fn render() void {
         var menu = dvui.menu(@src(), .horizontal, .{});
         defer menu.deinit();
 
-        if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{})) |r| {
+        if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{ .tag = "first-focusable" })) |r| {
             var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
             if (dvui.menuItemLabel(@src(), "Quit", .{}, .{ .expand = .horizontal }) != null) {
-                std.process.cleanExit();
+                return false;
+            }
+        }
+
+        if (dvui.menuItemLabel(@src(), "Components", .{ .submenu = true }, .{})) |r| {
+            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+            defer fw.deinit();
+
+            if (dvui.menuItemLabel(@src(), "Resistor", .{}, .{ .expand = .horizontal }) != null) {
+                circuit.placement_mode = .component;
+                circuit.held_component = .resistor;
+                fw.close();
+            }
+
+            if (dvui.menuItemLabel(@src(), "Voltage source", .{}, .{ .expand = .horizontal }) != null) {
+                circuit.placement_mode = .component;
+                circuit.held_component = .voltage_source;
+                fw.close();
+            }
+
+            if (dvui.menuItemLabel(@src(), "Ground", .{}, .{ .expand = .horizontal }) != null) {
+                circuit.placement_mode = .component;
+                circuit.held_component = .ground;
+                fw.close();
             }
         }
     }
+
+    return true;
+}
+
+pub fn render(allocator: std.mem.Allocator) !bool {
+    _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
+    _ = sdl.SDL_RenderClear(renderer);
+
+    if (!renderToolbox())
+        return false;
 
     var paned = dvui.paned(
         @src(),
@@ -452,11 +377,13 @@ pub fn render() void {
         paned.split_ratio.* = 0.2;
     }
 
+    if (paned.showSecond()) {
+        try circuit_widget.renderCircuit(allocator);
+    }
+
     if (paned.showFirst()) {
         sidebar.render();
     }
 
-    if (paned.showSecond()) {
-        renderCircuit();
-    }
+    return true;
 }
