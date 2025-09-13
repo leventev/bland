@@ -18,59 +18,6 @@ pub var screen_state: ScreenState = .{};
 pub var window: *sdl.SDL_Window = undefined;
 pub var renderer: *sdl.SDL_Renderer = undefined;
 
-pub const Rect = struct {
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-
-    fn toSDLFRect(self: Rect) sdl.SDL_FRect {
-        return sdl.SDL_FRect{
-            .x = @as(f32, @floatFromInt(self.x)),
-            .y = @as(f32, @floatFromInt(self.y)),
-            .w = @as(f32, @floatFromInt(self.w)),
-            .h = @as(f32, @floatFromInt(self.h)),
-        };
-    }
-};
-
-pub const Color = struct {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
-
-    pub const white = Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
-    pub const black = Color{ .r = 0, .g = 0, .b = 0, .a = 255 };
-
-    pub fn fromHex(color: u32) Color {
-        return Color{
-            .r = @intCast(color >> 24),
-            .g = @intCast((color >> 16) & 0xFF),
-            .b = @intCast((color >> 8) & 0xFF),
-            .a = @intCast(color & 0xFF),
-        };
-    }
-
-    pub fn toSDLColor(self: Color) sdl.SDL_Color {
-        return sdl.SDL_Color{
-            .r = self.r,
-            .g = self.g,
-            .b = self.b,
-            .a = self.a,
-        };
-    }
-
-    pub fn toDVUIColor(self: Color) dvui.Color {
-        return dvui.Color{
-            .r = self.r,
-            .g = self.g,
-            .b = self.b,
-            .a = self.a,
-        };
-    }
-};
-
 const ScreenState = struct {
     camera_x: i32 = 0,
     camera_y: i32 = 0,
@@ -97,56 +44,23 @@ const ScreenState = struct {
     }
 };
 
-pub const ScreenPosition = struct {
-    x: i32,
-    y: i32,
-
-    pub fn fromWorldPosition(pos: WorldPosition) ScreenPosition {
-        return ScreenPosition{
-            .x = screen_state.camera_x + pos.x,
-            .y = screen_state.camera_y + pos.y,
-        };
-    }
-};
-
-// TODO: WorldPosition sounds silly for a circuit simulator
-// but i have no idea what to rename it to
-pub const WorldPosition = struct {
-    x: i32,
-    y: i32,
-
-    pub fn fromGridPosition(pos: GridPosition) WorldPosition {
-        return WorldPosition{
-            .x = pos.x * global.grid_size,
-            .y = pos.y * global.grid_size,
-        };
-    }
-
-    pub fn fromScreenPosition(pos: ScreenPosition) WorldPosition {
-        return WorldPosition{
-            .x = pos.x - screen_state.camera_x,
-            .y = pos.y - screen_state.camera_y,
-        };
-    }
-};
-
-pub fn renderCenteredText(x: i32, y: i32, color: Color, text: []const u8) void {
+pub fn renderCenteredText(pos: dvui.Point, color: dvui.Color, text: []const u8) void {
     const f = dvui.Font{
-        .name = global.font_name,
+        .id = .fromName(global.font_name),
         .size = global.font_size,
     };
 
     const s = dvui.Font.textSize(f, text);
 
     const r = dvui.Rect.Physical{
-        .x = @as(f32, @floatFromInt(x)) - s.w / 2,
-        .y = @as(f32, @floatFromInt(y)) - s.h / 2,
+        .x = pos.x - s.w / 2,
+        .y = pos.y - s.h / 2,
         .w = s.w,
         .h = s.h,
     };
 
     dvui.renderText(.{
-        .color = color.toDVUIColor(),
+        .color = color,
         .background_color = null,
         .debug = false,
         .font = f,
@@ -157,31 +71,24 @@ pub fn renderCenteredText(x: i32, y: i32, color: Color, text: []const u8) void {
     }) catch @panic("failed to render text");
 }
 
-pub fn drawRect(rect: Rect) void {
-    const sdl_rect = rect.toSDLFRect();
-    _ = sdl.SDL_RenderRect(renderer, &sdl_rect);
+pub fn drawRect(rect: dvui.Rect.Physical, color: dvui.Color) void {
+    dvui.Rect.stroke(rect, dvui.Rect.Physical.all(0), .{
+        .color = color,
+        .thickness = 1,
+    });
 }
 
-pub fn fillRect(rect: Rect) void {
-    const sdl_rect = rect.toSDLFRect();
-    _ = sdl.SDL_RenderFillRect(renderer, &sdl_rect);
+pub fn fillRect(rect: dvui.Rect.Physical, color: dvui.Color) void {
+    dvui.Rect.fill(rect, dvui.Rect.Physical.all(0), .{
+        .color = color,
+    });
 }
 
-pub fn setColor(color: Color) void {
-    const sdl_color = color.toSDLColor();
-    _ = sdl.SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a);
-}
-
-pub fn drawLine(x1: i32, y1: i32, x2: i32, y2: i32) void {
-    const slope_x = x2 - x1;
-    const slope_y = y2 - y1;
-
-    const scaled_x1: f32 = @as(f32, @floatFromInt(x1)) * screen_state.xscale();
-    const scaled_y1: f32 = @as(f32, @floatFromInt(y1)) * screen_state.yscale();
-    const scaled_x2: f32 = scaled_x1 + @as(f32, @floatFromInt(slope_x)) * screen_state.xscale();
-    const scaled_y2: f32 = scaled_y1 + @as(f32, @floatFromInt(slope_y)) * screen_state.yscale();
-
-    _ = sdl.SDL_RenderLine(renderer, scaled_x1, scaled_y1, scaled_x2, scaled_y2);
+pub fn drawLine(p1: dvui.Point.Physical, p2: dvui.Point.Physical, color: dvui.Color, thickness: f32) void {
+    dvui.Path.stroke(
+        .{ .points = &.{ p1, p2 } },
+        .{ .color = color, .thickness = thickness },
+    );
 }
 
 pub const ComponentRenderType = enum {
@@ -193,169 +100,245 @@ pub const ComponentRenderType = enum {
 };
 
 const ComponentRenderColors = struct {
-    wire_color: Color,
-    component_color: Color,
+    wire_color: dvui.Color,
+    component_color: dvui.Color,
 };
+
+fn dvuiColorFromHex(color: u32) dvui.Color {
+    return dvui.Color{
+        .r = @intCast(color >> 24),
+        .g = @intCast((color >> 16) & 0xFF),
+        .b = @intCast((color >> 8) & 0xFF),
+        .a = @intCast(color & 0xFF),
+    };
+}
 
 pub fn renderColors(render_type: ComponentRenderType) ComponentRenderColors {
     switch (render_type) {
-        .normal => return .{ .wire_color = Color.fromHex(0x32f032ff), .component_color = Color.fromHex(0xb428e6ff) },
-        .holding => return .{ .wire_color = Color.fromHex(0x999999ff), .component_color = Color.fromHex(0x999999ff) },
-        .unable_to_place => return .{ .wire_color = Color.fromHex(0xbb4040ff), .component_color = Color.fromHex(0xbb4040ff) },
-        .hovered => return .{ .wire_color = Color.fromHex(0x32f032ff), .component_color = Color.fromHex(0x44ffffff) },
-        .selected => return .{ .wire_color = Color.fromHex(0x32f032ff), .component_color = Color.fromHex(0xff4444ff) },
+        .normal => return .{
+            .wire_color = dvuiColorFromHex(0x32f032ff),
+            .component_color = dvuiColorFromHex(0xb428e6ff),
+        },
+        .holding => return .{
+            .wire_color = dvuiColorFromHex(0x999999ff),
+            .component_color = dvuiColorFromHex(0x999999ff),
+        },
+        .unable_to_place => return .{
+            .wire_color = dvuiColorFromHex(0xbb4040ff),
+            .component_color = dvuiColorFromHex(0xbb4040ff),
+        },
+        .hovered => return .{
+            .wire_color = dvuiColorFromHex(0x32f032ff),
+            .component_color = dvuiColorFromHex(0x44ffffff),
+        },
+        .selected => return .{
+            .wire_color = dvuiColorFromHex(0x32f032ff),
+            .component_color = dvuiColorFromHex(0xff4444ff),
+        },
     }
 }
 
 pub const TerminalWire = struct {
-    pos: ScreenPosition,
-    pixel_length: i32,
+    pos: dvui.Point,
+    pixel_length: f32,
     direction: circuit.Wire.Direction,
 };
 
-pub fn renderTerminalWire(wire: TerminalWire, render_type: ComponentRenderType) void {
+pub fn renderTerminalWire(
+    wire: TerminalWire,
+    render_type: ComponentRenderType,
+) void {
     const pos = wire.pos;
     const wire_color = renderColors(render_type).wire_color;
 
-    setColor(wire_color);
     switch (wire.direction) {
         .horizontal => {
             drawLine(
-                pos.x,
-                pos.y - 1,
-                pos.x + wire.pixel_length,
-                pos.y - 1,
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y - 1,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire.pixel_length,
+                    .y = pos.y - 1,
+                },
+                wire_color,
+                1,
             );
 
             drawLine(
-                pos.x,
-                pos.y,
-                pos.x + wire.pixel_length,
-                pos.y,
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire.pixel_length,
+                    .y = pos.y,
+                },
+                wire_color,
+                1,
             );
         },
         .vertical => {
             drawLine(
-                pos.x - 1,
-                pos.y,
-                pos.x - 1,
-                pos.y + wire.pixel_length,
+                dvui.Point.Physical{
+                    .x = pos.x - 1,
+                    .y = pos.y,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x - 1,
+                    .y = pos.y + wire.pixel_length,
+                },
+                wire_color,
+                1,
             );
 
             drawLine(
-                pos.x,
-                pos.y,
-                pos.x,
-                pos.y + wire.pixel_length,
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + wire.pixel_length,
+                },
+                wire_color,
+                1,
             );
         },
     }
 }
 
-fn renderTerminalWires(wires: []TerminalWire, render_type: ComponentRenderType) void {
+fn renderTerminalWires(
+    wires: []TerminalWire,
+    render_type: ComponentRenderType,
+) void {
     for (wires) |wire| {
         renderTerminalWire(wire, render_type);
     }
 }
 
-pub fn renderWire(wire: circuit.Wire, render_type: ComponentRenderType) void {
+pub fn renderWire(
+    circuit_rect: dvui.Rect.Physical,
+    wire: circuit.Wire,
+    render_type: ComponentRenderType,
+) void {
+    const pos = wire.pos.toCircuitPosition(circuit_rect);
     const wire_color = renderColors(render_type).wire_color;
-
-    const world_pos = WorldPosition.fromGridPosition(wire.pos);
-    const coords = ScreenPosition.fromWorldPosition(world_pos);
-
-    const length: i32 = wire.length * global.grid_size;
-
-    setColor(wire_color);
+    const length: f32 = @floatFromInt(wire.length * global.grid_size);
 
     if (render_type == .holding) {
-        const rect1 = Rect{
-            .x = coords.x - 3,
-            .y = coords.y - 3,
+        const rect1 = dvui.Rect.Physical{
+            .x = pos.x - 3,
+            .y = pos.y - 3,
             .w = 6,
             .h = 6,
         };
-        drawRect(rect1);
+        drawRect(rect1, wire_color);
 
-        const world_pos2 = WorldPosition.fromGridPosition(wire.end());
-        const coords2 = ScreenPosition.fromWorldPosition(world_pos2);
+        const pos2 = wire.end().toCircuitPosition(circuit_rect);
 
-        const rect2 = Rect{
-            .x = coords2.x - 3,
-            .y = coords2.y - 3,
+        const rect2 = dvui.Rect.Physical{
+            .x = pos2.x - 3,
+            .y = pos2.y - 3,
             .w = 6,
             .h = 6,
         };
-        drawRect(rect2);
+        drawRect(rect2, wire_color);
     }
 
     switch (wire.direction) {
         .horizontal => {
             drawLine(
-                coords.x,
-                coords.y - 1,
-                coords.x + length,
-                coords.y - 1,
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y - 1,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + length,
+                    .y = pos.y - 1,
+                },
+                wire_color,
+                1,
             );
             drawLine(
-                coords.x,
-                coords.y,
-                coords.x + length,
-                coords.y,
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + length,
+                    .y = pos.y,
+                },
+                wire_color,
+                1,
             );
         },
         .vertical => {
             drawLine(
-                coords.x - 1,
-                coords.y,
-                coords.x - 1,
-                coords.y + length,
+                dvui.Point.Physical{
+                    .x = pos.x - 1,
+                    .y = pos.y,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x - 1,
+                    .y = pos.y + length,
+                },
+                wire_color,
+                1,
             );
             drawLine(
-                coords.x,
-                coords.y,
-                coords.x,
-                coords.y + length,
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + length,
+                },
+                wire_color,
+                1,
             );
         },
     }
 }
 
-pub fn render() void {
-    _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
-    _ = sdl.SDL_RenderClear(renderer);
+pub fn renderCircuit() void {
+    var circuit_area = dvui.box(@src(), .{
+        .dir = .horizontal,
+    }, .{
+        .color_fill = dvui.themeGet().color(.control, .fill),
+        .expand = .both,
+    });
+    defer circuit_area.deinit();
 
-    const offset_x: u32 = @mod(@abs(screen_state.camera_x), global.grid_size);
-    const offset_y: u32 = @mod(@abs(screen_state.camera_y), global.grid_size);
+    const circuit_rect = circuit_area.data().rectScale().r;
 
-    const count_x: usize = @intCast(@divTrunc(screen_state.cameraWidth(), global.grid_size) + 1);
-    const count_y: usize = @intCast(@divTrunc(screen_state.cameraHeight(), global.grid_size) + 1);
-
-    _ = sdl.SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    const count_x: usize = @intFromFloat(@divTrunc(circuit_rect.w, global.grid_size) + 1);
+    const count_y: usize = @intFromFloat(@divTrunc(circuit_rect.h, global.grid_size) + 1);
 
     for (0..count_x) |i| {
         for (0..count_y) |j| {
-            const camera_x: i32 = @as(i32, @intCast(offset_x)) + @as(i32, @intCast(i)) * global.grid_size;
-            const camera_y: i32 = @as(i32, @intCast(offset_y)) + @as(i32, @intCast(j)) * global.grid_size;
-            const screen_x: f32 = @as(f32, @floatFromInt(camera_x)) * screen_state.xscale();
-            const screen_y: f32 = @as(f32, @floatFromInt(camera_y)) * screen_state.yscale();
+            const x = circuit_rect.x + @as(f32, @floatFromInt(i)) * global.grid_size;
+            const y = circuit_rect.y + @as(f32, @floatFromInt(j)) * global.grid_size;
 
-            const rect1 = sdl.SDL_FRect{
-                .x = screen_x - 1,
-                .y = screen_y - 2,
+            const rect1 = dvui.Rect.Physical{
+                .x = x - 1,
+                .y = y - 2,
                 .w = 2,
                 .h = 4,
             };
 
-            const rect2 = sdl.SDL_FRect{
-                .x = screen_x - 2,
-                .y = screen_y - 1,
+            const rect2 = dvui.Rect.Physical{
+                .x = x - 2,
+                .y = y - 1,
                 .w = 4,
                 .h = 2,
             };
 
-            _ = sdl.SDL_RenderFillRect(renderer, &rect1);
-            _ = sdl.SDL_RenderFillRect(renderer, &rect2);
+            const col = dvui.Color{ .r = 100, .g = 100, .b = 100, .a = 255 };
+            dvui.Rect.fill(rect1, dvui.Rect.Physical.all(0), .{ .color = col });
+            dvui.Rect.fill(rect2, dvui.Rect.Physical.all(0), .{ .color = col });
         }
     }
 
@@ -367,15 +350,18 @@ pub fn render() void {
         else
             ComponentRenderType.normal;
 
-        comp.render(render_type);
+        comp.render(circuit_rect, render_type);
     }
 
     for (circuit.wires.items) |wire| {
-        renderWire(wire, .normal);
+        renderWire(circuit_rect, wire, .normal);
     }
 
     if (circuit.placement_mode == .component) {
-        const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
+        const grid_pos = circuit.held_component.gridPositionFromMouse(
+            circuit_rect,
+            circuit.held_component_rotation,
+        );
         const can_place = circuit.canPlaceComponent(
             circuit.held_component,
             grid_pos,
@@ -383,13 +369,14 @@ pub fn render() void {
         );
         const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
         circuit.held_component.renderHolding(
+            circuit_rect,
             grid_pos,
             circuit.held_component_rotation,
             render_type,
         );
     } else if (circuit.placement_mode == .wire) {
         if (circuit.held_wire_p1) |p1| {
-            const p2 = circuit.gridPositionFromMouse();
+            const p2 = circuit.gridPositionFromMouse(circuit_rect);
             const xlen = @abs(p2.x - p1.x);
             const ylen = @abs(p2.y - p1.y);
 
@@ -405,9 +392,71 @@ pub fn render() void {
 
             const can_place = circuit.canPlaceWire(wire);
             const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-            renderWire(wire, render_type);
+            renderWire(circuit_rect, wire, render_type);
+        }
+    }
+}
+
+pub fn render() void {
+    _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
+    _ = sdl.SDL_RenderClear(renderer);
+
+    var window_box = dvui.box(
+        @src(),
+        .{
+            .dir = .vertical,
+        },
+        .{
+            .expand = .both,
+            .background = true,
+        },
+    );
+    defer window_box.deinit();
+
+    {
+        var toolbox = dvui.box(@src(), .{
+            .dir = .vertical,
+        }, .{
+            .expand = .horizontal,
+            .background = true,
+            .style = .window,
+        });
+        defer toolbox.deinit();
+
+        var menu = dvui.menu(@src(), .horizontal, .{});
+        defer menu.deinit();
+
+        if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{})) |r| {
+            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+            defer fw.deinit();
+
+            if (dvui.menuItemLabel(@src(), "Quit", .{}, .{ .expand = .horizontal }) != null) {
+                std.process.cleanExit();
+            }
         }
     }
 
-    sidebar.render();
+    var paned = dvui.paned(
+        @src(),
+        .{
+            .collapsed_size = 200,
+            .direction = .horizontal,
+        },
+        .{
+            .expand = .both,
+        },
+    );
+    defer paned.deinit();
+
+    if (dvui.firstFrame(paned.data().id)) {
+        paned.split_ratio.* = 0.2;
+    }
+
+    if (paned.showFirst()) {
+        sidebar.render();
+    }
+
+    if (paned.showSecond()) {
+        renderCircuit();
+    }
 }

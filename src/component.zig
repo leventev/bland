@@ -7,6 +7,8 @@ const resistor = @import("components/resistor.zig");
 const voltage_source = @import("components/voltage_source.zig");
 const ground = @import("components/ground.zig");
 
+const dvui = @import("dvui");
+
 const GridPosition = circuit.GridPosition;
 
 pub const OccupiedGridPosition = struct {
@@ -58,8 +60,9 @@ pub const Component = struct {
         );
     }
 
-    pub fn render(self: Component, render_type: renderer.ComponentRenderType) void {
+    pub fn render(self: Component, circuit_rect: dvui.Rect.Physical, render_type: renderer.ComponentRenderType) void {
         self.inner.render(
+            circuit_rect,
             self.pos,
             self.rotation,
             self.name,
@@ -141,21 +144,22 @@ pub const Component = struct {
             };
         }
 
-        pub fn gridPositionFromMouse(self: InnerType, rotation: Rotation) GridPosition {
-            const grid_pos = circuit.gridPositionFromMouse();
+        pub fn gridPositionFromMouse(self: InnerType, circuit_rect: dvui.Rect.Physical, rotation: Rotation) GridPosition {
+            const grid_pos = circuit.gridPositionFromMouse(circuit_rect);
             return self.centerForMouse(rotation, grid_pos);
         }
 
         pub fn renderHolding(
             self: Component.InnerType,
+            circuit_area: dvui.Rect.Physical,
             pos: GridPosition,
             rot: Component.Rotation,
             render_type: renderer.ComponentRenderType,
         ) void {
             switch (self) {
-                .resistor => resistor.render(pos, rot, null, null, render_type),
-                .voltage_source => voltage_source.render(pos, rot, null, null, render_type),
-                .ground => ground.render(pos, rot, render_type),
+                .resistor => resistor.render(circuit_area, pos, rot, null, null, render_type),
+                .voltage_source => voltage_source.render(circuit_area, pos, rot, null, null, render_type),
+                .ground => ground.render(circuit_area, pos, rot, render_type),
             }
         }
     };
@@ -167,15 +171,16 @@ pub const Component = struct {
 
         pub fn render(
             self: Component.Inner,
+            circuit_rect: dvui.Rect.Physical,
             pos: GridPosition,
             rot: Component.Rotation,
             name: []const u8,
             render_type: renderer.ComponentRenderType,
         ) void {
             switch (self) {
-                .resistor => |r| resistor.render(pos, rot, name, r, render_type),
-                .voltage_source => |v| voltage_source.render(pos, rot, name, v, render_type),
-                .ground => ground.render(pos, rot, render_type),
+                .resistor => |r| resistor.render(circuit_rect, pos, rot, name, r, render_type),
+                .voltage_source => |v| voltage_source.render(circuit_rect, pos, rot, name, v, render_type),
+                .ground => ground.render(circuit_rect, pos, rot, render_type),
             }
         }
     };

@@ -22,15 +22,15 @@ pub const GridPosition = struct {
     x: i32,
     y: i32,
 
-    pub fn fromWorldPosition(pos: renderer.WorldPosition) GridPosition {
-        return GridPosition{
-            .x = @divTrunc(pos.x, global.grid_size),
-            .y = @divTrunc(pos.y, global.grid_size),
-        };
-    }
-
     pub fn eql(self: GridPosition, other: GridPosition) bool {
         return self.x == other.x and self.y == other.y;
+    }
+
+    pub fn toCircuitPosition(self: GridPosition, circuit_rect: dvui.Rect.Physical) dvui.Point {
+        return dvui.Point{
+            .x = circuit_rect.x + @as(f32, @floatFromInt(self.x * global.grid_size)),
+            .y = circuit_rect.y + @as(f32, @floatFromInt(self.y * global.grid_size)),
+        };
     }
 };
 
@@ -108,8 +108,8 @@ pub var held_component_rotation: component.Component.Rotation = .right;
 
 pub var held_wire_p1: ?GridPosition = null;
 
-pub var components: std.ArrayList(component.Component) = undefined;
-pub var wires: std.ArrayList(Wire) = undefined;
+pub var components: std.array_list.Managed(component.Component) = undefined;
+pub var wires: std.array_list.Managed(Wire) = undefined;
 
 pub fn canPlaceComponent(
     comp_type: component.Component.InnerType,
@@ -200,24 +200,19 @@ pub fn canPlaceWire(wire: Wire) bool {
     return true;
 }
 
-pub fn gridPositionFromMouse() GridPosition {
-    var mouse_x_tmp: f32 = undefined;
-    var mouse_y_tmp: f32 = undefined;
-    _ = sdl.SDL_GetMouseState(&mouse_x_tmp, &mouse_y_tmp);
+pub fn gridPositionFromMouse(circuit_rect: dvui.Rect.Physical) GridPosition {
+    const pos = dvui.currentWindow().mouse_pt;
+    const rel_pos = pos.diff(circuit_rect.topLeft());
 
-    const mouse_x = @as(i32, @intFromFloat(mouse_x_tmp));
-    const mouse_y = @as(i32, @intFromFloat(mouse_y_tmp));
+    var grid_pos = GridPosition{
+        .x = @intFromFloat(@divTrunc(rel_pos.x, global.grid_size)),
+        .y = @intFromFloat(@divTrunc(rel_pos.y, global.grid_size)),
+    };
 
-    const world_pos = renderer.WorldPosition.fromScreenPosition(
-        renderer.ScreenPosition{ .x = mouse_x, .y = mouse_y },
-    );
-
-    var grid_pos = GridPosition.fromWorldPosition(world_pos);
-
-    if (@mod(mouse_x, global.grid_size) > global.grid_size / 2)
+    if (@mod(rel_pos.x, global.grid_size) > global.grid_size / 2)
         grid_pos.x += 1;
 
-    if (@mod(mouse_y, global.grid_size) > global.grid_size / 2)
+    if (@mod(rel_pos.y, global.grid_size) > global.grid_size / 2)
         grid_pos.y += 1;
 
     return grid_pos;

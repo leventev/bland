@@ -12,12 +12,12 @@ comptime {
 }
 
 pub const title_font = dvui.Font{
-    .name = global.font_name,
+    .id = dvui.Font.FontId.fromName(global.font_name),
     .size = 22,
 };
 
 pub const normal_font = dvui.Font{
-    .name = global.font_name,
+    .id = dvui.Font.FontId.fromName(global.font_name),
     .size = 19,
 };
 
@@ -69,8 +69,8 @@ pub var selected_component_changed: bool = false;
 
 pub fn renderComponentList() void {
     var tl = dvui.textLayout(@src(), .{}, .{
-        .color_fill = .{ .color = title_bg_color },
-        .color_text = .{ .color = .white },
+        .color_fill = title_bg_color,
+        .color_text = .white,
         .font = title_font,
         .expand = .horizontal,
     });
@@ -86,17 +86,10 @@ pub fn renderComponentList() void {
         else
             bg_color;
 
-        const hover_bg = if (selected_component_id == i)
-            button_selected_color
-        else
-            button_hover_color;
-
         var bw = dvui.ButtonWidget.init(@src(), .{}, .{
             .id_extra = i,
             .expand = .horizontal,
-            .color_fill = .{ .color = bg },
-            .color_fill_hover = .{ .color = hover_bg },
-            .color_fill_press = .{ .color = hover_bg },
+            .color_fill = bg,
             .margin = dvui.Rect.all(0),
             .corner_radius = dvui.Rect.all(0),
         });
@@ -108,10 +101,9 @@ pub fn renderComponentList() void {
         dvui.labelNoFmt(@src(), comp.name, .{}, .{
             .id_extra = 0,
             .expand = .horizontal,
-            .color_text = .{ .color = text_color_normal },
+            .color_text = text_color_normal,
             .font = normal_font,
-            .color_fill = .{ .color = bg },
-            .color_fill_hover = .{ .color = hover_bg },
+            .color_fill = bg,
             .margin = dvui.Rect.all(0),
         });
 
@@ -132,8 +124,8 @@ pub fn renderComponentList() void {
 
 pub fn renderPropertyBox() void {
     var tl = dvui.textLayout(@src(), .{}, .{
-        .color_fill = .{ .color = title_bg_color },
-        .color_text = .{ .color = .white },
+        .color_fill = title_bg_color,
+        .color_text = .white,
         .font = title_font,
         .expand = .horizontal,
     });
@@ -145,7 +137,7 @@ pub fn renderPropertyBox() void {
         var selected_comp = &circuit.components.items[comp_id];
 
         dvui.label(@src(), "name", .{}, .{
-            .color_text = .{ .color = text_color_normal },
+            .color_text = text_color_normal,
             .font = normal_font,
         });
 
@@ -154,8 +146,8 @@ pub fn renderPropertyBox() void {
                 .buffer = selected_comp.name_buffer,
             },
         }, .{
-            .color_fill = .{ .color = title_bg_color },
-            .color_text = .{ .color = .white },
+            .color_fill = title_bg_color,
+            .color_text = .white,
             .font = normal_font,
             .max_size_content = .width(100),
         });
@@ -174,30 +166,43 @@ pub fn renderPropertyBox() void {
 pub fn render() void {
     var menu = dvui.box(
         @src(),
-        .vertical,
+        .{
+            .dir = .vertical,
+        },
         .{
             .background = true,
             .min_size_content = .{ .w = 150, .h = dvui.windowRect().h },
             .border = .{ .w = 2 }, // right 2px
-            .color_fill = .{ .color = bg_color },
-            .color_border = .{ .color = border_color },
+            .color_fill = bg_color,
+            .color_border = border_color,
+            .expand = .horizontal,
         },
     );
     defer menu.deinit();
 
-    var components_box = dvui.box(@src(), .vertical, .{
-        .background = true,
-        .min_size_content = .{ .w = 150, .h = 300 },
-        .color_fill = .{ .color = bg_color },
-    });
+    var components_box = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .background = true,
+            .min_size_content = .{ .w = 150, .h = 300 },
+            .color_fill = bg_color,
+            .expand = .horizontal,
+        },
+    );
     renderComponentList();
     components_box.deinit();
 
-    var property_box = dvui.box(@src(), .vertical, .{
-        .background = true,
-        .min_size_content = .{ .w = 150, .h = 300 },
-        .color_fill = .{ .color = bg_color },
-    });
+    var property_box = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .background = true,
+            .min_size_content = .{ .w = 150, .h = 300 },
+            .color_fill = bg_color,
+            .expand = .horizontal,
+        },
+    );
     renderPropertyBox();
     property_box.deinit();
 }

@@ -5,6 +5,8 @@ const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 
+const dvui = @import("dvui");
+
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const OccupiedGridPosition = component.OccupiedGridPosition;
@@ -78,83 +80,115 @@ pub fn getOccupiedGridPositions(
 }
 
 pub fn render(
-    pos: GridPosition,
+    circuit_area: dvui.Rect.Physical,
+    grid_pos: GridPosition,
     rot: Component.Rotation,
     render_type: renderer.ComponentRenderType,
 ) void {
-    const wire_pixel_len = 16;
-
-    const world_pos = renderer.WorldPosition.fromGridPosition(pos);
-    const coords = renderer.ScreenPosition.fromWorldPosition(world_pos);
-
+    const pos = grid_pos.toCircuitPosition(circuit_area);
     const render_colors = renderer.renderColors(render_type);
 
     const triangle_side = 45;
     const triangle_height = 39;
+    const wire_pixel_len = 16;
 
     switch (rot) {
         .right, .left => {
-            const wire_off: i32 = if (rot == .right) wire_pixel_len else -wire_pixel_len;
+            const wire_off: f32 = if (rot == .right) wire_pixel_len else -wire_pixel_len;
             renderer.renderTerminalWire(renderer.TerminalWire{
                 .direction = .horizontal,
-                .pos = coords,
+                .pos = pos,
                 .pixel_length = wire_off,
             }, render_type);
 
-            const x_off: i32 = if (rot == .right) triangle_height else -triangle_height;
+            const x_off: f32 = if (rot == .right) triangle_height else -triangle_height;
 
-            renderer.setColor(render_colors.component_color);
             renderer.drawLine(
-                coords.x + wire_off,
-                coords.y - triangle_side / 2,
-                coords.x + wire_off,
-                coords.y + triangle_side / 2,
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y - triangle_side / 2,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y + triangle_side / 2,
+                },
+                render_colors.component_color,
+                1,
             );
 
             renderer.drawLine(
-                coords.x + wire_off,
-                coords.y - triangle_side / 2,
-                coords.x + wire_off + x_off,
-                coords.y,
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y - triangle_side / 2,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off + x_off,
+                    .y = pos.y,
+                },
+                render_colors.component_color,
+                1,
             );
 
             renderer.drawLine(
-                coords.x + wire_off,
-                coords.y + triangle_side / 2,
-                coords.x + wire_off + x_off,
-                coords.y,
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y + triangle_side / 2,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off + x_off,
+                    .y = pos.y,
+                },
+                render_colors.component_color,
+                1,
             );
         },
         .top, .bottom => {
-            const wire_off: i32 = if (rot == .bottom) wire_pixel_len else -wire_pixel_len;
+            const wire_off: f32 = if (rot == .bottom) wire_pixel_len else -wire_pixel_len;
             renderer.renderTerminalWire(renderer.TerminalWire{
                 .direction = .vertical,
-                .pos = coords,
+                .pos = pos,
                 .pixel_length = wire_off,
             }, render_type);
 
-            const y_off: i32 = if (rot == .bottom) triangle_height else -triangle_height;
+            const y_off: f32 = if (rot == .bottom) triangle_height else -triangle_height;
 
-            renderer.setColor(render_colors.component_color);
             renderer.drawLine(
-                coords.x - triangle_side / 2,
-                coords.y + wire_off,
-                coords.x + triangle_side / 2,
-                coords.y + wire_off,
+                dvui.Point.Physical{
+                    .x = pos.x - triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                render_colors.component_color,
+                1,
             );
 
             renderer.drawLine(
-                coords.x - triangle_side / 2,
-                coords.y + wire_off,
-                coords.x,
-                coords.y + wire_off + y_off,
+                dvui.Point.Physical{
+                    .x = pos.x - triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + wire_off + y_off,
+                },
+                render_colors.component_color,
+                1,
             );
 
             renderer.drawLine(
-                coords.x + triangle_side / 2,
-                coords.y + wire_off,
-                coords.x,
-                coords.y + wire_off + y_off,
+                dvui.Point.Physical{
+                    .x = pos.x + triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + wire_off + y_off,
+                },
+                render_colors.component_color,
+                1,
             );
         },
     }

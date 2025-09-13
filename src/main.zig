@@ -73,7 +73,8 @@ fn handleMouseDownEvent(allocator: std.mem.Allocator, event: *sdl.SDL_Event) !vo
     if (event.button.button != sdl.SDL_BUTTON_LEFT) return;
 
     if (circuit.placement_mode == .component) {
-        const grid_pos = circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
+        const grid_pos = circuit.GridPosition{ .x = 0, .y = 0 };
+        //circuit.held_component.gridPositionFromMouse(circuit.held_component_rotation);
         if (circuit.canPlaceComponent(circuit.held_component, grid_pos, circuit.held_component_rotation)) {
             var comp = component.Component{
                 .pos = grid_pos,
@@ -88,7 +89,8 @@ fn handleMouseDownEvent(allocator: std.mem.Allocator, event: *sdl.SDL_Event) !vo
         }
     } else if (circuit.placement_mode == .wire) {
         if (circuit.held_wire_p1) |p1| {
-            const p2 = circuit.gridPositionFromMouse();
+            const p2 = circuit.GridPosition{ .x = 0, .y = 0 };
+            //circuit.gridPositionFromMouse();
             const xlen = @abs(p2.x - p1.x);
             const ylen = @abs(p2.y - p1.y);
 
@@ -107,7 +109,8 @@ fn handleMouseDownEvent(allocator: std.mem.Allocator, event: *sdl.SDL_Event) !vo
                 circuit.held_wire_p1 = null;
             }
         } else {
-            circuit.held_wire_p1 = circuit.gridPositionFromMouse();
+            circuit.held_wire_p1 = circuit.GridPosition{ .x = 0, .y = 0 };
+            //circuit.gridPositionFromMouse();
         }
     }
 }
@@ -202,8 +205,8 @@ pub fn main() !void {
     var win = try dvui.Window.init(@src(), allocator, backend.backend(), .{});
     defer win.deinit();
 
-    circuit.components = std.ArrayList(component.Component).init(allocator);
-    circuit.wires = std.ArrayList(circuit.Wire).init(allocator);
+    circuit.components = std.array_list.Managed(component.Component).init(allocator);
+    circuit.wires = std.array_list.Managed(circuit.Wire).init(allocator);
     defer circuit.components.deinit();
     defer circuit.wires.deinit();
 

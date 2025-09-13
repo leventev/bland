@@ -5,6 +5,8 @@ const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 
+const dvui = @import("dvui");
+
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 
@@ -46,7 +48,8 @@ fn formatValue(value: f32, buf: []u8) !?[]const u8 {
 }
 
 pub fn render(
-    pos: GridPosition,
+    circuit_rect: dvui.Rect.Physical,
+    grid_pos: GridPosition,
     rot: component.Component.Rotation,
     name: ?[]const u8,
     value: ?f32,
@@ -56,8 +59,7 @@ pub fn render(
     const resistor_length = 2 * global.grid_size - 2 * wire_pixel_len;
     const resistor_width = 28;
 
-    const world_pos = renderer.WorldPosition.fromGridPosition(pos);
-    const coords = renderer.ScreenPosition.fromWorldPosition(world_pos);
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
 
     const resistor_color = renderer.renderColors(render_type).component_color;
 
@@ -70,84 +72,90 @@ pub fn render(
     switch (rot) {
         .left, .right => {
             renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = coords,
+                .pos = pos,
                 .direction = .horizontal,
                 .pixel_length = wire_pixel_len,
             }, render_type);
             renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = renderer.ScreenPosition{
-                    .x = coords.x + global.grid_size * 2,
-                    .y = coords.y,
+                .pos = dvui.Point{
+                    .x = pos.x + global.grid_size * 2,
+                    .y = pos.y,
                 },
                 .direction = .horizontal,
                 .pixel_length = -wire_pixel_len,
             }, render_type);
 
-            const rect = renderer.Rect{
-                .x = coords.x + wire_pixel_len,
-                .y = coords.y - resistor_width / 2,
+            const rect = dvui.Rect.Physical{
+                .x = pos.x + wire_pixel_len,
+                .y = pos.y - resistor_width / 2,
                 .w = resistor_length,
                 .h = resistor_width,
             };
 
-            renderer.setColor(resistor_color);
-            renderer.drawRect(rect);
+            renderer.drawRect(rect, resistor_color);
             if (name) |str| {
                 renderer.renderCenteredText(
-                    coords.x + global.grid_size,
-                    coords.y - (resistor_width / 2 + global.font_size / 2 + 2),
-                    renderer.Color.white,
+                    dvui.Point{
+                        .x = pos.x + global.grid_size,
+                        .y = pos.y - (resistor_width / 2 + global.font_size / 2 + 2),
+                    },
+                    dvui.Color.white,
                     str,
                 );
             }
 
             if (value_str) |str| {
                 renderer.renderCenteredText(
-                    coords.x + global.grid_size,
-                    coords.y + resistor_width / 2 + global.font_size / 2 + 2,
-                    renderer.Color.white,
+                    dvui.Point{
+                        .x = pos.x + global.grid_size,
+                        .y = pos.y + resistor_width / 2 + global.font_size / 2 + 2,
+                    },
+                    dvui.Color.white,
                     str,
                 );
             }
         },
         .bottom, .top => {
             renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = coords,
+                .pos = pos,
                 .direction = .vertical,
                 .pixel_length = wire_pixel_len,
             }, render_type);
             renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = renderer.ScreenPosition{
-                    .x = coords.x,
-                    .y = coords.y + global.grid_size * 2,
+                .pos = dvui.Point{
+                    .x = pos.x,
+                    .y = pos.y + global.grid_size * 2,
                 },
                 .direction = .vertical,
                 .pixel_length = -wire_pixel_len,
             }, render_type);
 
-            const rect = renderer.Rect{
-                .x = coords.x - resistor_width / 2,
-                .y = coords.y + wire_pixel_len,
+            const rect = dvui.Rect.Physical{
+                .x = pos.x - resistor_width / 2,
+                .y = pos.y + wire_pixel_len,
                 .w = resistor_width,
                 .h = resistor_length,
             };
 
-            renderer.setColor(resistor_color);
-            renderer.drawRect(rect);
+            renderer.drawRect(rect, resistor_color);
             if (name) |str| {
                 renderer.renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size - (global.font_size / 2 + 8),
-                    renderer.Color.white,
+                    dvui.Point{
+                        .x = pos.x + global.grid_size / 2,
+                        .y = pos.y + global.grid_size - (global.font_size / 2 + 8),
+                    },
+                    dvui.Color.white,
                     str,
                 );
             }
 
             if (value_str) |str| {
                 renderer.renderCenteredText(
-                    coords.x + global.grid_size / 2,
-                    coords.y + global.grid_size + (global.font_size / 2 + 8),
-                    renderer.Color.white,
+                    dvui.Point{
+                        .x = pos.x + global.grid_size / 2,
+                        .y = pos.y + global.grid_size + (global.font_size / 2 + 8),
+                    },
+                    dvui.Color.white,
                     str,
                 );
             }
