@@ -11,12 +11,61 @@ const ComponentRenderType = renderer.ComponentRenderType;
 
 var mouse_pos: dvui.Point.Physical = undefined;
 
+pub fn initKeybinds(allocator: std.mem.Allocator) !void {
+    const win = dvui.currentWindow();
+    try win.keybinds.putNoClobber(allocator, "normal_mode", .{ .key = .escape });
+    try win.keybinds.putNoClobber(allocator, "register_placement_mode", .{ .key = .r });
+    try win.keybinds.putNoClobber(allocator, "voltage_source_placement_mode", .{ .key = .v });
+    try win.keybinds.putNoClobber(allocator, "ground_placement_mode", .{ .key = .g });
+    try win.keybinds.putNoClobber(allocator, "wire_placement_mode", .{ .key = .w });
+    try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .t });
+    try win.keybinds.putNoClobber(allocator, "analyse", .{ .key = .a });
+}
+
+fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
+    if (ev.matchBind("normal_mode") and ev.action == .down) {
+        circuit.placement_mode = .none;
+    }
+
+    if (ev.matchBind("register_placement_mode") and ev.action == .down) {
+        circuit.placement_mode = .component;
+        circuit.held_component = .resistor;
+    }
+
+    if (ev.matchBind("voltage_source_placement_mode") and ev.action == .down) {
+        circuit.placement_mode = .component;
+        circuit.held_component = .voltage_source;
+    }
+
+    if (ev.matchBind("ground_placement_mode") and ev.action == .down) {
+        circuit.placement_mode = .component;
+        circuit.held_component = .ground;
+    }
+
+    if (ev.matchBind("wire_placement_mode") and ev.action == .down) {
+        circuit.placement_mode = .wire;
+        circuit.held_wire_p1 = null;
+    }
+
+    if (ev.matchBind("rotate") and ev.action == .down) {
+        circuit.held_component_rotation = switch (circuit.held_component_rotation) {
+            .right => component.Component.Rotation.bottom,
+            .bottom => component.Component.Rotation.left,
+            .left => component.Component.Rotation.top,
+            .top => component.Component.Rotation.right,
+        };
+    }
+
+    if (ev.matchBind("analyse") and ev.action == .down) {
+        circuit.analyse(allocator);
+    }
+}
+
 fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.BoxWidget) !void {
     for (dvui.events()) |*ev| {
-        if (!circuit_area.matchEvent(ev)) continue;
-
         switch (ev.evt) {
             .mouse => |mouse_ev| {
+                if (!circuit_area.matchEvent(ev)) continue;
                 mouse_pos = mouse_ev.p;
 
                 const circuit_rect = circuit_area.data().rectScale().r;
@@ -47,10 +96,9 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                             }
                         } else if (circuit.placement_mode == .wire) {
                             if (circuit.held_wire_p1) |p1| {
-                                const p2 = circuit.held_component.gridPositionFromScreenPos(
+                                const p2 = circuit.gridPositionFromPos(
                                     circuit_rect,
                                     mouse_pos,
-                                    circuit.held_component_rotation,
                                 );
                                 const xlen = @abs(p2.x - p1.x);
                                 const ylen = @abs(p2.y - p1.y);
@@ -70,10 +118,9 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                     circuit.held_wire_p1 = null;
                                 }
                             } else {
-                                circuit.held_wire_p1 = circuit.held_component.gridPositionFromScreenPos(
+                                circuit.held_wire_p1 = circuit.gridPositionFromPos(
                                     circuit_rect,
                                     mouse_pos,
-                                    circuit.held_component_rotation,
                                 );
                             }
                         }
@@ -81,7 +128,10 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                     else => {},
                 }
             },
-            .key => {},
+            .key => |key_ev| {
+                if (ev.target_widgetId != null) continue;
+                try checkForKeybinds(allocator, key_ev);
+            },
             .text => {},
         }
     }

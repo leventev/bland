@@ -12,6 +12,8 @@ const renderer = @import("renderer.zig");
 
 pub const default_window_width = 1024;
 pub const default_window_height = 768;
+pub const minimum_window_width = 640;
+pub const minimum_window_height = 480;
 
 pub const grid_size = 64;
 

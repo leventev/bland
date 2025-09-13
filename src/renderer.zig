@@ -355,9 +355,6 @@ fn renderToolbox() bool {
 }
 
 pub fn render(allocator: std.mem.Allocator) !bool {
-    _ = sdl.SDL_SetRenderDrawColor(renderer, 45, 45, 60, 255);
-    _ = sdl.SDL_RenderClear(renderer);
-
     if (!renderToolbox())
         return false;
 
