@@ -55,12 +55,8 @@ pub fn render(
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 
     const total_len = 2 * global.grid_size;
-    const middle_len = 16;
-    const middle_width = 4;
+    const middle_len = 50;
     const wire_len = (total_len - middle_len) / 2;
-
-    const positive_side_len = 48;
-    const negative_side_len = 32;
 
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
@@ -87,32 +83,29 @@ pub fn render(
                 .pixel_length = -wire_len,
             }, render_type);
 
-            var rect1 = dvui.Rect.Physical{
-                .x = pos.x + wire_len,
-                .y = pos.y - positive_side_len / 2,
-                .w = middle_width,
-                .h = positive_side_len,
-            };
-            var rect2 = dvui.Rect.Physical{
-                .x = pos.x + wire_len + middle_len - middle_width,
-                .y = pos.y - negative_side_len / 2,
-                .w = middle_width,
-                .h = negative_side_len,
-            };
+            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+            defer path.deinit();
 
-            if (rot == .left) {
-                const tmp = rect1.x;
-                rect1.x = rect2.x;
-                rect2.x = tmp;
-            }
+            path.addArc(
+                dvui.Point.Physical{
+                    .x = pos.x + global.grid_size,
+                    .y = pos.y,
+                },
+                middle_len / 2,
+                dvui.math.pi * 2,
+                0,
+                false,
+            );
 
-            renderer.drawRect(rect1, render_colors.component_color, thickness);
-            renderer.drawRect(rect2, render_colors.component_color, thickness);
+            path.build().stroke(.{
+                .color = render_colors.component_color,
+                .thickness = thickness,
+            });
 
             if (name) |str| {
                 renderer.renderCenteredText(
                     dvui.Point{
-                        .x = pos.x + global.grid_size / 2,
+                        .x = pos.x + global.grid_size / 3,
                         .y = pos.y - global.grid_size / 4,
                     },
                     dvui.themeGet().color(.content, .text),
@@ -123,7 +116,7 @@ pub fn render(
             if (value_str) |str| {
                 renderer.renderCenteredText(
                     dvui.Point{
-                        .x = pos.x + global.grid_size + global.grid_size / 2,
+                        .x = pos.x + 2 * global.grid_size - global.grid_size / 3,
                         .y = pos.y - global.grid_size / 4,
                     },
                     dvui.themeGet().color(.content, .text),
@@ -134,16 +127,16 @@ pub fn render(
             const sign: f32 = if (rot == .right) -1 else 1;
             renderer.renderCenteredText(
                 dvui.Point{
-                    .x = pos.x + global.grid_size + sign * 20,
-                    .y = pos.y + global.grid_size / 4,
+                    .x = pos.x + global.grid_size + sign * middle_len / 4,
+                    .y = pos.y,
                 },
                 render_colors.component_color,
                 "+",
             );
             renderer.renderCenteredText(
                 dvui.Point{
-                    .x = pos.x + global.grid_size - sign * 20,
-                    .y = pos.y + global.grid_size / 4,
+                    .x = pos.x + global.grid_size - sign * middle_len / 4,
+                    .y = pos.y,
                 },
                 render_colors.component_color,
                 "-",
@@ -164,32 +157,30 @@ pub fn render(
                 .pixel_length = -wire_len,
             }, render_type);
 
-            var rect1 = dvui.Rect.Physical{
-                .x = pos.x - positive_side_len / 2,
-                .y = pos.y + wire_len,
-                .w = positive_side_len,
-                .h = middle_width,
-            };
-            var rect2 = dvui.Rect.Physical{
-                .x = pos.x - negative_side_len / 2,
-                .y = pos.y + wire_len + middle_len - middle_width,
-                .w = negative_side_len,
-                .h = middle_width,
-            };
+            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+            defer path.deinit();
 
-            if (rot == .top) {
-                const tmp = rect1.y;
-                rect1.y = rect2.y;
-                rect2.y = tmp;
-            }
+            path.addArc(
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + global.grid_size,
+                },
+                middle_len / 2,
+                dvui.math.pi * 2,
+                0,
+                false,
+            );
 
-            renderer.drawRect(rect1, render_colors.component_color, thickness);
-            renderer.drawRect(rect2, render_colors.component_color, thickness);
+            path.build().stroke(.{
+                .color = render_colors.component_color,
+                .thickness = thickness,
+            });
+
             if (name) |str| {
                 renderer.renderCenteredText(
                     dvui.Point{
                         .x = pos.x + global.grid_size / 2,
-                        .y = pos.y + global.grid_size - (global.circuit_font_size + 2),
+                        .y = pos.y + global.grid_size / 3,
                     },
                     dvui.themeGet().color(.content, .text),
                     str,
@@ -200,7 +191,7 @@ pub fn render(
                 renderer.renderCenteredText(
                     dvui.Point{
                         .x = pos.x + global.grid_size / 2,
-                        .y = pos.y + global.grid_size + (global.circuit_font_size + 2),
+                        .y = pos.y + 2 * global.grid_size - global.grid_size / 3,
                     },
                     dvui.themeGet().color(.content, .text),
                     str,
@@ -210,16 +201,16 @@ pub fn render(
             const sign: f32 = if (rot == .bottom) -1 else 1;
             renderer.renderCenteredText(
                 dvui.Point{
-                    .x = pos.x - global.grid_size / 4,
-                    .y = pos.y + global.grid_size + sign * 20,
+                    .x = pos.x,
+                    .y = pos.y + global.grid_size + sign * middle_len / 4,
                 },
                 render_colors.component_color,
                 "+",
             );
             renderer.renderCenteredText(
                 dvui.Point{
-                    .x = pos.x - global.grid_size / 4,
-                    .y = pos.y + global.grid_size - sign * 20,
+                    .x = pos.x,
+                    .y = pos.y + global.grid_size - sign * middle_len / 4,
                 },
                 render_colors.component_color,
                 "-",
