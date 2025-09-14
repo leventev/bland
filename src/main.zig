@@ -20,16 +20,28 @@ fn init(win: *dvui.Window) !void {
     defer circuit.wires.deinit();
 
     try dvui.addFont(global.font_name, global.font_data, null);
+    try dvui.addFont(global.bold_font_name, global.bold_font_data, null);
 
     try circuit_widget.initKeybinds(allocator);
 
     // TODO
-    var theme = dvui.Theme.builtin.adwaita_dark;
-    theme.font_body = .{ .id = .fromName(global.font_name), .size = 18 };
-    theme.font_caption = .{ .id = .fromName(global.font_name), .size = 15 };
-    theme.font_title = .{ .id = .fromName(global.font_name), .size = 20 };
+    global.dark_theme.font_body = .{ .id = .fromName(global.font_name), .size = 18 };
+    global.dark_theme.font_caption = .{ .id = .fromName(global.font_name), .size = 15 };
+    global.dark_theme.font_title = .{ .id = .fromName(global.font_name), .size = 20 };
+    global.dark_theme.font_title_1 = .{ .id = .fromName(global.bold_font_name), .size = 19 };
+    global.dark_theme.font_title_2 = .{ .id = .fromName(global.bold_font_name), .size = 18 };
+    global.dark_theme.font_title_3 = .{ .id = .fromName(global.bold_font_name), .size = 17 };
+    global.dark_theme.font_title_4 = .{ .id = .fromName(global.bold_font_name), .size = 16 };
 
-    dvui.themeSet(theme);
+    global.light_theme.font_body = .{ .id = .fromName(global.font_name), .size = 18 };
+    global.light_theme.font_caption = .{ .id = .fromName(global.font_name), .size = 15 };
+    global.light_theme.font_title = .{ .id = .fromName(global.font_name), .size = 20 };
+    global.light_theme.font_title_1 = .{ .id = .fromName(global.bold_font_name), .size = 19 };
+    global.light_theme.font_title_2 = .{ .id = .fromName(global.bold_font_name), .size = 18 };
+    global.light_theme.font_title_3 = .{ .id = .fromName(global.bold_font_name), .size = 17 };
+    global.light_theme.font_title_4 = .{ .id = .fromName(global.bold_font_name), .size = 16 };
+
+    dvui.themeSet(global.dark_theme);
 }
 
 fn frame() !dvui.App.Result {

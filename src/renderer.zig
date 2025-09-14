@@ -9,6 +9,8 @@ const circuit_widget = @import("circuit_widget.zig");
 const dvui = @import("dvui");
 const GridPosition = circuit.GridPosition;
 
+pub var dark_mode: bool = true;
+
 pub fn renderCenteredText(pos: dvui.Point, color: dvui.Color, text: []const u8) void {
     const f = dvui.Font{
         .id = .fromName(global.font_name),
@@ -36,10 +38,10 @@ pub fn renderCenteredText(pos: dvui.Point, color: dvui.Color, text: []const u8) 
     }) catch @panic("failed to render text");
 }
 
-pub fn drawRect(rect: dvui.Rect.Physical, color: dvui.Color) void {
+pub fn drawRect(rect: dvui.Rect.Physical, color: dvui.Color, thickness: f32) void {
     dvui.Rect.stroke(rect, dvui.Rect.Physical.all(0), .{
         .color = color,
-        .thickness = 1,
+        .thickness = thickness,
     });
 }
 
@@ -62,6 +64,38 @@ pub const ComponentRenderType = enum {
     unable_to_place,
     hovered,
     selected,
+
+    pub fn colors(self: ComponentRenderType) ComponentRenderColors {
+        switch (self) {
+            .normal => return .{
+                .wire_color = dvuiColorFromHex(0x32f032ff),
+                .component_color = dvuiColorFromHex(0xb428e6ff),
+            },
+            .holding => return .{
+                .wire_color = dvuiColorFromHex(0x999999ff),
+                .component_color = dvuiColorFromHex(0x999999ff),
+            },
+            .unable_to_place => return .{
+                .wire_color = dvuiColorFromHex(0xbb4040ff),
+                .component_color = dvuiColorFromHex(0xbb4040ff),
+            },
+            .hovered => return .{
+                .wire_color = dvuiColorFromHex(0x32f032ff),
+                .component_color = dvuiColorFromHex(0x44ffffff),
+            },
+            .selected => return .{
+                .wire_color = dvuiColorFromHex(0x32f032ff),
+                .component_color = dvuiColorFromHex(0xff4444ff),
+            },
+        }
+    }
+
+    pub fn thickness(self: ComponentRenderType) f32 {
+        return switch (self) {
+            .normal, .hovered => 1,
+            .holding, .selected, .unable_to_place => 4,
+        };
+    }
 };
 
 const ComponentRenderColors = struct {
@@ -78,31 +112,6 @@ fn dvuiColorFromHex(color: u32) dvui.Color {
     };
 }
 
-pub fn renderColors(render_type: ComponentRenderType) ComponentRenderColors {
-    switch (render_type) {
-        .normal => return .{
-            .wire_color = dvuiColorFromHex(0x32f032ff),
-            .component_color = dvuiColorFromHex(0xb428e6ff),
-        },
-        .holding => return .{
-            .wire_color = dvuiColorFromHex(0x999999ff),
-            .component_color = dvuiColorFromHex(0x999999ff),
-        },
-        .unable_to_place => return .{
-            .wire_color = dvuiColorFromHex(0xbb4040ff),
-            .component_color = dvuiColorFromHex(0xbb4040ff),
-        },
-        .hovered => return .{
-            .wire_color = dvuiColorFromHex(0x32f032ff),
-            .component_color = dvuiColorFromHex(0x44ffffff),
-        },
-        .selected => return .{
-            .wire_color = dvuiColorFromHex(0x32f032ff),
-            .component_color = dvuiColorFromHex(0xff4444ff),
-        },
-    }
-}
-
 pub const TerminalWire = struct {
     pos: dvui.Point,
     pixel_length: f32,
@@ -114,7 +123,8 @@ pub fn renderTerminalWire(
     render_type: ComponentRenderType,
 ) void {
     const pos = wire.pos;
-    const wire_color = renderColors(render_type).wire_color;
+    const wire_color = render_type.colors().wire_color;
+    const thickness = render_type.thickness();
 
     switch (wire.direction) {
         .horizontal => {
@@ -128,7 +138,7 @@ pub fn renderTerminalWire(
                     .y = pos.y - 1,
                 },
                 wire_color,
-                1,
+                thickness,
             );
 
             drawLine(
@@ -141,7 +151,7 @@ pub fn renderTerminalWire(
                     .y = pos.y,
                 },
                 wire_color,
-                1,
+                thickness,
             );
         },
         .vertical => {
@@ -155,7 +165,7 @@ pub fn renderTerminalWire(
                     .y = pos.y + wire.pixel_length,
                 },
                 wire_color,
-                1,
+                thickness,
             );
 
             drawLine(
@@ -168,7 +178,7 @@ pub fn renderTerminalWire(
                     .y = pos.y + wire.pixel_length,
                 },
                 wire_color,
-                1,
+                thickness,
             );
         },
     }
@@ -189,8 +199,10 @@ pub fn renderWire(
     render_type: ComponentRenderType,
 ) void {
     const pos = wire.pos.toCircuitPosition(circuit_rect);
-    const wire_color = renderColors(render_type).wire_color;
     const length: f32 = @floatFromInt(wire.length * global.grid_size);
+
+    const wire_color = render_type.colors().wire_color;
+    const thickness = render_type.thickness();
 
     if (render_type == .holding) {
         const rect1 = dvui.Rect.Physical{
@@ -199,7 +211,7 @@ pub fn renderWire(
             .w = 6,
             .h = 6,
         };
-        drawRect(rect1, wire_color);
+        drawRect(rect1, wire_color, thickness);
 
         const pos2 = wire.end().toCircuitPosition(circuit_rect);
 
@@ -209,7 +221,7 @@ pub fn renderWire(
             .w = 6,
             .h = 6,
         };
-        drawRect(rect2, wire_color);
+        drawRect(rect2, wire_color, thickness);
     }
 
     switch (wire.direction) {
@@ -224,7 +236,7 @@ pub fn renderWire(
                     .y = pos.y - 1,
                 },
                 wire_color,
-                1,
+                thickness,
             );
             drawLine(
                 dvui.Point.Physical{
@@ -236,7 +248,7 @@ pub fn renderWire(
                     .y = pos.y,
                 },
                 wire_color,
-                1,
+                thickness,
             );
         },
         .vertical => {
@@ -250,7 +262,7 @@ pub fn renderWire(
                     .y = pos.y + length,
                 },
                 wire_color,
-                1,
+                thickness,
             );
             drawLine(
                 dvui.Point.Physical{
@@ -262,7 +274,7 @@ pub fn renderWire(
                     .y = pos.y + length,
                 },
                 wire_color,
-                1,
+                thickness,
             );
         },
     }
@@ -325,6 +337,20 @@ fn renderToolbox(allocator: std.mem.Allocator) bool {
         if (dvui.menuItemLabel(@src(), "Analyse", .{}, .{ .expand = .horizontal }) != null) {
             circuit.analyse(allocator);
             fw.close();
+        }
+    }
+
+    if (dvui.menuItemLabel(@src(), "Settings", .{ .submenu = true }, .{})) |r| {
+        var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer fw.deinit();
+
+        if (dvui.menuItemLabel(@src(), "Toggle light/dark mode", .{}, .{ .expand = .horizontal }) != null) {
+            dark_mode = !dark_mode;
+            fw.close();
+            if (dark_mode)
+                dvui.themeSet(global.dark_theme)
+            else
+                dvui.themeSet(global.light_theme);
         }
     }
 

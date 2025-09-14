@@ -56,6 +56,11 @@ pub fn renderComponentList() void {
         else
             dvui.themeGet().color(.control, .fill);
 
+        const font = if (selected_component_id == i)
+            dvui.themeGet().font_title_2
+        else
+            dvui.themeGet().font_body;
+
         var bw = dvui.ButtonWidget.init(@src(), .{}, .{
             .id_extra = i,
             .expand = .horizontal,
@@ -72,7 +77,7 @@ pub fn renderComponentList() void {
             .id_extra = 0,
             .expand = .horizontal,
             .color_text = dvui.themeGet().color(.control, .text),
-            .font = dvui.themeGet().font_body,
+            .font = font,
             .color_fill = bg,
             .margin = dvui.Rect.all(0),
             .padding = dvui.Rect.all(2),
@@ -144,7 +149,7 @@ pub fn renderPropertyBox() void {
             },
         }, .{
             .color_fill = dvui.themeGet().color(.control, .fill),
-            .color_text = .white,
+            .color_text = dvui.themeGet().color(.content, .text),
             .font = dvui.themeGet().font_body,
             .expand = .horizontal,
             .margin = dvui.Rect.all(4),

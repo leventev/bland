@@ -86,7 +86,8 @@ pub fn render(
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_area);
-    const render_colors = renderer.renderColors(render_type);
+    const render_colors = render_type.colors();
+    const thickness = render_type.thickness();
 
     const triangle_side = 45;
     const triangle_height = 39;
@@ -113,7 +114,7 @@ pub fn render(
                     .y = pos.y + triangle_side / 2,
                 },
                 render_colors.component_color,
-                1,
+                thickness,
             );
 
             renderer.drawLine(
@@ -126,7 +127,7 @@ pub fn render(
                     .y = pos.y,
                 },
                 render_colors.component_color,
-                1,
+                thickness,
             );
 
             renderer.drawLine(
@@ -139,7 +140,7 @@ pub fn render(
                     .y = pos.y,
                 },
                 render_colors.component_color,
-                1,
+                thickness,
             );
         },
         .top, .bottom => {
@@ -162,7 +163,7 @@ pub fn render(
                     .y = pos.y + wire_off,
                 },
                 render_colors.component_color,
-                1,
+                thickness,
             );
 
             renderer.drawLine(
@@ -175,7 +176,7 @@ pub fn render(
                     .y = pos.y + wire_off + y_off,
                 },
                 render_colors.component_color,
-                1,
+                thickness,
             );
 
             renderer.drawLine(
@@ -188,7 +189,7 @@ pub fn render(
                     .y = pos.y + wire_off + y_off,
                 },
                 render_colors.component_color,
-                1,
+                thickness,
             );
         },
     }

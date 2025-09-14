@@ -62,7 +62,8 @@ pub fn render(
     const positive_side_len = 48;
     const negative_side_len = 32;
 
-    const render_colors = renderer.renderColors(render_type);
+    const render_colors = render_type.colors();
+    const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
     const value_str = if (value) |val| formatValue(
@@ -105,8 +106,8 @@ pub fn render(
                 rect2.x = tmp;
             }
 
-            renderer.drawRect(rect1, render_colors.component_color);
-            renderer.drawRect(rect2, render_colors.component_color);
+            renderer.drawRect(rect1, render_colors.component_color, thickness);
+            renderer.drawRect(rect2, render_colors.component_color, thickness);
 
             if (name) |str| {
                 renderer.renderCenteredText(
@@ -114,7 +115,7 @@ pub fn render(
                         .x = pos.x + global.grid_size / 2,
                         .y = pos.y - global.grid_size / 4,
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }
@@ -125,7 +126,7 @@ pub fn render(
                         .x = pos.x + global.grid_size + global.grid_size / 2,
                         .y = pos.y - global.grid_size / 4,
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }
@@ -182,15 +183,15 @@ pub fn render(
                 rect2.y = tmp;
             }
 
-            renderer.drawRect(rect1, render_colors.component_color);
-            renderer.drawRect(rect2, render_colors.component_color);
+            renderer.drawRect(rect1, render_colors.component_color, thickness);
+            renderer.drawRect(rect2, render_colors.component_color, thickness);
             if (name) |str| {
                 renderer.renderCenteredText(
                     dvui.Point{
                         .x = pos.x + global.grid_size / 2,
                         .y = pos.y + global.grid_size - (global.circuit_font_size + 2),
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }
@@ -201,7 +202,7 @@ pub fn render(
                         .x = pos.x + global.grid_size / 2,
                         .y = pos.y + global.grid_size + (global.circuit_font_size + 2),
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }

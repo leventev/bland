@@ -61,7 +61,8 @@ pub fn render(
 
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 
-    const resistor_color = renderer.renderColors(render_type).component_color;
+    const resistor_color = render_type.colors().component_color;
+    const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
     const value_str = if (value) |val| formatValue(
@@ -92,14 +93,14 @@ pub fn render(
                 .h = resistor_width,
             };
 
-            renderer.drawRect(rect, resistor_color);
+            renderer.drawRect(rect, resistor_color, thickness);
             if (name) |str| {
                 renderer.renderCenteredText(
                     dvui.Point{
                         .x = pos.x + global.grid_size,
                         .y = pos.y - (resistor_width / 2 + global.circuit_font_size / 2 + 2),
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }
@@ -110,7 +111,7 @@ pub fn render(
                         .x = pos.x + global.grid_size,
                         .y = pos.y + resistor_width / 2 + global.circuit_font_size / 2 + 2,
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }
@@ -137,14 +138,14 @@ pub fn render(
                 .h = resistor_length,
             };
 
-            renderer.drawRect(rect, resistor_color);
+            renderer.drawRect(rect, resistor_color, thickness);
             if (name) |str| {
                 renderer.renderCenteredText(
                     dvui.Point{
                         .x = pos.x + global.grid_size / 2,
                         .y = pos.y + global.grid_size - (global.circuit_font_size / 2 + 8),
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }
@@ -155,7 +156,7 @@ pub fn render(
                         .x = pos.x + global.grid_size / 2,
                         .y = pos.y + global.grid_size + (global.circuit_font_size / 2 + 8),
                     },
-                    dvui.Color.white,
+                    dvui.themeGet().color(.content, .text),
                     str,
                 );
             }
