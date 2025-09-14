@@ -163,6 +163,8 @@ pub fn renderPropertyBox() void {
         selected_comp.name = te.getText();
 
         te.deinit();
+
+        selected_comp.renderPropertyBox();
     }
 }
 

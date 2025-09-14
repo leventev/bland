@@ -94,6 +94,10 @@ pub const Component = struct {
         self.name = try @as(InnerType, self.inner).setNewComponentName(self.name_buffer);
     }
 
+    pub fn renderPropertyBox(self: *Component) void {
+        self.inner.renderPropertyBox();
+    }
+
     pub const InnerType = enum {
         resistor,
         voltage_source,
@@ -184,7 +188,7 @@ pub const Component = struct {
         ground: void,
 
         pub fn render(
-            self: Component.Inner,
+            self: Inner,
             circuit_rect: dvui.Rect.Physical,
             pos: GridPosition,
             rot: Component.Rotation,
@@ -195,6 +199,14 @@ pub const Component = struct {
                 .resistor => |r| resistor.render(circuit_rect, pos, rot, name, r, render_type),
                 .voltage_source => |v| voltage_source.render(circuit_rect, pos, rot, name, v, render_type),
                 .ground => ground.render(circuit_rect, pos, rot, render_type),
+            }
+        }
+
+        pub fn renderPropertyBox(self: *Inner) void {
+            switch (self.*) {
+                .resistor => |*r| resistor.renderPropertyBox(r),
+                .voltage_source => |*v| voltage_source.renderPropertyBox(v),
+                else => {},
             }
         }
     };

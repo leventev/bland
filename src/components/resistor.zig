@@ -163,3 +163,39 @@ pub fn render(
         },
     }
 }
+
+pub fn renderPropertyBox(r: *f32) void {
+    dvui.label(@src(), "resistance", .{}, .{
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_body,
+    });
+
+    var box = dvui.box(
+        @src(),
+        .{ .dir = .horizontal },
+        .{
+            .expand = .horizontal,
+        },
+    );
+    defer box.deinit();
+
+    _ = dvui.textEntryNumber(@src(), f32, .{
+        .value = r,
+        .show_min_max = true,
+        .min = 0.00001,
+    }, .{
+        .color_fill = dvui.themeGet().color(.control, .fill),
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_body,
+        .expand = .horizontal,
+        .margin = dvui.Rect.all(4),
+    });
+
+    dvui.label(@src(), "\u{03A9}", .{}, .{
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_title,
+        .margin = dvui.Rect.all(4),
+        .padding = dvui.Rect.all(4),
+        .gravity_y = 0.5,
+    });
+}

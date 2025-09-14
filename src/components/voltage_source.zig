@@ -218,3 +218,38 @@ pub fn render(
         },
     }
 }
+
+pub fn renderPropertyBox(v: *f32) void {
+    dvui.label(@src(), "voltage", .{}, .{
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_body,
+    });
+
+    var box = dvui.box(
+        @src(),
+        .{ .dir = .horizontal },
+        .{
+            .expand = .horizontal,
+        },
+    );
+    defer box.deinit();
+
+    _ = dvui.textEntryNumber(@src(), f32, .{
+        .value = v,
+        .show_min_max = true,
+    }, .{
+        .color_fill = dvui.themeGet().color(.control, .fill),
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_body,
+        .expand = .horizontal,
+        .margin = dvui.Rect.all(4),
+    });
+
+    dvui.label(@src(), "V", .{}, .{
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_title,
+        .margin = dvui.Rect.all(4),
+        .padding = dvui.Rect.all(4),
+        .gravity_y = 0.5,
+    });
+}
