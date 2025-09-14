@@ -6,85 +6,55 @@ const circuit = @import("circuit.zig");
 const renderer = @import("renderer.zig");
 
 const dvui = @import("dvui");
-const SDLBackend = dvui.backend;
-comptime {
-    std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
-}
-
-pub const title_font = dvui.Font{
-    .id = dvui.Font.FontId.fromName(global.font_name),
-    .size = 22,
-};
-
-pub const normal_font = dvui.Font{
-    .id = dvui.Font.FontId.fromName(global.font_name),
-    .size = 19,
-};
-
-pub const bg_color = dvui.Color{
-    .r = 40,
-    .g = 40,
-    .b = 55,
-    .a = 255,
-};
-
-pub const button_hover_color = dvui.Color{
-    .r = 60,
-    .g = 60,
-    .b = 80,
-    .a = 255,
-};
-
-pub const button_selected_color = dvui.Color{
-    .r = 50,
-    .g = 50,
-    .b = 65,
-    .a = 255,
-};
-
-pub const title_bg_color = dvui.Color{
-    .r = 35,
-    .g = 35,
-    .b = 48,
-    .a = 255,
-};
-
-pub const border_color = dvui.Color{
-    .r = 30,
-    .g = 30,
-    .b = 43,
-    .a = 255,
-};
-
-pub const text_color_normal = dvui.Color{
-    .r = 220,
-    .g = 220,
-    .b = 220,
-    .a = 255,
-};
 
 pub var hovered_component_id: ?usize = null;
 pub var selected_component_id: ?usize = null;
 pub var selected_component_changed: bool = false;
 
 pub fn renderComponentList() void {
-    var tl = dvui.textLayout(@src(), .{}, .{
-        .color_fill = title_bg_color,
-        .color_text = .white,
-        .font = title_font,
-        .expand = .horizontal,
-    });
+    {
+        var tl_box = dvui.box(
+            @src(),
+            .{
+                .dir = .horizontal,
+            },
+            .{
+                .color_fill = dvui.themeGet().color(.content, .fill),
+                .expand = .horizontal,
+                .background = true,
+                .border = dvui.Rect{ .h = 1 },
+                .color_border = dvui.themeGet().color(.content, .border),
+            },
+        );
+        defer tl_box.deinit();
 
-    tl.addText("components", .{});
-    tl.deinit();
+        var tl = dvui.textLayout(@src(), .{}, .{
+            .color_fill = dvui.themeGet().color(.content, .fill),
+            .color_text = dvui.themeGet().color(.window, .text),
+            .font = dvui.themeGet().font_title,
+            .gravity_x = 0.5,
+        });
+        defer tl.deinit();
+
+        tl.addText("components", .{});
+    }
 
     hovered_component_id = null;
 
+    var scroll = dvui.scrollArea(
+        @src(),
+        .{},
+        .{
+            .expand = .horizontal,
+        },
+    );
+    defer scroll.deinit();
+
     for (0.., circuit.components.items) |i, comp| {
         const bg = if (selected_component_id == i)
-            button_selected_color
+            dvui.themeGet().color(.highlight, .fill)
         else
-            bg_color;
+            dvui.themeGet().color(.control, .fill);
 
         var bw = dvui.ButtonWidget.init(@src(), .{}, .{
             .id_extra = i,
@@ -101,10 +71,11 @@ pub fn renderComponentList() void {
         dvui.labelNoFmt(@src(), comp.name, .{}, .{
             .id_extra = 0,
             .expand = .horizontal,
-            .color_text = text_color_normal,
-            .font = normal_font,
+            .color_text = dvui.themeGet().color(.control, .text),
+            .font = dvui.themeGet().font_body,
             .color_fill = bg,
             .margin = dvui.Rect.all(0),
+            .padding = dvui.Rect.all(2),
         });
 
         if (bw.hovered()) {
@@ -123,22 +94,48 @@ pub fn renderComponentList() void {
 }
 
 pub fn renderPropertyBox() void {
-    var tl = dvui.textLayout(@src(), .{}, .{
-        .color_fill = title_bg_color,
-        .color_text = .white,
-        .font = title_font,
-        .expand = .horizontal,
-    });
+    {
+        var tl_box = dvui.box(
+            @src(),
+            .{
+                .dir = .horizontal,
+            },
+            .{
+                .color_fill = dvui.themeGet().color(.content, .fill),
+                .expand = .horizontal,
+                .background = true,
+                .border = dvui.Rect{ .h = 1 },
+                .color_border = dvui.themeGet().color(.content, .border),
+            },
+        );
+        defer tl_box.deinit();
 
-    tl.addText("properties", .{});
-    tl.deinit();
+        var tl = dvui.textLayout(@src(), .{}, .{
+            .color_fill = dvui.themeGet().color(.content, .fill),
+            .color_text = dvui.themeGet().color(.window, .text),
+            .font = dvui.themeGet().font_title,
+            .gravity_x = 0.5,
+        });
+        defer tl.deinit();
+
+        tl.addText("properties", .{});
+    }
 
     if (selected_component_id) |comp_id| {
+        var scroll = dvui.scrollArea(
+            @src(),
+            .{},
+            .{
+                .expand = .horizontal,
+            },
+        );
+        defer scroll.deinit();
+
         var selected_comp = &circuit.components.items[comp_id];
 
         dvui.label(@src(), "name", .{}, .{
-            .color_text = text_color_normal,
-            .font = normal_font,
+            .color_text = dvui.themeGet().color(.content, .text),
+            .font = dvui.themeGet().font_body,
         });
 
         var te = dvui.textEntry(@src(), .{
@@ -146,10 +143,11 @@ pub fn renderPropertyBox() void {
                 .buffer = selected_comp.name_buffer,
             },
         }, .{
-            .color_fill = title_bg_color,
+            .color_fill = dvui.themeGet().color(.control, .fill),
             .color_text = .white,
-            .font = normal_font,
-            .max_size_content = .width(100),
+            .font = dvui.themeGet().font_body,
+            .expand = .horizontal,
+            .margin = dvui.Rect.all(4),
         });
 
         if (dvui.firstFrame(te.data().id) or selected_component_changed) {
@@ -164,45 +162,52 @@ pub fn renderPropertyBox() void {
 }
 
 pub fn render() void {
-    var menu = dvui.box(
+    var menu = dvui.paned(
         @src(),
         .{
-            .dir = .vertical,
+            .direction = .vertical,
+            .collapsed_size = 100,
         },
         .{
             .background = true,
             .min_size_content = .{ .w = 150, .h = dvui.windowRect().h },
             .border = .{ .w = 2 }, // right 2px
-            .color_fill = bg_color,
-            .color_border = border_color,
+            .color_fill = dvui.themeGet().color(.window, .fill),
+            .color_border = dvui.themeGet().color(.window, .border),
             .expand = .horizontal,
         },
     );
     defer menu.deinit();
 
-    var components_box = dvui.box(
-        @src(),
-        .{ .dir = .vertical },
-        .{
-            .background = true,
-            .min_size_content = .{ .w = 150, .h = 300 },
-            .color_fill = bg_color,
-            .expand = .horizontal,
-        },
-    );
-    renderComponentList();
-    components_box.deinit();
+    if (dvui.firstFrame(menu.data().id)) {
+        menu.split_ratio.* = 0.5;
+    }
 
-    var property_box = dvui.box(
-        @src(),
-        .{ .dir = .vertical },
-        .{
-            .background = true,
-            .min_size_content = .{ .w = 150, .h = 300 },
-            .color_fill = bg_color,
-            .expand = .horizontal,
-        },
-    );
-    renderPropertyBox();
-    property_box.deinit();
+    if (menu.showFirst()) {
+        var components_box = dvui.box(
+            @src(),
+            .{ .dir = .vertical },
+            .{
+                .background = true,
+                .color_fill = dvui.themeGet().color(.window, .fill),
+                .expand = .both,
+            },
+        );
+        renderComponentList();
+        components_box.deinit();
+    }
+
+    if (menu.showSecond()) {
+        var property_box = dvui.box(
+            @src(),
+            .{ .dir = .vertical },
+            .{
+                .background = true,
+                .color_fill = dvui.themeGet().color(.window, .fill),
+                .expand = .both,
+            },
+        );
+        renderPropertyBox();
+        property_box.deinit();
+    }
 }

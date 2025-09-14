@@ -33,6 +33,15 @@ pub const Component = struct {
         bottom,
         left,
         top,
+
+        pub fn rotateClockwise(self: Rotation) Rotation {
+            return switch (self) {
+                .right => .bottom,
+                .bottom => .left,
+                .left => .top,
+                .top => .right,
+            };
+        }
     };
 
     pos: GridPosition,

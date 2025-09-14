@@ -6,11 +6,6 @@ const global = @import("global.zig");
 const matrix = @import("matrix.zig");
 
 const dvui = @import("dvui");
-const SDLBackend = dvui.backend;
-comptime {
-    std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
-}
-const sdl = SDLBackend.c;
 
 pub const PlacementMode = enum {
     none,

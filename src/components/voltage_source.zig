@@ -188,7 +188,7 @@ pub fn render(
                 renderer.renderCenteredText(
                     dvui.Point{
                         .x = pos.x + global.grid_size / 2,
-                        .y = pos.y + global.grid_size - (global.font_size + 2),
+                        .y = pos.y + global.grid_size - (global.circuit_font_size + 2),
                     },
                     dvui.Color.white,
                     str,
@@ -199,7 +199,7 @@ pub fn render(
                 renderer.renderCenteredText(
                     dvui.Point{
                         .x = pos.x + global.grid_size / 2,
-                        .y = pos.y + global.grid_size + (global.font_size + 2),
+                        .y = pos.y + global.grid_size + (global.circuit_font_size + 2),
                     },
                     dvui.Color.white,
                     str,

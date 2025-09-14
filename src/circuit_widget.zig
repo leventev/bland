@@ -20,6 +20,7 @@ pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     try win.keybinds.putNoClobber(allocator, "wire_placement_mode", .{ .key = .w });
     try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .t });
     try win.keybinds.putNoClobber(allocator, "analyse", .{ .key = .a });
+    try win.keybinds.putNoClobber(allocator, "open_debug_window", .{ .key = .l });
 }
 
 fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
@@ -48,16 +49,15 @@ fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
     }
 
     if (ev.matchBind("rotate") and ev.action == .down) {
-        circuit.held_component_rotation = switch (circuit.held_component_rotation) {
-            .right => component.Component.Rotation.bottom,
-            .bottom => component.Component.Rotation.left,
-            .left => component.Component.Rotation.top,
-            .top => component.Component.Rotation.right,
-        };
+        circuit.held_component_rotation = circuit.held_component_rotation.rotateClockwise();
     }
 
     if (ev.matchBind("analyse") and ev.action == .down) {
         circuit.analyse(allocator);
+    }
+
+    if (ev.matchBind("open_debug_window") and ev.action == .down) {
+        dvui.toggleDebugWindow();
     }
 }
 
@@ -141,12 +141,14 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     var circuit_area = dvui.BoxWidget.init(@src(), .{
         .dir = .horizontal,
     }, .{
-        .color_fill = dvui.themeGet().color(.control, .fill),
+        .color_fill = dvui.themeGet().color(.content, .fill),
+        .background = true,
         .expand = .both,
     });
     defer circuit_area.deinit();
 
     circuit_area.install();
+    circuit_area.drawBackground();
     try handleCircuitAreaEvents(allocator, &circuit_area);
 
     const circuit_rect = circuit_area.data().rectScale().r;

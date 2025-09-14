@@ -7,11 +7,6 @@ const circuit = @import("circuit.zig");
 const circuit_widget = @import("circuit_widget.zig");
 
 const dvui = @import("dvui");
-const SDLBackend = dvui.backend;
-comptime {
-    std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
-}
-const sdl = SDLBackend.c;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -27,6 +22,14 @@ fn init(win: *dvui.Window) !void {
     try dvui.addFont(global.font_name, global.font_data, null);
 
     try circuit_widget.initKeybinds(allocator);
+
+    // TODO
+    var theme = dvui.Theme.builtin.adwaita_dark;
+    theme.font_body = .{ .id = .fromName(global.font_name), .size = 18 };
+    theme.font_caption = .{ .id = .fromName(global.font_name), .size = 15 };
+    theme.font_title = .{ .id = .fromName(global.font_name), .size = 20 };
+
+    dvui.themeSet(theme);
 }
 
 fn frame() !dvui.App.Result {

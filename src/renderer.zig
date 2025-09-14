@@ -7,48 +7,12 @@ const sidebar = @import("sidebar.zig");
 const circuit_widget = @import("circuit_widget.zig");
 
 const dvui = @import("dvui");
-const SDLBackend = dvui.backend;
-comptime {
-    std.debug.assert(@hasDecl(SDLBackend, "SDLBackend"));
-}
-const sdl = SDLBackend.c;
-
 const GridPosition = circuit.GridPosition;
-
-pub var screen_state: ScreenState = .{};
-pub var window: *sdl.SDL_Window = undefined;
-pub var renderer: *sdl.SDL_Renderer = undefined;
-
-const ScreenState = struct {
-    camera_x: i32 = 0,
-    camera_y: i32 = 0,
-    window_x: i32 = 0,
-    window_y: i32 = 0,
-    width: i32 = 0,
-    height: i32 = 0,
-    scale: f32 = 1,
-
-    fn cameraWidth(self: ScreenState) i32 {
-        return @intFromFloat(@as(f32, @floatFromInt(global.default_window_width)) * self.scale);
-    }
-
-    fn cameraHeight(self: ScreenState) i32 {
-        return @intFromFloat(@as(f32, @floatFromInt(global.default_window_height)) * self.scale);
-    }
-
-    fn xscale(self: ScreenState) f32 {
-        return @as(f32, @floatFromInt(self.width)) / @as(f32, @floatFromInt(global.default_window_width));
-    }
-
-    fn yscale(self: ScreenState) f32 {
-        return @as(f32, @floatFromInt(self.height)) / @as(f32, @floatFromInt(global.default_window_height));
-    }
-};
 
 pub fn renderCenteredText(pos: dvui.Point, color: dvui.Color, text: []const u8) void {
     const f = dvui.Font{
         .id = .fromName(global.font_name),
-        .size = global.font_size,
+        .size = global.circuit_font_size,
     };
 
     const s = dvui.Font.textSize(f, text);
@@ -304,50 +268,63 @@ pub fn renderWire(
     }
 }
 
-fn renderToolbox() bool {
-    {
-        var toolbox = dvui.box(@src(), .{
-            .dir = .vertical,
-        }, .{
-            .expand = .horizontal,
-            .background = true,
-            .style = .window,
-        });
-        defer toolbox.deinit();
+fn renderToolbox(allocator: std.mem.Allocator) bool {
+    var toolbox = dvui.box(@src(), .{
+        .dir = .vertical,
+    }, .{
+        .expand = .horizontal,
+        .background = true,
+        .style = .window,
+    });
+    defer toolbox.deinit();
 
-        var menu = dvui.menu(@src(), .horizontal, .{});
-        defer menu.deinit();
+    var menu = dvui.menu(@src(), .horizontal, .{});
+    defer menu.deinit();
 
-        if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{ .tag = "first-focusable" })) |r| {
-            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
-            defer fw.deinit();
+    if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{ .tag = "first-focusable" })) |r| {
+        var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer fw.deinit();
 
-            if (dvui.menuItemLabel(@src(), "Quit", .{}, .{ .expand = .horizontal }) != null) {
-                return false;
-            }
+        if (dvui.menuItemLabel(@src(), "Quit", .{}, .{ .expand = .horizontal }) != null) {
+            return false;
+        }
+    }
+
+    if (dvui.menuItemLabel(@src(), "Components", .{ .submenu = true }, .{})) |r| {
+        var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer fw.deinit();
+
+        if (dvui.menuItemLabel(@src(), "Rotate held component", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.held_component_rotation = circuit.held_component_rotation.rotateClockwise();
+            fw.close();
         }
 
-        if (dvui.menuItemLabel(@src(), "Components", .{ .submenu = true }, .{})) |r| {
-            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
-            defer fw.deinit();
+        if (dvui.menuItemLabel(@src(), "Resistor", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .resistor;
+            fw.close();
+        }
 
-            if (dvui.menuItemLabel(@src(), "Resistor", .{}, .{ .expand = .horizontal }) != null) {
-                circuit.placement_mode = .component;
-                circuit.held_component = .resistor;
-                fw.close();
-            }
+        if (dvui.menuItemLabel(@src(), "Voltage source", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .voltage_source;
+            fw.close();
+        }
 
-            if (dvui.menuItemLabel(@src(), "Voltage source", .{}, .{ .expand = .horizontal }) != null) {
-                circuit.placement_mode = .component;
-                circuit.held_component = .voltage_source;
-                fw.close();
-            }
+        if (dvui.menuItemLabel(@src(), "Ground", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .ground;
+            fw.close();
+        }
+    }
 
-            if (dvui.menuItemLabel(@src(), "Ground", .{}, .{ .expand = .horizontal }) != null) {
-                circuit.placement_mode = .component;
-                circuit.held_component = .ground;
-                fw.close();
-            }
+    if (dvui.menuItemLabel(@src(), "Circuit", .{ .submenu = true }, .{})) |r| {
+        var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer fw.deinit();
+
+        if (dvui.menuItemLabel(@src(), "Analyse", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.analyse(allocator);
+            fw.close();
         }
     }
 
@@ -355,7 +332,7 @@ fn renderToolbox() bool {
 }
 
 pub fn render(allocator: std.mem.Allocator) !bool {
-    if (!renderToolbox())
+    if (!renderToolbox(allocator))
         return false;
 
     var paned = dvui.paned(
@@ -366,6 +343,8 @@ pub fn render(allocator: std.mem.Allocator) !bool {
         },
         .{
             .expand = .both,
+            .background = true,
+            .color_fill = dvui.themeGet().color(.content, .fill),
         },
     );
     defer paned.deinit();
