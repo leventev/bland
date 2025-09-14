@@ -137,7 +137,24 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
     }
 }
 
+const GridPositionWireConnection = struct {
+    end_connection: usize,
+    non_end_connection: usize,
+};
+
 pub fn renderCircuit(allocator: std.mem.Allocator) !void {
+    // to decide where to render lumps we count all wire connections per node
+    // it would be better to visualize this with a drawing on paper
+    // if end_connection > 0 and non_end_connection > 0 then we put a lump there
+    // if end_connection > 2 or non_end_connection == 2 then we put a lump there
+    var grid_pos_wire_connections = std.AutoHashMap(
+        circuit.GridPosition,
+        GridPositionWireConnection,
+    ).init(
+        allocator,
+    );
+    defer grid_pos_wire_connections.deinit();
+
     var circuit_area = dvui.BoxWidget.init(@src(), .{
         .dir = .horizontal,
     }, .{
@@ -189,11 +206,66 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ComponentRenderType.normal;
 
+        var terminal_buff: [8]circuit.GridPosition = undefined;
+        const terminals = comp.terminals(&terminal_buff);
+        for (terminals) |gpos| {
+            // ensure key existsterm
+            _ = try grid_pos_wire_connections.getOrPutValue(gpos, .{
+                .end_connection = 0,
+                .non_end_connection = 0,
+            });
+            var ptr = grid_pos_wire_connections.getPtr(gpos).?;
+            ptr.end_connection += 1;
+        }
+
         comp.render(circuit_rect, render_type);
     }
 
     for (circuit.wires.items) |wire| {
+        var it = wire.iterator();
+        while (it.next()) |gpos| {
+            // ensure key existsterm
+            _ = try grid_pos_wire_connections.getOrPutValue(gpos, .{
+                .end_connection = 0,
+                .non_end_connection = 0,
+            });
+            var ptr = grid_pos_wire_connections.getPtr(gpos).?;
+            if (gpos.eql(wire.pos) or gpos.eql(wire.end())) {
+                ptr.end_connection += 1;
+            } else {
+                ptr.non_end_connection += 1;
+            }
+        }
         renderer.renderWire(circuit_rect, wire, .normal);
+    }
+
+    var it = grid_pos_wire_connections.iterator();
+    while (it.next()) |entry| {
+        const gpos = entry.key_ptr.*;
+        const wire_connections = entry.value_ptr.*;
+        if (wire_connections.end_connection > 0 and wire_connections.non_end_connection > 0 or
+            wire_connections.end_connection > 2 or wire_connections.non_end_connection == 2)
+        {
+            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+            defer path.deinit();
+
+            const pos = gpos.toCircuitPosition(circuit_rect);
+
+            path.addArc(
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y,
+                },
+                7,
+                dvui.math.pi * 2,
+                0,
+                false,
+            );
+
+            path.build().fillConvex(.{
+                .color = ComponentRenderType.normal.colors().wire_color,
+            });
+        }
     }
 
     if (circuit.placement_mode == .component) {
