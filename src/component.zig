@@ -6,6 +6,7 @@ const circuit = @import("circuit.zig");
 const resistor = @import("components/resistor.zig");
 const voltage_source = @import("components/voltage_source.zig");
 const ground = @import("components/ground.zig");
+const capacitor = @import("components/capacitor.zig");
 
 const dvui = @import("dvui");
 
@@ -102,6 +103,7 @@ pub const Component = struct {
         resistor,
         voltage_source,
         ground,
+        capacitor,
 
         fn centerForMouse(self: InnerType, rotation: Rotation, pos: GridPosition) GridPosition {
             switch (self) {
@@ -112,6 +114,9 @@ pub const Component = struct {
                     return voltage_source.centerForMouse(pos, rotation);
                 },
                 .ground => return pos,
+                .capacitor => {
+                    return capacitor.centerForMouse(pos, rotation);
+                },
             }
         }
 
@@ -120,6 +125,7 @@ pub const Component = struct {
                 .resistor => return resistor.defaultValue(),
                 .voltage_source => return voltage_source.defaultValue(),
                 .ground => return Inner{ .ground = {} },
+                .capacitor => return capacitor.defaultValue(),
             }
         }
 
@@ -128,6 +134,7 @@ pub const Component = struct {
                 .resistor => resistor.setNewComponentName(buff),
                 .voltage_source => voltage_source.setNewComponentName(buff),
                 .ground => ground.setNewComponentName(buff),
+                .capacitor => capacitor.setNewComponentName(buff),
             };
         }
 
@@ -141,6 +148,7 @@ pub const Component = struct {
                 .ground => ground.getTerminals(pos, rotation, terminals_buff),
                 .resistor => resistor.getTerminals(pos, rotation, terminals_buff),
                 .voltage_source => voltage_source.getTerminals(pos, rotation, terminals_buff),
+                .capacitor => capacitor.getTerminals(pos, rotation, terminals_buff),
             };
         }
 
@@ -154,6 +162,7 @@ pub const Component = struct {
                 .ground => ground.getOccupiedGridPositions(pos, rotation, occupied),
                 .resistor => resistor.getOccupiedGridPositions(pos, rotation, occupied),
                 .voltage_source => voltage_source.getOccupiedGridPositions(pos, rotation, occupied),
+                .capacitor => capacitor.getOccupiedGridPositions(pos, rotation, occupied),
             };
         }
 
@@ -178,6 +187,7 @@ pub const Component = struct {
                 .resistor => resistor.render(circuit_area, pos, rot, null, null, render_type),
                 .voltage_source => voltage_source.render(circuit_area, pos, rot, null, null, render_type),
                 .ground => ground.render(circuit_area, pos, rot, render_type),
+                .capacitor => capacitor.render(circuit_area, pos, rot, null, null, render_type),
             }
         }
     };
@@ -186,6 +196,7 @@ pub const Component = struct {
         resistor: f32,
         voltage_source: f32,
         ground: void,
+        capacitor: f32,
 
         pub fn render(
             self: Inner,
@@ -199,6 +210,7 @@ pub const Component = struct {
                 .resistor => |r| resistor.render(circuit_rect, pos, rot, name, r, render_type),
                 .voltage_source => |v| voltage_source.render(circuit_rect, pos, rot, name, v, render_type),
                 .ground => ground.render(circuit_rect, pos, rot, render_type),
+                .capacitor => |c| capacitor.render(circuit_rect, pos, rot, name, c, render_type),
             }
         }
 
@@ -206,6 +218,7 @@ pub const Component = struct {
             switch (self.*) {
                 .resistor => |*r| resistor.renderPropertyBox(r),
                 .voltage_source => |*v| voltage_source.renderPropertyBox(v),
+                .capacitor => |*c| capacitor.renderPropertyBox(c),
                 else => {},
             }
         }

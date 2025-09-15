@@ -328,11 +328,22 @@ fn renderToolbox(allocator: std.mem.Allocator) bool {
             circuit.held_component = .ground;
             fw.close();
         }
+
+        if (dvui.menuItemLabel(@src(), "Capacitor", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .capacitor;
+            fw.close();
+        }
     }
 
     if (dvui.menuItemLabel(@src(), "Circuit", .{ .submenu = true }, .{})) |r| {
         var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
+
+        if (dvui.menuItemLabel(@src(), "Wire", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .wire;
+            fw.close();
+        }
 
         if (dvui.menuItemLabel(@src(), "Analyse", .{}, .{ .expand = .horizontal }) != null) {
             circuit.analyse(allocator);
