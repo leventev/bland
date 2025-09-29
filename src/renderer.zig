@@ -323,6 +323,12 @@ fn renderToolbox(allocator: std.mem.Allocator) bool {
             fw.close();
         }
 
+        if (dvui.menuItemLabel(@src(), "Current source", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .current_source;
+            fw.close();
+        }
+
         if (dvui.menuItemLabel(@src(), "Ground", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .component;
             circuit.held_component = .ground;
