@@ -1,15 +1,21 @@
 [X] matrix struct
 [X] input the nodal equations into a matrix
 [X] implement gauss-jordan elimination for matrices
-[X] support voltage sources between 2 unknown voltage nodes(supernodes)
+[X] support voltage sources between 2 unknown voltage nodes
 [X] be able to change the name of components
-[ ] add current sources
+[X] add current sources
 [ ] while hovering over a wire highlight all other wires connected to it
-[ ] be able to change the resistance of a resistor
-[ ] add capacitors
+[X] be able to change the resistance of a resistor
+[X] add capacitors
+[X] add MNA
 [ ] add inductors
-[ ] be able to solve DAEs
 [ ] display voltage/current-time graphs
 [ ] be able to save and load circuits
 [ ] more complex analysis methods
 [ ] be able to delete, move, copy, paste elements of the circuit
+[ ] add voltage controlled voltage sources
+[ ] add voltage controlled current sources
+[ ] add current controlled voltage sources
+[ ] add current controlled current sources
+[ ] add node pins
+[ ] unit appropriate value text fields

@@ -252,45 +252,12 @@ fn buildNetList(allocator: std.mem.Allocator) !NetList {
     try traverseWiresForNodes(allocator, &remaining_terminals, &node_terminals);
     try findAllDirectConnections(allocator, &remaining_terminals, &node_terminals);
 
-    var nodes = try mergeGroundNodes(allocator, node_terminals.items);
-
-    setKnownVoltages(&nodes);
+    const nodes = try mergeGroundNodes(allocator, node_terminals.items);
 
     return NetList{
         .allocator = allocator,
         .nodes = nodes,
     };
-}
-
-fn checkForKnownVoltage(nodes: *std.ArrayListUnmanaged(NetList.Node)) bool {
-    for (nodes.items) |*node| {
-        if (node.voltage != null) continue;
-
-        for (node.connected_terminals.items) |term| {
-            const comp = components.items[term.component_id];
-            if (@as(component.Component.InnerType, comp.inner) != component.Component.InnerType.voltage_source)
-                continue;
-
-            const pos_node_id = comp.terminal_node_ids[0];
-            const neg_node_id = comp.terminal_node_ids[1];
-            const add = pos_node_id == node.id;
-            const other_node_id = if (add) neg_node_id else pos_node_id;
-
-            const other_node = nodes.items[other_node_id];
-            if (other_node.voltage) |other_voltage| {
-                // TODO: polarity
-                const voltage = comp.inner.voltage_source;
-                node.voltage = other_voltage + if (add) voltage else -voltage;
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-fn setKnownVoltages(nodes: *std.ArrayListUnmanaged(NetList.Node)) void {
-    nodes.items[0].voltage = 0;
-    while (checkForKnownVoltage(nodes)) {}
 }
 
 fn mergeGroundNodes(
@@ -530,299 +497,234 @@ fn getLastConnected(
     return null;
 }
 
-const Supernode = struct {
-    // node ids
-    nodes: std.ArrayListUnmanaged(usize),
-    // component ids
-    voltage_sources: std.ArrayListUnmanaged(usize),
+const MNA = struct {
+    mat: matrix.Matrix(f32),
+    nodes: []const NetList.Node,
+    group_2: []const usize,
+
+    fn init(
+        allocator: std.mem.Allocator,
+        nodes: []const NetList.Node,
+        group_2: []const usize,
+    ) !MNA {
+        const total_variable_count = nodes.len - 1 + group_2.len;
+        return MNA{
+            .mat = try matrix.Matrix(f32).init(
+                allocator,
+                total_variable_count,
+                total_variable_count + 1,
+            ),
+            .nodes = nodes,
+            .group_2 = group_2,
+        };
+    }
+
+    fn stampVoltageVoltage(
+        self: *MNA,
+        row_voltage_id: usize,
+        col_voltage_id: usize,
+        val: f32,
+    ) void {
+        // ignore grounds
+        if (row_voltage_id == 0 or col_voltage_id == 0) return;
+        self.mat.data[row_voltage_id - 1][col_voltage_id - 1] += val;
+    }
+
+    fn stampVoltageCurrent(
+        self: *MNA,
+        row_voltage_id: usize,
+        col_current_id: usize,
+        val: f32,
+    ) void {
+        // ignore grounds
+        const col = self.nodes.len - 1 + col_current_id;
+        if (row_voltage_id == 0) return;
+        self.mat.data[row_voltage_id - 1][col] += val;
+    }
+
+    fn stampCurrentCurrent(
+        self: *MNA,
+        row_current_id: usize,
+        col_current_id: usize,
+        val: f32,
+    ) void {
+        const row = self.nodes.len - 1 + row_current_id;
+        const col = self.nodes.len - 1 + col_current_id;
+        self.mat.data[row][col] += val;
+    }
+
+    fn stampCurrentVoltage(
+        self: *MNA,
+        row_current_id: usize,
+        col_voltage_id: usize,
+        val: f32,
+    ) void {
+        // ignore ground
+        if (col_voltage_id == 0) return;
+        const row = self.nodes.len - 1 + row_current_id;
+        self.mat.data[row][col_voltage_id - 1] += val;
+    }
+
+    fn stampVoltageRHS(self: *MNA, row_voltage_id: usize, val: f32) void {
+        // ignore ground
+        if (row_voltage_id == 0) return;
+        self.mat.data[row_voltage_id - 1][self.mat.col_count - 1] = val;
+    }
+
+    fn stampCurrentRHS(self: *MNA, row_current_id: usize, val: f32) void {
+        const row = self.nodes.len - 1 + row_current_id;
+        self.mat.data[row][self.mat.col_count - 1] = val;
+    }
 };
 
-const NodeGroup = union(enum) {
-    single: usize,
-    supernode: Supernode,
-};
+fn createMNAMatrix(allocator: std.mem.Allocator, nodes: []const NetList.Node, group_2: []const usize) !MNA {
+    // create matrix (|v| + |i2| X |v| + |i2| + 1)
+    // where v is all nodes except ground
+    // the last column is the RHS of the equation Ax=b
+    // basically (A|b) where b is an (|v| + |i2| X 1) matrix
 
-fn getNodeGroup(
-    allocator: std.mem.Allocator,
-    nodes: []const NetList.Node,
-    start_node_id: usize,
-) !NodeGroup {
-    var node_group = std.ArrayListUnmanaged(usize){};
-    var voltage_sources = std.ArrayListUnmanaged(usize){};
+    const total_variable_count = nodes.len - 1 + group_2.len;
 
-    var node_queue = try std.ArrayListUnmanaged(usize).initCapacity(allocator, 4);
-    defer node_queue.deinit(allocator);
-
-    try node_queue.append(allocator, start_node_id);
-
-    while (node_queue.pop()) |node_id| {
-        const node = nodes[node_id];
-
-        // if there is a voltage source connected to a node with a known voltage
-        // then we dont need to use a supernode
-        if (node.voltage != null) {
-            node_group.deinit(allocator);
-            return NodeGroup{ .single = start_node_id };
-        }
-
-        try node_group.append(allocator, node.id);
-
-        for (node.connected_terminals.items) |terminal| {
-            const comp = components.items[terminal.component_id];
-            switch (comp.inner) {
-                else => continue,
-                .voltage_source => {
-                    // skip voltage sources already added
-                    var found = false;
-                    for (voltage_sources.items) |vs_id| {
-                        if (vs_id == terminal.component_id) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (found) continue;
-
-                    const other_node_id = comp.otherNode(node.id);
-
-                    try node_queue.append(allocator, other_node_id);
-                    try voltage_sources.append(allocator, terminal.component_id);
-                },
-            }
-        }
-    }
-
-    return NodeGroup{ .supernode = .{
-        .nodes = node_group,
-        .voltage_sources = voltage_sources,
-    } };
-}
-
-fn findSupernodes(
-    allocator: std.mem.Allocator,
-    nodes: []const NetList.Node,
-) !std.ArrayListUnmanaged(NodeGroup) {
-    var nodes_remaining = try allocator.alloc(bool, nodes.len);
-    defer allocator.free(nodes_remaining);
-
-    var node_groups = std.ArrayListUnmanaged(NodeGroup){};
-
-    for (0..nodes_remaining.len) |i| {
-        nodes_remaining[i] = true;
-    }
-
-    // TODO: implement a more optimal solution
-    // the current implementation keeps allocating and deallocating a buffer
-    // and traverses the same node multiple times
-    // a better solution would be finding all voltage source "groups" first
-    // and then checking whether any node connected to it has a known voltage
-    // if yes then calculate the voltages of all other nodes
-    // if not then we have to use the supernode technique
-    // but as this is not a performance critical code segment
-    // this has low priority
-
-    for (0..nodes_remaining.len) |i| {
-        if (!nodes_remaining[i]) continue;
-
-        const current_node = nodes[i];
-        // if the node voltage is known the node is normal
-        if (current_node.voltage != null) {
-            try node_groups.append(allocator, NodeGroup{ .single = i });
-            nodes_remaining[i] = false;
-        } else {
-            const group = try getNodeGroup(allocator, nodes, i);
-            try node_groups.append(allocator, group);
-            switch (group) {
-                .single => |node_id| {
-                    nodes_remaining[node_id] = false;
-                },
-                .supernode => |supernode| {
-                    for (supernode.nodes.items) |node_id| {
-                        nodes_remaining[node_id] = false;
-                    }
-                },
-            }
-        }
-    }
-
-    return node_groups;
-}
-
-fn addEquationToRow(
-    nodes: []const NetList.Node,
-    mat: *matrix.Matrix(f32),
-    current_row: usize,
-    node_id: usize,
-) void {
-    const node = nodes[node_id];
-
-    var total_conductance: f32 = 0;
-
-    for (node.connected_terminals.items) |terminal| {
-        const comp = components.items[terminal.component_id];
-        switch (comp.inner) {
-            .resistor => |resistance| {
-                const conductance = 1 / resistance;
-                total_conductance += conductance;
-
-                const other_node_id = comp.otherNode(node_id);
-
-                // set the coefficient for the other node
-                // we add the conductance instead of just setting it
-                // because of parallel resistances
-                mat.data[current_row][other_node_id] += -conductance;
-            },
-            else => continue,
-        }
-    }
-
-    // set the coefficient for the current node
-    mat.data[current_row][node.id] = total_conductance;
-}
-
-fn addSingleNodeToAugmentedMatrix(
-    nodes: []const NetList.Node,
-    mat: *matrix.Matrix(f32),
-    current_row: usize,
-    node_id: usize,
-) void {
-    const node = nodes[node_id];
-
-    if (node.voltage) |voltage| {
-        // set the coefficient associated with the node to 1
-        // and the rightmost column to the known voltage
-        // all other columns are 0
-        mat.data[current_row][node_id] = 1;
-        mat.data[current_row][nodes.len] = voltage;
-    } else {
-        addEquationToRow(nodes, mat, current_row, node_id);
-    }
-}
-
-fn addSupernodeToAugmentedMatrix(
-    nodes: []const NetList.Node,
-    mat: *matrix.Matrix(f32),
-    current_row: usize,
-    supernode: Supernode,
-) void {
-    std.log.debug("add supernode {} {} {}", .{
-        current_row,
-        supernode.nodes.items.len,
-        supernode.voltage_sources.items.len,
-    });
-    // add all equations to the same row
-    for (supernode.nodes.items) |node_id| {
-        addEquationToRow(nodes, mat, current_row, node_id);
-    }
-    for (0.., supernode.voltage_sources.items) |i, comp_id| {
-        const row = current_row + 1 + i;
-
-        const comp = components.items[comp_id];
-        const positive_node = comp.terminal_node_ids[0];
-        const negative_node = comp.terminal_node_ids[1];
-
-        for (0..nodes.len) |col| {
-            mat.data[row][col] = 0;
-        }
-        mat.data[row][positive_node] = 1;
-        mat.data[row][negative_node] = -1;
-        mat.data[row][nodes.len] = comp.inner.voltage_source;
-    }
-}
-
-fn constructAugmentedMatrix(
-    allocator: std.mem.Allocator,
-    nodes: []const NetList.Node,
-) !matrix.Matrix(f32) {
-    var mat = try matrix.Matrix(f32).init(
+    var mna = try MNA.init(
         allocator,
-        nodes.len,
-        nodes.len + 1,
+        nodes,
+        group_2,
     );
 
-    for (0..nodes.len) |row| {
-        for (0..nodes.len + 1) |col| {
-            mat.data[row][col] = 0;
+    for (0..total_variable_count) |row| {
+        for (0..total_variable_count + 1) |col| {
+            mna.mat.data[row][col] = 0;
         }
     }
 
-    var node_groups = try findSupernodes(allocator, nodes);
-    defer {
-        for (node_groups.items) |*node_group| {
-            switch (node_group.*) {
-                .supernode => |*supernode| {
-                    supernode.nodes.deinit(allocator);
-                    supernode.voltage_sources.deinit(allocator);
-                },
-                else => {},
+    for (0.., components.items) |idx, comp| {
+        switch (comp.inner) {
+            .resistor => |r| {
+                const in_group_2 = std.mem.indexOf(usize, group_2, &.{idx}) != null;
+
+                const node_ids = comp.terminal_node_ids;
+                const v_plus = node_ids[0];
+                const v_minus = node_ids[1];
+
+                const g = 1 / r;
+
+                if (in_group_2) {} else {
+                    mna.stampVoltageVoltage(v_plus, v_plus, g);
+                    mna.stampVoltageVoltage(v_plus, v_minus, -g);
+                    mna.stampVoltageVoltage(v_minus, v_plus, -g);
+                    mna.stampVoltageVoltage(v_minus, v_minus, g);
+                }
+            },
+            .voltage_source => |v| {
+                const node_ids = comp.terminal_node_ids;
+                const v_plus = node_ids[0];
+                const v_minus = node_ids[1];
+
+                const idx_in_group_2 = std.mem.indexOf(usize, group_2, &.{idx}) orelse @panic("Invalid Group 2");
+
+                mna.stampVoltageCurrent(v_plus, idx_in_group_2, 1);
+                mna.stampVoltageCurrent(v_minus, idx_in_group_2, -1);
+
+                mna.stampCurrentVoltage(idx_in_group_2, v_plus, 1);
+                mna.stampCurrentVoltage(idx_in_group_2, v_minus, -1);
+                mna.stampCurrentRHS(idx_in_group_2, v);
+            },
+            .current_source => |i| {
+                const in_group_2 = std.mem.indexOf(usize, group_2, &.{idx}) != null;
+
+                const node_ids = comp.terminal_node_ids;
+                const v_plus = node_ids[0];
+                const v_minus = node_ids[1];
+
+                if (in_group_2) {} else {
+                    mna.stampVoltageRHS(v_plus, -i);
+                    mna.stampVoltageRHS(v_minus, i);
+                }
+            },
+            else => {},
+        }
+    }
+
+    return mna;
+}
+
+fn printMNAMatrix(
+    mat: *const matrix.Matrix(f32),
+    nodes: []const NetList.Node,
+    group_2: []const usize,
+) void {
+    const total_variable_count = nodes.len - 1 + group_2.len;
+    std.debug.assert(mat.row_count == total_variable_count);
+    std.debug.assert(mat.col_count == total_variable_count + 1);
+
+    for (0..total_variable_count) |row| {
+        if (row >= nodes.len - 1) {
+            std.debug.print("i{}: ", .{group_2[row - (nodes.len - 1)]});
+        } else {
+            std.debug.print("v{}: ", .{row + 1});
+        }
+
+        for (0..total_variable_count) |col| {
+            std.debug.print("{}", .{mat.data[row][col]});
+            if (col >= nodes.len - 1) {
+                std.debug.print("*i{} ", .{group_2[col - (nodes.len - 1)]});
+            } else {
+                std.debug.print("*v{} ", .{col + 1});
+            }
+
+            if (col != total_variable_count - 1) {
+                std.debug.print(" + ", .{});
             }
         }
-        node_groups.deinit(allocator);
+
+        std.debug.print("= {}", .{mat.data[row][total_variable_count]});
+
+        std.debug.print("\n", .{});
     }
-
-    var current_row: usize = 0;
-
-    for (node_groups.items) |node_group| {
-        switch (node_group) {
-            .single => |node_id| {
-                addSingleNodeToAugmentedMatrix(nodes, &mat, current_row, node_id);
-                current_row += 1;
-            },
-            .supernode => |supernode| {
-                addSupernodeToAugmentedMatrix(nodes, &mat, current_row, supernode);
-                current_row += supernode.nodes.items.len;
-            },
-        }
-    }
-
-    return mat;
 }
 
 pub fn analyse(allocator: std.mem.Allocator) void {
+    // group edges:
+    // - group 1(i1): all elements whose current will be eliminated
+    // - group 2(i2): all other elements
+
+    // since we include all nodes, theres no need to explicitly store their order
+    // however we store i2 elements
+
+    var group_2 = std.ArrayListUnmanaged(usize){};
+    defer group_2.deinit(allocator);
+
+    // TODO: include currents that are control variables
+    // TODO: include currents that we want to inspect
+    for (0.., components.items) |idx, comp| {
+        switch (comp.inner) {
+            .voltage_source => {
+                group_2.append(allocator, idx) catch {
+                    std.log.err("Failed to build netlist", .{});
+                    return;
+                };
+            },
+            else => {},
+        }
+    }
+
     var netlist = buildNetList(allocator) catch {
         std.log.err("Failed to build netlist", .{});
         return;
     };
     defer netlist.deinit();
 
-    var unknown_count: usize = 0;
-    for (netlist.nodes.items) |node| {
-        if (node.voltage) |voltage| {
-            std.log.debug("node #{} {}V", .{ node.id, voltage });
-        } else {
-            unknown_count += 1;
-            std.log.debug("node #{}", .{node.id});
-        }
-        for (node.connected_terminals.items) |term| {
-            std.log.debug("     {s}.{}", .{ components.items[term.component_id].name, term.terminal_id });
-        }
-    }
-
-    var augmented_matrix = constructAugmentedMatrix(allocator, netlist.nodes.items) catch {
-        std.log.err("Failed to construct augmented matrix", .{});
+    // create matrix (|v| + |i2| X |v| + |i2| + 1)
+    // iterate over all elements and stamp them onto the matrix
+    var mna = createMNAMatrix(allocator, netlist.nodes.items, group_2.items) catch {
+        std.log.err("Failed to build netlist", .{});
         return;
     };
-    defer augmented_matrix.deinit(allocator);
+    mna.mat.dump();
+    printMNAMatrix(&mna.mat, netlist.nodes.items, group_2.items);
 
-    augmented_matrix.dump();
-
-    augmented_matrix.gaussJordanElimination();
-
-    for (0..netlist.nodes.items.len) |i| {
-        const voltage = augmented_matrix.data[i][netlist.nodes.items.len];
-        netlist.nodes.items[i].voltage = voltage;
-        std.log.debug("node #{} voltage: {}V", .{ i, voltage });
-    }
-
-    for (components.items) |comp| {
-        switch (comp.inner) {
-            .resistor => |resistance| {
-                const node1 = netlist.nodes.items[comp.terminal_node_ids[0]];
-                const node2 = netlist.nodes.items[comp.terminal_node_ids[1]];
-                const voltage = node2.voltage.? - node1.voltage.?;
-                const current = @abs(voltage / resistance);
-                std.log.debug("{s} current: {}A", .{ comp.name, current });
-            },
-            else => {},
-        }
-    }
+    // solve the matrix with Gauss elimination
+    mna.mat.gaussJordanElimination();
+    mna.mat.dump();
+    printMNAMatrix(&mna.mat, netlist.nodes.items, group_2.items);
 }
