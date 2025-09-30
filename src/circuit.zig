@@ -497,7 +497,7 @@ fn getLastConnected(
     return null;
 }
 
-const MNA = struct {
+pub const MNA = struct {
     mat: matrix.Matrix(f32),
     nodes: []const NetList.Node,
     group_2: []const usize,
@@ -519,7 +519,7 @@ const MNA = struct {
         };
     }
 
-    fn stampVoltageVoltage(
+    pub fn stampVoltageVoltage(
         self: *MNA,
         row_voltage_id: usize,
         col_voltage_id: usize,
@@ -530,7 +530,7 @@ const MNA = struct {
         self.mat.data[row_voltage_id - 1][col_voltage_id - 1] += val;
     }
 
-    fn stampVoltageCurrent(
+    pub fn stampVoltageCurrent(
         self: *MNA,
         row_voltage_id: usize,
         col_current_id: usize,
@@ -542,7 +542,7 @@ const MNA = struct {
         self.mat.data[row_voltage_id - 1][col] += val;
     }
 
-    fn stampCurrentCurrent(
+    pub fn stampCurrentCurrent(
         self: *MNA,
         row_current_id: usize,
         col_current_id: usize,
@@ -553,7 +553,7 @@ const MNA = struct {
         self.mat.data[row][col] += val;
     }
 
-    fn stampCurrentVoltage(
+    pub fn stampCurrentVoltage(
         self: *MNA,
         row_current_id: usize,
         col_voltage_id: usize,
@@ -565,13 +565,13 @@ const MNA = struct {
         self.mat.data[row][col_voltage_id - 1] += val;
     }
 
-    fn stampVoltageRHS(self: *MNA, row_voltage_id: usize, val: f32) void {
+    pub fn stampVoltageRHS(self: *MNA, row_voltage_id: usize, val: f32) void {
         // ignore ground
         if (row_voltage_id == 0) return;
         self.mat.data[row_voltage_id - 1][self.mat.col_count - 1] = val;
     }
 
-    fn stampCurrentRHS(self: *MNA, row_current_id: usize, val: f32) void {
+    pub fn stampCurrentRHS(self: *MNA, row_current_id: usize, val: f32) void {
         const row = self.nodes.len - 1 + row_current_id;
         self.mat.data[row][self.mat.col_count - 1] = val;
     }
@@ -598,51 +598,8 @@ fn createMNAMatrix(allocator: std.mem.Allocator, nodes: []const NetList.Node, gr
     }
 
     for (0.., components.items) |idx, comp| {
-        switch (comp.inner) {
-            .resistor => |r| {
-                const in_group_2 = std.mem.indexOf(usize, group_2, &.{idx}) != null;
-
-                const node_ids = comp.terminal_node_ids;
-                const v_plus = node_ids[0];
-                const v_minus = node_ids[1];
-
-                const g = 1 / r;
-
-                if (in_group_2) {} else {
-                    mna.stampVoltageVoltage(v_plus, v_plus, g);
-                    mna.stampVoltageVoltage(v_plus, v_minus, -g);
-                    mna.stampVoltageVoltage(v_minus, v_plus, -g);
-                    mna.stampVoltageVoltage(v_minus, v_minus, g);
-                }
-            },
-            .voltage_source => |v| {
-                const node_ids = comp.terminal_node_ids;
-                const v_plus = node_ids[0];
-                const v_minus = node_ids[1];
-
-                const idx_in_group_2 = std.mem.indexOf(usize, group_2, &.{idx}) orelse @panic("Invalid Group 2");
-
-                mna.stampVoltageCurrent(v_plus, idx_in_group_2, 1);
-                mna.stampVoltageCurrent(v_minus, idx_in_group_2, -1);
-
-                mna.stampCurrentVoltage(idx_in_group_2, v_plus, 1);
-                mna.stampCurrentVoltage(idx_in_group_2, v_minus, -1);
-                mna.stampCurrentRHS(idx_in_group_2, v);
-            },
-            .current_source => |i| {
-                const in_group_2 = std.mem.indexOf(usize, group_2, &.{idx}) != null;
-
-                const node_ids = comp.terminal_node_ids;
-                const v_plus = node_ids[0];
-                const v_minus = node_ids[1];
-
-                if (in_group_2) {} else {
-                    mna.stampVoltageRHS(v_plus, -i);
-                    mna.stampVoltageRHS(v_minus, i);
-                }
-            },
-            else => {},
-        }
+        const current_group_2_idx = std.mem.indexOf(usize, group_2, &.{idx});
+        comp.stampMatrix(&mna, current_group_2_idx);
     }
 
     return mna;

@@ -297,3 +297,19 @@ pub fn renderPropertyBox(current: *f32) void {
         .gravity_y = 0.5,
     });
 }
+
+pub fn stampMatrix(i: f32, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
+    const v_plus = terminal_node_ids[0];
+    const v_minus = terminal_node_ids[1];
+
+    // TODO: explain how stamping works
+    if (current_group_2_idx) |curr_idx| {
+        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+        mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
+        mna.stampCurrentRHS(curr_idx, i);
+    } else {
+        mna.stampVoltageRHS(v_plus, -i);
+        mna.stampVoltageRHS(v_minus, i);
+    }
+}

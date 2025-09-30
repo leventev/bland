@@ -253,3 +253,18 @@ pub fn renderPropertyBox(v: *f32) void {
         .gravity_y = 0.5,
     });
 }
+
+pub fn stampMatrix(v: f32, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
+    const v_plus = terminal_node_ids[0];
+    const v_minus = terminal_node_ids[1];
+
+    const curr_idx = current_group_2_idx orelse @panic("Invalid voltage stamp");
+
+    // TODO: explain stamping
+    mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+    mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+
+    mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+    mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+    mna.stampCurrentRHS(curr_idx, v);
+}

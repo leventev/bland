@@ -100,6 +100,10 @@ pub const Component = struct {
         self.inner.renderPropertyBox();
     }
 
+    pub fn stampMatrix(self: *const Component, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
+        self.inner.stampMatrix(&self.terminal_node_ids, mna, current_group_2_idx);
+    }
+
     pub const InnerType = enum {
         resistor,
         voltage_source,
@@ -233,6 +237,21 @@ pub const Component = struct {
                 .current_source => |*i| current_source.renderPropertyBox(i),
                 .capacitor => |*c| capacitor.renderPropertyBox(c),
                 else => {},
+            }
+        }
+
+        pub fn stampMatrix(
+            self: *const Inner,
+            terminal_node_ids: []const usize,
+            mna: *circuit.MNA,
+            current_group_2_idx: ?usize,
+        ) void {
+            switch (self.*) {
+                .ground => {},
+                .resistor => |r| resistor.stampMatrix(r, terminal_node_ids, mna, current_group_2_idx),
+                .voltage_source => |v| voltage_source.stampMatrix(v, terminal_node_ids, mna, current_group_2_idx),
+                .current_source => |i| current_source.stampMatrix(i, terminal_node_ids, mna, current_group_2_idx),
+                else => @panic("TODO: unimplemented"),
             }
         }
     };
