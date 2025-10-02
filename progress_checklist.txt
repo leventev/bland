@@ -17,5 +17,5 @@
 [ ] add voltage controlled current sources
 [ ] add current controlled voltage sources
 [ ] add current controlled current sources
-[ ] add node pins
+[X] add node pins
 [ ] unit appropriate value text fields
