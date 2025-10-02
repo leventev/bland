@@ -11,6 +11,15 @@ const ComponentRenderType = renderer.ComponentRenderType;
 
 var mouse_pos: dvui.Point.Physical = undefined;
 
+// TODO: be able to rename pins
+const Pin = struct {
+    pos: circuit.GridPosition,
+    rotation: circuit.Rotation,
+    num: usize,
+};
+
+var pins = std.ArrayListUnmanaged(Pin){};
+
 pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     const win = dvui.currentWindow();
     try win.keybinds.putNoClobber(allocator, "normal_mode", .{ .key = .escape });
@@ -23,6 +32,7 @@ pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .t });
     try win.keybinds.putNoClobber(allocator, "analyse", .{ .key = .a });
     try win.keybinds.putNoClobber(allocator, "open_debug_window", .{ .key = .l });
+    try win.keybinds.putNoClobber(allocator, "pin_placement_mode", .{ .key = .p });
 }
 
 fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
@@ -61,7 +71,7 @@ fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
     }
 
     if (ev.matchBind("rotate") and ev.action == .down) {
-        circuit.held_component_rotation = circuit.held_component_rotation.rotateClockwise();
+        circuit.placement_rotation = circuit.placement_rotation.rotateClockwise();
     }
 
     if (ev.matchBind("analyse") and ev.action == .down) {
@@ -70,6 +80,10 @@ fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
 
     if (ev.matchBind("open_debug_window") and ev.action == .down) {
         dvui.toggleDebugWindow();
+    }
+
+    if (ev.matchBind("pin_placement_mode") and ev.action == .down) {
+        circuit.placement_mode = .pin;
     }
 }
 
@@ -88,17 +102,17 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                             const grid_pos = circuit.held_component.gridPositionFromScreenPos(
                                 circuit_rect,
                                 mouse_pos,
-                                circuit.held_component_rotation,
+                                circuit.placement_rotation,
                             );
                             if (circuit.canPlaceComponent(
                                 circuit.held_component,
                                 grid_pos,
-                                circuit.held_component_rotation,
+                                circuit.placement_rotation,
                             )) {
                                 var comp = component.Component{
                                     .pos = grid_pos,
                                     .inner = circuit.held_component.defaultValue(),
-                                    .rotation = circuit.held_component_rotation,
+                                    .rotation = circuit.placement_rotation,
                                     .name_buffer = try allocator.alloc(u8, component.max_component_name_length),
                                     .name = &.{},
                                     .terminal_node_ids = undefined,
@@ -135,6 +149,19 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                     mouse_pos,
                                 );
                             }
+                        } else if (circuit.placement_mode == .pin) {
+                            const grid_pos = circuit.gridPositionFromPos(
+                                circuit_rect,
+                                mouse_pos,
+                            );
+
+                            if (canPlacePin(grid_pos)) {
+                                try pins.append(allocator, Pin{
+                                    .pos = grid_pos,
+                                    .rotation = circuit.placement_rotation,
+                                    .num = pins.items.len + 1,
+                                });
+                            }
                         }
                     },
                     else => {},
@@ -153,6 +180,229 @@ const GridPositionWireConnection = struct {
     end_connection: usize,
     non_end_connection: usize,
 };
+
+fn renderHoldingComponent(circuit_rect: dvui.Rect.Physical) void {
+    const grid_pos = circuit.held_component.gridPositionFromScreenPos(
+        circuit_rect,
+        mouse_pos,
+        circuit.placement_rotation,
+    );
+
+    const can_place = circuit.canPlaceComponent(
+        circuit.held_component,
+        grid_pos,
+        circuit.placement_rotation,
+    );
+    const render_type = if (can_place)
+        ComponentRenderType.holding
+    else
+        ComponentRenderType.unable_to_place;
+
+    circuit.held_component.renderHolding(
+        circuit_rect,
+        grid_pos,
+        circuit.placement_rotation,
+        render_type,
+    );
+}
+
+fn renderHoldingWire(circuit_rect: dvui.Rect.Physical) void {
+    const p1 = circuit.held_wire_p1 orelse return;
+    const p2 = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
+    const xlen = @abs(p2.x - p1.x);
+    const ylen = @abs(p2.y - p1.y);
+
+    const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
+        .direction = .horizontal,
+        .length = p2.x - p1.x,
+        .pos = p1,
+    } else circuit.Wire{
+        .direction = .vertical,
+        .length = p2.y - p1.y,
+        .pos = p1,
+    };
+
+    const can_place = circuit.canPlaceWire(wire);
+    const render_type = if (can_place)
+        ComponentRenderType.holding
+    else
+        ComponentRenderType.unable_to_place;
+
+    renderer.renderWire(circuit_rect, wire, render_type);
+}
+
+fn renderPin(
+    circuit_rect: dvui.Rect.Physical,
+    grid_pos: circuit.GridPosition,
+    rotation: circuit.Rotation,
+    label: []const u8,
+    render_type: renderer.ComponentRenderType,
+) void {
+    // TODO: better font handling
+    const f = dvui.Font{
+        .id = .fromName(global.font_name),
+        .size = global.circuit_font_size,
+    };
+
+    const dist_from_point = 10;
+    const angle = 15.0 / 180.0 * std.math.pi;
+
+    const color = render_type.colors().component_color;
+    const thickness = render_type.thickness();
+
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const label_size = dvui.Font.textSize(f, label);
+    const rect_width = label_size.w + 20;
+    const rect_height = label_size.h + 10;
+
+    switch (rotation) {
+        .top, .bottom => {
+            const trig_height = std.math.tan(angle) * rect_width / 2;
+
+            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+            defer path.deinit();
+
+            const sign: f32 = if (rotation == .bottom) 1 else -1;
+
+            // triangle peak
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x,
+                .y = pos.y + dist_from_point * sign,
+            });
+
+            // rect bottom/top left
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x - rect_width / 2,
+                .y = pos.y + (dist_from_point + trig_height) * sign,
+            });
+
+            // rect top/bottom left
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x - rect_width / 2,
+                .y = pos.y + (dist_from_point + trig_height + rect_height) * sign,
+            });
+
+            // rect top/bottom right
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + rect_width / 2,
+                .y = pos.y + (dist_from_point + trig_height + rect_height) * sign,
+            });
+
+            // rect bottom/top left
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + rect_width / 2,
+                .y = pos.y + (dist_from_point + trig_height) * sign,
+            });
+
+            // triangle peak
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x,
+                .y = pos.y + dist_from_point * sign,
+            });
+
+            const p = path.build();
+
+            p.stroke(.{ .color = color, .thickness = thickness });
+
+            renderer.renderCenteredText(
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + (dist_from_point + trig_height + rect_height / 2) * sign,
+                },
+                dvui.themeGet().color(.content, .text),
+                label,
+            );
+        },
+        .right, .left => {
+            const trig_height = std.math.tan(angle) * rect_height / 2;
+
+            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+            defer path.deinit();
+
+            const sign: f32 = if (rotation == .right) 1 else -1;
+
+            // triangle peak
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + dist_from_point * sign,
+                .y = pos.y,
+            });
+
+            // rect bottom left/right
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + (dist_from_point + trig_height) * sign,
+                .y = pos.y + rect_height / 2,
+            });
+
+            // rect bottom right/left
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + (dist_from_point + trig_height + rect_width) * sign,
+                .y = pos.y + rect_height / 2,
+            });
+
+            // rect top right/left
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + (dist_from_point + trig_height + rect_width) * sign,
+                .y = pos.y - rect_height / 2,
+            });
+
+            // rect bottom left/right
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + (dist_from_point + trig_height) * sign,
+                .y = pos.y - rect_height / 2,
+            });
+
+            // triangle peak
+            path.addPoint(dvui.Point.Physical{
+                .x = pos.x + dist_from_point * sign,
+                .y = pos.y,
+            });
+
+            const p = path.build();
+
+            p.stroke(.{ .color = color, .thickness = thickness });
+
+            renderer.renderCenteredText(
+                dvui.Point.Physical{
+                    .x = pos.x + (dist_from_point + trig_height + rect_width / 2) * sign,
+                    .y = pos.y,
+                },
+                dvui.themeGet().color(.content, .text),
+                label,
+            );
+        },
+    }
+}
+
+fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
+    const grid_pos = circuit.gridPositionFromPos(
+        circuit_rect,
+        mouse_pos,
+    );
+
+    const can_place = canPlacePin(grid_pos);
+    const render_type = if (can_place)
+        ComponentRenderType.holding
+    else
+        ComponentRenderType.unable_to_place;
+
+    var buff: [256]u8 = undefined;
+    const label = std.fmt.bufPrint(
+        &buff,
+        "Pin {}",
+        .{pins.items.len + 1},
+    ) catch @panic("Invalid fmt");
+
+    renderPin(circuit_rect, grid_pos, circuit.placement_rotation, label, render_type);
+}
+
+fn canPlacePin(pos: circuit.GridPosition) bool {
+    for (pins.items) |pin| {
+        if (pin.pos.eql(pos)) return false;
+    }
+
+    return true;
+}
 
 pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     // to decide where to render lumps we count all wire connections per node
@@ -280,44 +530,18 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
-    if (circuit.placement_mode == .component) {
-        const grid_pos = circuit.held_component.gridPositionFromScreenPos(
-            circuit_rect,
-            mouse_pos,
-            circuit.held_component_rotation,
-        );
-
-        const can_place = circuit.canPlaceComponent(
-            circuit.held_component,
-            grid_pos,
-            circuit.held_component_rotation,
-        );
-        const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-        circuit.held_component.renderHolding(
-            circuit_rect,
-            grid_pos,
-            circuit.held_component_rotation,
-            render_type,
-        );
-    } else if (circuit.placement_mode == .wire) {
-        if (circuit.held_wire_p1) |p1| {
-            const p2 = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
-            const xlen = @abs(p2.x - p1.x);
-            const ylen = @abs(p2.y - p1.y);
-
-            const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
-                .direction = .horizontal,
-                .length = p2.x - p1.x,
-                .pos = p1,
-            } else circuit.Wire{
-                .direction = .vertical,
-                .length = p2.y - p1.y,
-                .pos = p1,
-            };
-
-            const can_place = circuit.canPlaceWire(wire);
-            const render_type = if (can_place) ComponentRenderType.holding else ComponentRenderType.unable_to_place;
-            renderer.renderWire(circuit_rect, wire, render_type);
-        }
+    for (pins.items) |pin| {
+        var buff: [256]u8 = undefined;
+        const label = try std.fmt.bufPrint(&buff, "Pin {}", .{pin.num});
+        renderPin(circuit_rect, pin.pos, pin.rotation, label, .normal);
     }
+
+    switch (circuit.placement_mode) {
+        .none => {},
+        .component => renderHoldingComponent(circuit_rect),
+        .wire => renderHoldingWire(circuit_rect),
+        .pin => renderHoldingPin(circuit_rect),
+    }
+
+    if (circuit.placement_mode == .component) {} else if (circuit.placement_mode == .wire) {}
 }

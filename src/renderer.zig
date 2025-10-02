@@ -11,7 +11,7 @@ const GridPosition = circuit.GridPosition;
 
 pub var dark_mode: bool = true;
 
-pub fn renderCenteredText(pos: dvui.Point, color: dvui.Color, text: []const u8) void {
+pub fn renderCenteredText(pos: dvui.Point.Physical, color: dvui.Color, text: []const u8) void {
     const f = dvui.Font{
         .id = .fromName(global.font_name),
         .size = global.circuit_font_size,
@@ -307,7 +307,7 @@ fn renderToolbox(allocator: std.mem.Allocator) bool {
         defer fw.deinit();
 
         if (dvui.menuItemLabel(@src(), "Rotate held component", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.held_component_rotation = circuit.held_component_rotation.rotateClockwise();
+            circuit.placement_rotation = circuit.placement_rotation.rotateClockwise();
             fw.close();
         }
 

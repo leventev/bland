@@ -4,10 +4,11 @@ const circuit = @import("../circuit.zig");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
+const Rotation = circuit.Rotation;
 
 pub fn twoTerminalOccupiedPoints(
     pos: GridPosition,
-    rotation: Component.Rotation,
+    rotation: Rotation,
     occupied: []component.OccupiedGridPosition,
 ) []component.OccupiedGridPosition {
     std.debug.assert(occupied.len >= 3);
@@ -44,7 +45,7 @@ pub fn twoTerminalOccupiedPoints(
 
 pub fn twoTerminalTerminals(
     pos: GridPosition,
-    rotation: Component.Rotation,
+    rotation: Rotation,
     terminals: []GridPosition,
 ) []GridPosition {
     terminals[0] = GridPosition{ .x = pos.x, .y = pos.y };
@@ -61,7 +62,7 @@ pub fn twoTerminalTerminals(
 
 pub fn twoTerminalCenterForMouse(
     pos: GridPosition,
-    rotation: Component.Rotation,
+    rotation: Rotation,
 ) GridPosition {
     switch (rotation) {
         .top, .bottom => {

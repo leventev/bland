@@ -9,6 +9,7 @@ const dvui = @import("dvui");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
+const Rotation = circuit.Rotation;
 
 var resistor_counter: usize = 0;
 
@@ -23,7 +24,7 @@ pub fn setNewComponentName(buff: []u8) ![]u8 {
 
 pub fn getTerminals(
     pos: GridPosition,
-    rotation: Component.Rotation,
+    rotation: Rotation,
     terminals: []GridPosition,
 ) []GridPosition {
     return common.twoTerminalTerminals(pos, rotation, terminals);
@@ -31,13 +32,13 @@ pub fn getTerminals(
 
 pub fn getOccupiedGridPositions(
     pos: GridPosition,
-    rotation: Component.Rotation,
+    rotation: Rotation,
     occupied: []component.OccupiedGridPosition,
 ) []component.OccupiedGridPosition {
     return common.twoTerminalOccupiedPoints(pos, rotation, occupied);
 }
 
-pub fn centerForMouse(pos: GridPosition, rotation: Component.Rotation) GridPosition {
+pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
@@ -50,7 +51,7 @@ fn formatValue(value: f32, buf: []u8) !?[]const u8 {
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
-    rot: component.Component.Rotation,
+    rot: Rotation,
     name: ?[]const u8,
     value: ?f32,
     render_type: renderer.ComponentRenderType,
@@ -96,7 +97,7 @@ pub fn render(
             renderer.drawRect(rect, resistor_color, thickness);
             if (name) |str| {
                 renderer.renderCenteredText(
-                    dvui.Point{
+                    dvui.Point.Physical{
                         .x = pos.x + global.grid_size,
                         .y = pos.y - (resistor_width / 2 + global.circuit_font_size / 2 + 2),
                     },
@@ -107,7 +108,7 @@ pub fn render(
 
             if (value_str) |str| {
                 renderer.renderCenteredText(
-                    dvui.Point{
+                    dvui.Point.Physical{
                         .x = pos.x + global.grid_size,
                         .y = pos.y + resistor_width / 2 + global.circuit_font_size / 2 + 2,
                     },
@@ -141,7 +142,7 @@ pub fn render(
             renderer.drawRect(rect, resistor_color, thickness);
             if (name) |str| {
                 renderer.renderCenteredText(
-                    dvui.Point{
+                    dvui.Point.Physical{
                         .x = pos.x + global.grid_size / 2,
                         .y = pos.y + global.grid_size - (global.circuit_font_size / 2 + 8),
                     },
@@ -152,7 +153,7 @@ pub fn render(
 
             if (value_str) |str| {
                 renderer.renderCenteredText(
-                    dvui.Point{
+                    dvui.Point.Physical{
                         .x = pos.x + global.grid_size / 2,
                         .y = pos.y + global.grid_size + (global.circuit_font_size / 2 + 8),
                     },

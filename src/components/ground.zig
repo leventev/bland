@@ -10,6 +10,7 @@ const dvui = @import("dvui");
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const OccupiedGridPosition = component.OccupiedGridPosition;
+const Rotation = circuit.Rotation;
 
 var ground_counter: usize = 0;
 
@@ -30,7 +31,7 @@ pub fn setNewComponentName(buff: []u8) ![]u8 {
 
 pub fn getTerminals(
     pos: GridPosition,
-    rotation: Component.Rotation,
+    rotation: Rotation,
     terminals: []GridPosition,
 ) []GridPosition {
     _ = rotation;
@@ -43,7 +44,7 @@ pub fn getTerminals(
 
 pub fn getOccupiedGridPositions(
     pos: GridPosition,
-    rotation: Component.Rotation,
+    rotation: Rotation,
     occupied: []OccupiedGridPosition,
 ) []OccupiedGridPosition {
     occupied[0] = OccupiedGridPosition{
@@ -82,7 +83,7 @@ pub fn getOccupiedGridPositions(
 pub fn render(
     circuit_area: dvui.Rect.Physical,
     grid_pos: GridPosition,
-    rot: Component.Rotation,
+    rot: Rotation,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_area);

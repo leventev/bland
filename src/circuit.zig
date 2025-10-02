@@ -11,6 +11,23 @@ pub const PlacementMode = enum {
     none,
     component,
     wire,
+    pin,
+};
+
+pub const Rotation = enum {
+    right,
+    bottom,
+    left,
+    top,
+
+    pub fn rotateClockwise(self: Rotation) Rotation {
+        return switch (self) {
+            .right => .bottom,
+            .bottom => .left,
+            .left => .top,
+            .top => .right,
+        };
+    }
 };
 
 pub const GridPosition = struct {
@@ -99,7 +116,7 @@ pub const Wire = struct {
 pub var placement_mode: PlacementMode = .none;
 
 pub var held_component: component.Component.InnerType = .resistor;
-pub var held_component_rotation: component.Component.Rotation = .right;
+pub var placement_rotation: Rotation = .right;
 
 pub var held_wire_p1: ?GridPosition = null;
 
@@ -109,7 +126,7 @@ pub var wires: std.array_list.Managed(Wire) = undefined;
 pub fn canPlaceComponent(
     comp_type: component.Component.InnerType,
     pos: GridPosition,
-    rotation: component.Component.Rotation,
+    rotation: Rotation,
 ) bool {
     var buffer: [100]component.OccupiedGridPosition = undefined;
     const positions = comp_type.getOccupiedGridPositions(pos, rotation, buffer[0..]);

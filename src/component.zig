@@ -29,23 +29,9 @@ pub fn occupiedPointsIntersect(occupied1: []OccupiedGridPosition, occupied2: []O
 
 pub const max_component_name_length = 20;
 
+const Rotation = circuit.Rotation;
+
 pub const Component = struct {
-    pub const Rotation = enum {
-        right,
-        bottom,
-        left,
-        top,
-
-        pub fn rotateClockwise(self: Rotation) Rotation {
-            return switch (self) {
-                .right => .bottom,
-                .bottom => .left,
-                .left => .top,
-                .top => .right,
-            };
-        }
-    };
-
     pos: GridPosition,
 
     rotation: Rotation,
@@ -193,7 +179,7 @@ pub const Component = struct {
             self: Component.InnerType,
             circuit_area: dvui.Rect.Physical,
             pos: GridPosition,
-            rot: Component.Rotation,
+            rot: Rotation,
             render_type: renderer.ComponentRenderType,
         ) void {
             switch (self) {
@@ -217,7 +203,7 @@ pub const Component = struct {
             self: Inner,
             circuit_rect: dvui.Rect.Physical,
             pos: GridPosition,
-            rot: Component.Rotation,
+            rot: Rotation,
             name: []const u8,
             render_type: renderer.ComponentRenderType,
         ) void {
