@@ -233,3 +233,14 @@ pub fn renderPropertyBox(c: *f32) void {
         .gravity_y = 0.5,
     });
 }
+
+pub fn stampMatrix(c: f32, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
+    const v_plus = terminal_node_ids[0];
+    const v_minus = terminal_node_ids[1];
+
+    _ = c;
+    _ = mna;
+    _ = current_group_2_idx;
+    _ = v_plus;
+    _ = v_minus;
+}

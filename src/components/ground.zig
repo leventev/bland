@@ -29,6 +29,11 @@ pub fn setNewComponentName(buff: []u8) ![]u8 {
     return std.fmt.bufPrint(buff, "G{}", .{ground_counter});
 }
 
+pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
+    _ = rotation;
+    return pos;
+}
+
 pub fn getTerminals(
     pos: GridPosition,
     rotation: Rotation,

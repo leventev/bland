@@ -3,11 +3,6 @@ const std = @import("std");
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
-const resistor = @import("components/resistor.zig");
-const voltage_source = @import("components/voltage_source.zig");
-const current_source = @import("components/current_source.zig");
-const ground = @import("components/ground.zig");
-const capacitor = @import("components/capacitor.zig");
 
 const dvui = @import("dvui");
 
@@ -91,48 +86,41 @@ pub const Component = struct {
     }
 
     pub const InnerType = enum {
+        ground,
         resistor,
         voltage_source,
         current_source,
-        ground,
         capacitor,
 
-        fn centerForMouse(self: InnerType, rotation: Rotation, pos: GridPosition) GridPosition {
+        fn module(comptime self: InnerType) type {
+            return switch (self) {
+                .resistor => @import("components/resistor.zig"),
+                .voltage_source => @import("components/voltage_source.zig"),
+                .current_source => @import("components/current_source.zig"),
+                .capacitor => @import("components/capacitor.zig"),
+                .ground => @import("components/ground.zig"),
+            };
+        }
+
+        fn centerForMouse(self: InnerType, pos: GridPosition, rotation: Rotation) GridPosition {
             switch (self) {
-                .resistor => {
-                    return resistor.centerForMouse(pos, rotation);
-                },
-                .voltage_source => {
-                    return voltage_source.centerForMouse(pos, rotation);
-                },
-                .current_source => {
-                    return current_source.centerForMouse(pos, rotation);
-                },
-                .ground => return pos,
-                .capacitor => {
-                    return capacitor.centerForMouse(pos, rotation);
-                },
+                inline else => |x| return x.module().centerForMouse(
+                    pos,
+                    rotation,
+                ),
             }
         }
 
         pub fn defaultValue(self: InnerType) Inner {
             switch (self) {
-                .resistor => return resistor.defaultValue(),
-                .voltage_source => return voltage_source.defaultValue(),
-                .current_source => return current_source.defaultValue(),
-                .ground => return Inner{ .ground = {} },
-                .capacitor => return capacitor.defaultValue(),
+                inline else => |x| return x.module().defaultValue(),
             }
         }
 
         fn setNewComponentName(self: InnerType, buff: []u8) ![]u8 {
-            return switch (self) {
-                .resistor => resistor.setNewComponentName(buff),
-                .voltage_source => voltage_source.setNewComponentName(buff),
-                .current_source => current_source.setNewComponentName(buff),
-                .ground => ground.setNewComponentName(buff),
-                .capacitor => capacitor.setNewComponentName(buff),
-            };
+            switch (self) {
+                inline else => |x| return x.module().setNewComponentName(buff),
+            }
         }
 
         pub fn getTerminals(
@@ -141,13 +129,13 @@ pub const Component = struct {
             rotation: Rotation,
             terminals_buff: []GridPosition,
         ) []GridPosition {
-            return switch (self) {
-                .ground => ground.getTerminals(pos, rotation, terminals_buff),
-                .resistor => resistor.getTerminals(pos, rotation, terminals_buff),
-                .voltage_source => voltage_source.getTerminals(pos, rotation, terminals_buff),
-                .current_source => current_source.getTerminals(pos, rotation, terminals_buff),
-                .capacitor => capacitor.getTerminals(pos, rotation, terminals_buff),
-            };
+            switch (self) {
+                inline else => |x| return x.module().getTerminals(
+                    pos,
+                    rotation,
+                    terminals_buff,
+                ),
+            }
         }
 
         pub fn getOccupiedGridPositions(
@@ -156,13 +144,13 @@ pub const Component = struct {
             rotation: Rotation,
             occupied: []OccupiedGridPosition,
         ) []OccupiedGridPosition {
-            return switch (self) {
-                .ground => ground.getOccupiedGridPositions(pos, rotation, occupied),
-                .resistor => resistor.getOccupiedGridPositions(pos, rotation, occupied),
-                .voltage_source => voltage_source.getOccupiedGridPositions(pos, rotation, occupied),
-                .current_source => current_source.getOccupiedGridPositions(pos, rotation, occupied),
-                .capacitor => capacitor.getOccupiedGridPositions(pos, rotation, occupied),
-            };
+            switch (self) {
+                inline else => |x| return x.module().getOccupiedGridPositions(
+                    pos,
+                    rotation,
+                    occupied,
+                ),
+            }
         }
 
         pub fn gridPositionFromScreenPos(
@@ -172,57 +160,74 @@ pub const Component = struct {
             rotation: Rotation,
         ) GridPosition {
             const grid_pos = circuit.gridPositionFromPos(circuit_rect, pos);
-            return self.centerForMouse(rotation, grid_pos);
+            return self.centerForMouse(grid_pos, rotation);
         }
 
         pub fn renderHolding(
             self: Component.InnerType,
-            circuit_area: dvui.Rect.Physical,
+            circuit_rect: dvui.Rect.Physical,
             pos: GridPosition,
             rot: Rotation,
             render_type: renderer.ComponentRenderType,
         ) void {
             switch (self) {
-                .resistor => resistor.render(circuit_area, pos, rot, null, null, render_type),
-                .voltage_source => voltage_source.render(circuit_area, pos, rot, null, null, render_type),
-                .current_source => current_source.render(circuit_area, pos, rot, null, null, render_type),
-                .ground => ground.render(circuit_area, pos, rot, render_type),
-                .capacitor => capacitor.render(circuit_area, pos, rot, null, null, render_type),
+                .ground => InnerType.ground.module().render(
+                    circuit_rect,
+                    pos,
+                    rot,
+                    render_type,
+                ),
+                inline else => |x| x.module().render(
+                    circuit_rect,
+                    pos,
+                    rot,
+                    null,
+                    null,
+                    render_type,
+                ),
             }
         }
     };
 
     pub const Inner = union(InnerType) {
+        ground,
         resistor: f32,
         voltage_source: f32,
         current_source: f32,
-        ground: void,
         capacitor: f32,
 
         pub fn render(
-            self: Inner,
+            self: *const Inner,
             circuit_rect: dvui.Rect.Physical,
             pos: GridPosition,
             rot: Rotation,
             name: []const u8,
             render_type: renderer.ComponentRenderType,
         ) void {
-            switch (self) {
-                .resistor => |r| resistor.render(circuit_rect, pos, rot, name, r, render_type),
-                .voltage_source => |v| voltage_source.render(circuit_rect, pos, rot, name, v, render_type),
-                .current_source => |i| current_source.render(circuit_rect, pos, rot, name, i, render_type),
-                .ground => ground.render(circuit_rect, pos, rot, render_type),
-                .capacitor => |c| capacitor.render(circuit_rect, pos, rot, name, c, render_type),
+            switch (@as(InnerType, self.*)) {
+                .ground => InnerType.ground.module().render(
+                    circuit_rect,
+                    pos,
+                    rot,
+                    render_type,
+                ),
+                inline else => |x| InnerType.module(x).render(
+                    circuit_rect,
+                    pos,
+                    rot,
+                    name,
+                    @field(self, @tagName(x)),
+                    render_type,
+                ),
             }
         }
 
         pub fn renderPropertyBox(self: *Inner) void {
-            switch (self.*) {
-                .resistor => |*r| resistor.renderPropertyBox(r),
-                .voltage_source => |*v| voltage_source.renderPropertyBox(v),
-                .current_source => |*i| current_source.renderPropertyBox(i),
-                .capacitor => |*c| capacitor.renderPropertyBox(c),
-                else => {},
+            switch (@as(InnerType, self.*)) {
+                .ground => {},
+                inline else => |x| x.module().renderPropertyBox(
+                    &@field(self, @tagName(x)),
+                ),
             }
         }
 
@@ -232,12 +237,14 @@ pub const Component = struct {
             mna: *circuit.MNA,
             current_group_2_idx: ?usize,
         ) void {
-            switch (self.*) {
+            switch (@as(InnerType, self.*)) {
                 .ground => {},
-                .resistor => |r| resistor.stampMatrix(r, terminal_node_ids, mna, current_group_2_idx),
-                .voltage_source => |v| voltage_source.stampMatrix(v, terminal_node_ids, mna, current_group_2_idx),
-                .current_source => |i| current_source.stampMatrix(i, terminal_node_ids, mna, current_group_2_idx),
-                else => @panic("TODO: unimplemented"),
+                inline else => |x| x.module().stampMatrix(
+                    @field(self, @tagName(x)),
+                    terminal_node_ids,
+                    mna,
+                    current_group_2_idx,
+                ),
             }
         }
     };
