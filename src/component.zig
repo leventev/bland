@@ -191,10 +191,10 @@ pub const Component = struct {
 
     pub const Inner = union(InnerType) {
         ground,
-        resistor: f32,
-        voltage_source: f32,
-        current_source: f32,
-        capacitor: f32,
+        resistor: circuit.FloatType,
+        voltage_source: circuit.FloatType,
+        current_source: circuit.FloatType,
+        capacitor: circuit.FloatType,
 
         pub fn render(
             self: *const Inner,

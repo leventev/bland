@@ -12,6 +12,8 @@ const GridPosition = circuit.GridPosition;
 const OccupiedGridPosition = component.OccupiedGridPosition;
 const Rotation = circuit.Rotation;
 
+const FloatType = circuit.FloatType;
+
 var ground_counter: usize = 0;
 
 pub fn defaultValue() Component.Inner {

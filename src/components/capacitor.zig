@@ -11,6 +11,8 @@ const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
 
+const FloatType = circuit.FloatType;
+
 var capacitor_counter: usize = 0;
 
 pub fn defaultValue() Component.Inner {
@@ -42,7 +44,7 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-fn formatValue(value: f32, buf: []u8) !?[]const u8 {
+fn formatValue(value: FloatType, buf: []u8) !?[]const u8 {
     return try std.fmt.bufPrint(buf, "{d}F", .{value});
 }
 
@@ -51,7 +53,7 @@ pub fn render(
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?f32,
+    value: ?FloatType,
     render_type: renderer.ComponentRenderType,
 ) void {
     const wire_pixel_len = 55;
@@ -198,7 +200,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(c: *f32) void {
+pub fn renderPropertyBox(c: *FloatType) void {
     dvui.label(@src(), "capacitance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
@@ -213,10 +215,10 @@ pub fn renderPropertyBox(c: *f32) void {
     );
     defer box.deinit();
 
-    _ = dvui.textEntryNumber(@src(), f32, .{
+    _ = dvui.textEntryNumber(@src(), FloatType, .{
         .value = c,
         .show_min_max = true,
-        .min = std.math.floatMin(f32),
+        .min = std.math.floatMin(FloatType),
     }, .{
         .color_fill = dvui.themeGet().color(.control, .fill),
         .color_text = dvui.themeGet().color(.content, .text),
@@ -234,7 +236,7 @@ pub fn renderPropertyBox(c: *f32) void {
     });
 }
 
-pub fn stampMatrix(c: f32, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
+pub fn stampMatrix(c: FloatType, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 

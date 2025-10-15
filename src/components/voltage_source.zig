@@ -11,6 +11,8 @@ const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
 
+const FloatType = circuit.FloatType;
+
 var voltage_source_counter: usize = 0;
 
 pub fn defaultValue() Component.Inner {
@@ -41,7 +43,7 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-fn formatValue(value: f32, buf: []u8) !?[]const u8 {
+fn formatValue(value: FloatType, buf: []u8) !?[]const u8 {
     return try std.fmt.bufPrint(buf, "{d}V", .{value});
 }
 
@@ -50,7 +52,7 @@ pub fn render(
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?f32,
+    value: ?FloatType,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
@@ -220,7 +222,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(v: *f32) void {
+pub fn renderPropertyBox(v: *FloatType) void {
     dvui.label(@src(), "voltage", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
@@ -235,7 +237,7 @@ pub fn renderPropertyBox(v: *f32) void {
     );
     defer box.deinit();
 
-    _ = dvui.textEntryNumber(@src(), f32, .{
+    _ = dvui.textEntryNumber(@src(), FloatType, .{
         .value = v,
         .show_min_max = true,
     }, .{
@@ -255,7 +257,7 @@ pub fn renderPropertyBox(v: *f32) void {
     });
 }
 
-pub fn stampMatrix(v: f32, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
+pub fn stampMatrix(v: FloatType, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 

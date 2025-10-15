@@ -7,6 +7,8 @@ const matrix = @import("matrix.zig");
 
 const dvui = @import("dvui");
 
+pub const FloatType = f64;
+
 pub const PlacementMode = enum {
     none,
     component,
@@ -242,7 +244,7 @@ const NetList = struct {
     const Node = struct {
         id: usize,
         connected_terminals: std.ArrayListUnmanaged(Terminal),
-        voltage: ?f32,
+        voltage: ?FloatType,
     };
 
     fn deinit(self: *NetList) void {
@@ -515,7 +517,7 @@ fn getLastConnected(
 }
 
 pub const MNA = struct {
-    mat: matrix.Matrix(f32),
+    mat: matrix.Matrix(FloatType),
     nodes: []const NetList.Node,
     group_2: []const usize,
 
@@ -526,7 +528,7 @@ pub const MNA = struct {
     ) !MNA {
         const total_variable_count = nodes.len - 1 + group_2.len;
         return MNA{
-            .mat = try matrix.Matrix(f32).init(
+            .mat = try matrix.Matrix(FloatType).init(
                 allocator,
                 total_variable_count,
                 total_variable_count + 1,
@@ -540,7 +542,7 @@ pub const MNA = struct {
         self: *MNA,
         row_voltage_id: usize,
         col_voltage_id: usize,
-        val: f32,
+        val: FloatType,
     ) void {
         // ignore grounds
         if (row_voltage_id == 0 or col_voltage_id == 0) return;
@@ -551,7 +553,7 @@ pub const MNA = struct {
         self: *MNA,
         row_voltage_id: usize,
         col_current_id: usize,
-        val: f32,
+        val: FloatType,
     ) void {
         // ignore grounds
         const col = self.nodes.len - 1 + col_current_id;
@@ -563,7 +565,7 @@ pub const MNA = struct {
         self: *MNA,
         row_current_id: usize,
         col_current_id: usize,
-        val: f32,
+        val: FloatType,
     ) void {
         const row = self.nodes.len - 1 + row_current_id;
         const col = self.nodes.len - 1 + col_current_id;
@@ -574,7 +576,7 @@ pub const MNA = struct {
         self: *MNA,
         row_current_id: usize,
         col_voltage_id: usize,
-        val: f32,
+        val: FloatType,
     ) void {
         // ignore ground
         if (col_voltage_id == 0) return;
@@ -582,13 +584,13 @@ pub const MNA = struct {
         self.mat.data[row][col_voltage_id - 1] += val;
     }
 
-    pub fn stampVoltageRHS(self: *MNA, row_voltage_id: usize, val: f32) void {
+    pub fn stampVoltageRHS(self: *MNA, row_voltage_id: usize, val: FloatType) void {
         // ignore ground
         if (row_voltage_id == 0) return;
         self.mat.data[row_voltage_id - 1][self.mat.col_count - 1] = val;
     }
 
-    pub fn stampCurrentRHS(self: *MNA, row_current_id: usize, val: f32) void {
+    pub fn stampCurrentRHS(self: *MNA, row_current_id: usize, val: FloatType) void {
         const row = self.nodes.len - 1 + row_current_id;
         self.mat.data[row][self.mat.col_count - 1] = val;
     }
@@ -623,7 +625,7 @@ fn createMNAMatrix(allocator: std.mem.Allocator, nodes: []const NetList.Node, gr
 }
 
 fn printMNAMatrix(
-    mat: *const matrix.Matrix(f32),
+    mat: *const matrix.Matrix(FloatType),
     nodes: []const NetList.Node,
     group_2: []const usize,
 ) void {
