@@ -122,30 +122,10 @@ pub var placement_rotation: Rotation = .right;
 
 pub var held_wire_p1: ?GridPosition = null;
 
-pub var components: std.array_list.Managed(component.Component) = undefined;
-pub var wires: std.array_list.Managed(Wire) = undefined;
-
-pub fn canPlaceComponent(
-    comp_type: component.Component.InnerType,
-    pos: GridPosition,
-    rotation: Rotation,
-) bool {
-    var buffer: [100]component.OccupiedGridPosition = undefined;
-    const positions = comp_type.getOccupiedGridPositions(pos, rotation, buffer[0..]);
-    for (components.items) |comp| {
-        if (comp.intersects(positions)) return false;
-    }
-
-    var buffer2: [100]component.OccupiedGridPosition = undefined;
-    for (wires.items) |wire| {
-        const wire_positions = getOccupiedGridPositions(wire, buffer2[0..]);
-        if (component.occupiedPointsIntersect(positions, wire_positions)) return false;
-    }
-
-    return true;
-}
-
-fn getOccupiedGridPositions(wire: Wire, occupied: []component.OccupiedGridPosition) []component.OccupiedGridPosition {
+fn getOccupiedGridPositions(
+    wire: Wire,
+    occupied: []component.OccupiedGridPosition,
+) []component.OccupiedGridPosition {
     const abs_len = @abs(wire.length);
     std.debug.assert(abs_len < occupied.len);
     const negative = wire.length < 0;
@@ -168,53 +148,10 @@ fn getOccupiedGridPositions(wire: Wire, occupied: []component.OccupiedGridPositi
     return occupied[0..abs_len];
 }
 
-pub fn canPlaceWire(wire: Wire) bool {
-    var buffer: [100]component.OccupiedGridPosition = undefined;
-    const positions = getOccupiedGridPositions(wire, buffer[0..]);
-
-    for (components.items) |comp| {
-        if (comp.intersects(positions)) return false;
-    }
-
-    for (wires.items) |other_wire| {
-        if (wire.direction != other_wire.direction) continue;
-        if (wire.direction == .horizontal) {
-            if (wire.pos.y != other_wire.pos.y) continue;
-
-            const x1 = wire.pos.x + wire.length;
-            const x2 = other_wire.pos.x + other_wire.length;
-
-            const x1_start = @min(wire.pos.x, x1);
-            const x1_end = @max(wire.pos.x, x1);
-            const x2_start = @min(other_wire.pos.x, x2);
-            const x2_end = @max(other_wire.pos.x, x2);
-
-            const intersect_side1 = x2_end > x1_start and x2_end < x1_end;
-            const intersect_side2 = x2_start > x1_start and x2_start < x1_end;
-            const interesct_inside = x1_start >= x2_start and x1_end <= x2_end;
-            if (intersect_side1 or intersect_side2 or interesct_inside) return false;
-        } else {
-            if (wire.pos.x != other_wire.pos.x) continue;
-
-            const y1 = wire.pos.y + wire.length;
-            const y2 = other_wire.pos.y + other_wire.length;
-
-            const y1_start = @min(wire.pos.y, y1);
-            const y1_end = @max(wire.pos.y, y1);
-            const y2_start = @min(other_wire.pos.y, y2);
-            const y2_end = @max(other_wire.pos.y, y2);
-
-            const intersect_side1 = y2_end > y1_start and y2_end < y1_end;
-            const intersect_side2 = y2_start > y1_start and y2_start < y1_end;
-            const interesct_inside = y1_start >= y2_start and y1_end <= y2_end;
-            if (intersect_side1 or intersect_side2 or interesct_inside) return false;
-        }
-    }
-
-    return true;
-}
-
-pub fn gridPositionFromPos(circuit_rect: dvui.Rect.Physical, pos: dvui.Point.Physical) GridPosition {
+pub fn gridPositionFromPos(
+    circuit_rect: dvui.Rect.Physical,
+    pos: dvui.Point.Physical,
+) GridPosition {
     const rel_pos = pos.diff(circuit_rect.topLeft());
 
     var grid_pos = GridPosition{
@@ -232,27 +169,136 @@ pub fn gridPositionFromPos(circuit_rect: dvui.Rect.Physical, pos: dvui.Point.Phy
 }
 
 // TODO: use u32 instead of usize for IDs?
-const NetList = struct {
+pub const NetList = struct {
     allocator: std.mem.Allocator,
     nodes: std.ArrayListUnmanaged(Node),
+    components: std.ArrayListUnmanaged(component.Component),
 
-    const Terminal = struct {
+    pub const Terminal = struct {
         component_id: usize,
         terminal_id: usize,
     };
 
-    const Node = struct {
+    pub const Node = struct {
         id: usize,
         connected_terminals: std.ArrayListUnmanaged(Terminal),
         voltage: ?FloatType,
     };
 
-    fn deinit(self: *NetList) void {
+    pub fn init(allocator: std.mem.Allocator) !NetList {
+        var nodes = std.ArrayListUnmanaged(Node){};
+        try nodes.append(allocator, .{
+            .id = 0,
+            .connected_terminals = std.ArrayListUnmanaged(Terminal),
+            .voltage = 0,
+        });
+
+        return NetList{
+            .allocator = allocator,
+            .nodes = nodes,
+        };
+    }
+
+    pub fn allocateNode(self: *NetList) !usize {
+        const next_id = self.nodes.items.len;
+        try self.nodes.append(self.allocator, .{
+            .id = next_id,
+            .connected_terminals = std.ArrayListUnmanaged(Terminal),
+            .voltage = null,
+        });
+
+        return next_id;
+    }
+
+    pub fn addComponentConnection(
+        self: *NetList,
+        node_id: usize,
+        comp_id: usize,
+        term_id: usize,
+    ) !void {
+        // TODO: error instead of assert
+        std.debug.assert(node_id < self.nodes.items.len);
+        std.debug.assert(comp_id < self.components.len);
+
+        self.nodes.items[node_id].connected_terminals.append(
+            self.allocator,
+            NetList.Terminal{
+                .component_id = comp_id,
+                .terminal_id = term_id,
+            },
+        );
+    }
+
+    pub fn deinit(self: *NetList) void {
         for (self.nodes.items) |*node| {
             node.connected_terminals.deinit(self.allocator);
         }
         self.nodes.deinit(self.allocator);
+        self.components.deinit(self.allocator);
         self.* = undefined;
+    }
+
+    fn fromCircuit(circuit: *const Circuit) !NetList {
+        var node_terminals = std.ArrayListUnmanaged(
+            std.ArrayListUnmanaged(NetList.Terminal),
+        ){};
+        defer node_terminals.deinit(circuit.allocator);
+
+        var remaining_terminals = try circuit.getAllTerminals();
+        defer remaining_terminals.deinit();
+
+        try circuit.traverseWiresForNodes(
+            &remaining_terminals,
+            &node_terminals,
+        );
+
+        try findAllDirectConnections(
+            circuit.allocator,
+            &remaining_terminals,
+            &node_terminals,
+        );
+
+        const nodes = try circuit.mergeGroundNodes(
+            node_terminals.items,
+        );
+
+        return NetList{
+            .allocator = circuit.allocator,
+            .nodes = nodes,
+            .components = try circuit.components.clone(circuit.allocator),
+        };
+    }
+
+    // TODO: instead of group 2 pass the components whose
+    // currents are included in group 2
+    // since we will add currents used by CCVS, etc later too
+    // so the name group_2 is misleading
+    fn createMNAMatrix(self: *const NetList, group_2: []const usize) !MNA {
+        // create matrix (|v| + |i2| X |v| + |i2| + 1)
+        // where v is all nodes except ground
+        // the last column is the RHS of the equation Ax=b
+        // basically (A|b) where b is an (|v| + |i2| X 1) matrix
+
+        const total_variable_count = self.nodes.items.len - 1 + group_2.len;
+
+        var mna = try MNA.init(
+            self.allocator,
+            self.nodes.items,
+            group_2,
+        );
+
+        for (0..total_variable_count) |row| {
+            for (0..total_variable_count + 1) |col| {
+                mna.mat.data[row][col] = 0;
+            }
+        }
+
+        for (0.., self.components.items) |idx, comp| {
+            const current_group_2_idx = std.mem.indexOf(usize, group_2, &.{idx});
+            comp.stampMatrix(&mna, current_group_2_idx);
+        }
+
+        return mna;
     }
 };
 
@@ -261,103 +307,260 @@ const TerminalWithPos = struct {
     pos: GridPosition,
 };
 
-fn buildNetList(allocator: std.mem.Allocator) !NetList {
-    var node_terminals = std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)){};
-    defer node_terminals.deinit(allocator);
+pub var main_circuit: Circuit = undefined;
 
-    var remaining_terminals = try getRemainingTerminals(allocator);
-    defer remaining_terminals.deinit(allocator);
-
-    try traverseWiresForNodes(allocator, &remaining_terminals, &node_terminals);
-    try findAllDirectConnections(allocator, &remaining_terminals, &node_terminals);
-
-    const nodes = try mergeGroundNodes(allocator, node_terminals.items);
-
-    return NetList{
-        .allocator = allocator,
-        .nodes = nodes,
-    };
-}
-
-fn mergeGroundNodes(
+pub const Circuit = struct {
     allocator: std.mem.Allocator,
-    node_terminals: []std.ArrayListUnmanaged(NetList.Terminal),
-) !std.ArrayListUnmanaged(NetList.Node) {
-    var nodes = std.ArrayListUnmanaged(NetList.Node){};
+    components: std.ArrayList(component.Component),
+    wires: std.ArrayList(Wire),
 
-    // add ground node
-    try nodes.append(allocator, NetList.Node{
-        .id = 0,
-        .connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){},
-        .voltage = null,
-    });
+    fn getAllTerminals(self: *const Circuit) !std.array_list.Managed(TerminalWithPos) {
+        const terminal_count_approx = self.components.items.len * 2;
+        var terminals = try std.array_list.Managed(TerminalWithPos).initCapacity(
+            self.allocator,
+            terminal_count_approx,
+        );
 
-    for (node_terminals) |*terminals| {
-        if (nodeHasGround(terminals.items)) {
-            // the terminals are added to the ground node's list of terminals
-            // so we can deinit the list containing them
-            for (terminals.items) |term| {
-                components.items[term.component_id].terminal_node_ids[term.terminal_id] = 0;
-                try nodes.items[0].connected_terminals.append(allocator, term);
+        for (self.components.items, 0..) |comp, comp_id| {
+            // TODO: get terminal count for specific component
+            var buffer: [16]GridPosition = undefined;
+            const comp_terminals = comp.terminals(buffer[0..]);
+            for (comp_terminals, 0..) |pos, term_id| {
+                try terminals.append(TerminalWithPos{
+                    .term = NetList.Terminal{
+                        .component_id = comp_id,
+                        .terminal_id = term_id,
+                    },
+                    .pos = pos,
+                });
             }
-            terminals.deinit(allocator);
-        } else {
-            const node_id = nodes.items.len;
-            // if the node doesnt have a GND component connected to it
-            // then create its own node
-            try nodes.append(allocator, NetList.Node{
-                .id = node_id,
-                .connected_terminals = terminals.*,
-                .voltage = null,
-            });
-            for (terminals.items) |term| {
-                components.items[term.component_id].terminal_node_ids[term.terminal_id] = node_id;
+        }
+
+        return terminals;
+    }
+
+    // TODO: optimize this although i doubt this has a non negligible performance impact
+    fn traverseWiresForNodes(
+        self: *const Circuit,
+        remaining_terminals: *std.array_list.Managed(TerminalWithPos),
+        nodes: *std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)),
+    ) !void {
+        var connected_wire_buffer = try self.allocator.alloc(usize, self.wires.items.len);
+        defer self.allocator.free(connected_wire_buffer);
+
+        var remaining_wires = try self.allocator.dupe(Wire, self.wires.items);
+        var rem: usize = remaining_wires.len;
+
+        while (rem > 0) {
+            var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
+            const connected_wires = getConnectedWires(
+                remaining_wires,
+                remaining_wires.len - 1,
+                connected_wire_buffer[0..],
+            );
+
+            for (connected_wires) |wire_idx| {
+                const wire = remaining_wires[wire_idx];
+                while (getNextConnectedTerminalToWire(wire, remaining_terminals)) |term| {
+                    try connected_terminals.append(self.allocator, term);
+                }
             }
+
+            rem = remaining_wires.len - connected_wires.len;
+            if (rem == 0) {
+                self.allocator.free(remaining_wires);
+            } else {
+                var new_remaining_wires = try self.allocator.alloc(Wire, rem);
+                var idx: usize = 0;
+                for (0..remaining_wires.len) |i| {
+                    var should_remove = false;
+                    for (connected_wires) |j| {
+                        if (i == j) {
+                            should_remove = true;
+                            break;
+                        }
+                    }
+                    if (should_remove) continue;
+                    new_remaining_wires[idx] = remaining_wires[i];
+                    idx += 1;
+                }
+                self.allocator.free(remaining_wires);
+                remaining_wires = new_remaining_wires;
+            }
+
+            try nodes.append(self.allocator, connected_terminals);
         }
     }
 
-    return nodes;
-}
+    fn mergeGroundNodes(
+        self: *const Circuit,
+        node_terminals: []std.ArrayListUnmanaged(NetList.Terminal),
+    ) !std.ArrayListUnmanaged(NetList.Node) {
+        var nodes = std.ArrayListUnmanaged(NetList.Node){};
 
-fn nodeHasGround(terminals: []const NetList.Terminal) bool {
-    for (terminals) |term| {
-        const comp = components.items[term.component_id];
-        if (@as(component.Component.InnerType, comp.inner) == component.Component.InnerType.ground) {
-            return true;
+        // add ground node
+        try nodes.append(self.allocator, NetList.Node{
+            .id = 0,
+            .connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){},
+            .voltage = null,
+        });
+
+        for (node_terminals) |*terminals| {
+            if (self.nodeHasGround(terminals.items)) {
+                // the terminals are added to the ground node's list of terminals
+                // so we can deinit the list containing them
+                for (terminals.items) |term| {
+                    self.components.items[term.component_id].terminal_node_ids[term.terminal_id] = 0;
+                    try nodes.items[0].connected_terminals.append(self.allocator, term);
+                }
+                terminals.deinit(self.allocator);
+            } else {
+                // if the node doesnt have a GND component connected to it
+                // then create its own node
+                const node_id = nodes.items.len;
+                try nodes.append(self.allocator, NetList.Node{
+                    .id = node_id,
+                    .connected_terminals = terminals.*,
+                    .voltage = null,
+                });
+                for (terminals.items) |term| {
+                    self.components.items[term.component_id].terminal_node_ids[term.terminal_id] = node_id;
+                }
+            }
         }
+
+        return nodes;
     }
 
-    return false;
-}
+    fn nodeHasGround(self: *const Circuit, terminals: []const NetList.Terminal) bool {
+        for (terminals) |term| {
+            const comp = self.components.items[term.component_id];
+            const comp_type = @as(component.Component.InnerType, comp.inner);
+            if (comp_type == component.Component.InnerType.ground) {
+                return true;
+            }
+        }
 
-fn getRemainingTerminals(allocator: std.mem.Allocator) !std.ArrayListUnmanaged(TerminalWithPos) {
-    const terminal_count_approx = components.items.len * 2;
-    var remaining_terminals = try std.ArrayListUnmanaged(TerminalWithPos).initCapacity(
-        allocator,
-        terminal_count_approx,
-    );
+        return false;
+    }
 
-    for (components.items, 0..) |comp, comp_id| {
-        // TODO: get terminal count for specific component
-        var buffer: [16]GridPosition = undefined;
-        const terminals = comp.terminals(buffer[0..]);
-        for (terminals, 0..) |pos, term_id| {
-            try remaining_terminals.append(allocator, TerminalWithPos{
-                .term = NetList.Terminal{
-                    .component_id = comp_id,
-                    .terminal_id = term_id,
+    pub fn canPlaceWire(self: *const Circuit, wire: Wire) bool {
+        var buffer: [100]component.OccupiedGridPosition = undefined;
+        const positions = getOccupiedGridPositions(wire, buffer[0..]);
+
+        for (self.components.items) |comp| {
+            if (comp.intersects(positions)) return false;
+        }
+
+        for (self.wires.items) |other_wire| {
+            if (wire.direction != other_wire.direction) continue;
+            if (wire.direction == .horizontal) {
+                if (wire.pos.y != other_wire.pos.y) continue;
+
+                const x1 = wire.pos.x + wire.length;
+                const x2 = other_wire.pos.x + other_wire.length;
+
+                const x1_start = @min(wire.pos.x, x1);
+                const x1_end = @max(wire.pos.x, x1);
+                const x2_start = @min(other_wire.pos.x, x2);
+                const x2_end = @max(other_wire.pos.x, x2);
+
+                const intersect_side1 = x2_end > x1_start and x2_end < x1_end;
+                const intersect_side2 = x2_start > x1_start and x2_start < x1_end;
+                const interesct_inside = x1_start >= x2_start and x1_end <= x2_end;
+                if (intersect_side1 or intersect_side2 or interesct_inside) return false;
+            } else {
+                if (wire.pos.x != other_wire.pos.x) continue;
+
+                const y1 = wire.pos.y + wire.length;
+                const y2 = other_wire.pos.y + other_wire.length;
+
+                const y1_start = @min(wire.pos.y, y1);
+                const y1_end = @max(wire.pos.y, y1);
+                const y2_start = @min(other_wire.pos.y, y2);
+                const y2_end = @max(other_wire.pos.y, y2);
+
+                const intersect_side1 = y2_end > y1_start and y2_end < y1_end;
+                const intersect_side2 = y2_start > y1_start and y2_start < y1_end;
+                const interesct_inside = y1_start >= y2_start and y1_end <= y2_end;
+                if (intersect_side1 or intersect_side2 or interesct_inside) return false;
+            }
+        }
+
+        return true;
+    }
+
+    pub fn canPlaceComponent(
+        self: *const Circuit,
+        comp_type: component.Component.InnerType,
+        pos: GridPosition,
+        rotation: Rotation,
+    ) bool {
+        var buffer: [100]component.OccupiedGridPosition = undefined;
+        const positions = comp_type.getOccupiedGridPositions(pos, rotation, buffer[0..]);
+        for (self.components.items) |comp| {
+            if (comp.intersects(positions)) return false;
+        }
+
+        var buffer2: [100]component.OccupiedGridPosition = undefined;
+        for (self.wires.items) |wire| {
+            const wire_positions = getOccupiedGridPositions(wire, buffer2[0..]);
+            if (component.occupiedPointsIntersect(positions, wire_positions)) return false;
+        }
+
+        return true;
+    }
+
+    pub fn analyse(circuit: *const Circuit) void {
+        // group edges:
+        // - group 1(i1): all elements whose current will be eliminated
+        // - group 2(i2): all other elements
+
+        // since we include all nodes, theres no need to explicitly store their order
+        // however we store i2 elements
+
+        var group_2 = std.ArrayListUnmanaged(usize){};
+        defer group_2.deinit(circuit.allocator);
+
+        // TODO: include currents that are control variables
+        // TODO: include currents that we want to inspect
+        for (0.., circuit.components.items) |idx, comp| {
+            switch (comp.inner) {
+                .voltage_source => {
+                    group_2.append(circuit.allocator, idx) catch {
+                        std.log.err("Failed to build netlist", .{});
+                        return;
+                    };
                 },
-                .pos = pos,
-            });
+                else => {},
+            }
         }
-    }
 
-    return remaining_terminals;
-}
+        var netlist = NetList.fromCircuit(circuit) catch {
+            std.log.err("Failed to build netlist", .{});
+            return;
+        };
+        defer netlist.deinit();
+
+        // create matrix (|v| + |i2| X |v| + |i2| + 1)
+        // iterate over all elements and stamp them onto the matrix
+        var mna = netlist.createMNAMatrix(group_2.items) catch {
+            std.log.err("Failed to build netlist", .{});
+            return;
+        };
+        mna.mat.dump();
+        mna.print(netlist.nodes.items, group_2.items);
+
+        // solve the matrix with Gauss elimination
+        mna.mat.gaussJordanElimination();
+        mna.mat.dump();
+        mna.print(netlist.nodes.items, group_2.items);
+    }
+};
 
 fn findAllDirectConnections(
     allocator: std.mem.Allocator,
-    remaining_terminals: *std.ArrayListUnmanaged(TerminalWithPos),
+    remaining_terminals: *std.array_list.Managed(TerminalWithPos),
     nodes: *std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)),
 ) !void {
     while (remaining_terminals.pop()) |selected_terminal| {
@@ -373,7 +576,7 @@ fn findAllDirectConnections(
 
 fn getNextConnectedTerminalToWire(
     wire: Wire,
-    remaining_terminals: *std.ArrayListUnmanaged(TerminalWithPos),
+    remaining_terminals: *std.array_list.Managed(TerminalWithPos),
 ) ?NetList.Terminal {
     var i = remaining_terminals.items.len;
     while (i > 0) {
@@ -397,59 +600,6 @@ fn getNextConnectedTerminalToWire(
     return null;
 }
 
-// TODO: optimize this although i doubt this has a non negligible performance impact
-fn traverseWiresForNodes(
-    allocator: std.mem.Allocator,
-    remaining_terminals: *std.ArrayListUnmanaged(TerminalWithPos),
-    nodes: *std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)),
-) !void {
-    var connected_wire_buffer = try allocator.alloc(usize, wires.items.len);
-    defer allocator.free(connected_wire_buffer);
-
-    var remaining_wires = try allocator.dupe(Wire, wires.items);
-    var rem: usize = remaining_wires.len;
-
-    while (rem > 0) {
-        var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
-        const connected_wires = getConnectedWires(
-            remaining_wires,
-            remaining_wires.len - 1,
-            connected_wire_buffer[0..],
-        );
-
-        for (connected_wires) |wire_idx| {
-            const wire = remaining_wires[wire_idx];
-            while (getNextConnectedTerminalToWire(wire, remaining_terminals)) |term| {
-                try connected_terminals.append(allocator, term);
-            }
-        }
-
-        rem = remaining_wires.len - connected_wires.len;
-        if (rem == 0) {
-            allocator.free(remaining_wires);
-        } else {
-            var new_remaining_wires = try allocator.alloc(Wire, rem);
-            var idx: usize = 0;
-            for (0..remaining_wires.len) |i| {
-                var should_remove = false;
-                for (connected_wires) |j| {
-                    if (i == j) {
-                        should_remove = true;
-                        break;
-                    }
-                }
-                if (should_remove) continue;
-                new_remaining_wires[idx] = remaining_wires[i];
-                idx += 1;
-            }
-            allocator.free(remaining_wires);
-            remaining_wires = new_remaining_wires;
-        }
-
-        try nodes.append(allocator, connected_terminals);
-    }
-}
-
 fn getConnectedWires(ws: []const Wire, wire_id: usize, connected_wires: []usize) []usize {
     std.debug.assert(connected_wires.len > 0);
     connected_wires[0] = wire_id;
@@ -468,7 +618,12 @@ fn getConnectedWires(ws: []const Wire, wire_id: usize, connected_wires: []usize)
     return connected_wires[0..wire_count];
 }
 
-fn getDirectlyConnectedWires(ws: []const Wire, wire_id: usize, already_found_wires: []usize, connected_wires: []usize) []usize {
+fn getDirectlyConnectedWires(
+    ws: []const Wire,
+    wire_id: usize,
+    already_found_wires: []usize,
+    connected_wires: []usize,
+) []usize {
     var count: usize = 0;
     for (0..ws.len) |i| {
         if (wire_id == i) continue;
@@ -504,7 +659,7 @@ fn getNextConnectedWire(wire: Wire, ws: *std.ArrayList(Wire)) ?Wire {
 
 fn getLastConnected(
     pos: GridPosition,
-    terms: *std.ArrayListUnmanaged(TerminalWithPos),
+    terms: *std.array_list.Managed(TerminalWithPos),
 ) ?TerminalWithPos {
     for (0..terms.items.len) |i| {
         if (pos.eql(terms.items[i].pos)) {
@@ -594,113 +749,40 @@ pub const MNA = struct {
         const row = self.nodes.len - 1 + row_current_id;
         self.mat.data[row][self.mat.col_count - 1] = val;
     }
-};
 
-fn createMNAMatrix(allocator: std.mem.Allocator, nodes: []const NetList.Node, group_2: []const usize) !MNA {
-    // create matrix (|v| + |i2| X |v| + |i2| + 1)
-    // where v is all nodes except ground
-    // the last column is the RHS of the equation Ax=b
-    // basically (A|b) where b is an (|v| + |i2| X 1) matrix
+    fn print(
+        self: *const MNA,
+        nodes: []const NetList.Node,
+        group_2: []const usize,
+    ) void {
+        const mat = self.mat;
+        const total_variable_count = nodes.len - 1 + group_2.len;
+        std.debug.assert(mat.row_count == total_variable_count);
+        std.debug.assert(mat.col_count == total_variable_count + 1);
 
-    const total_variable_count = nodes.len - 1 + group_2.len;
-
-    var mna = try MNA.init(
-        allocator,
-        nodes,
-        group_2,
-    );
-
-    for (0..total_variable_count) |row| {
-        for (0..total_variable_count + 1) |col| {
-            mna.mat.data[row][col] = 0;
-        }
-    }
-
-    for (0.., components.items) |idx, comp| {
-        const current_group_2_idx = std.mem.indexOf(usize, group_2, &.{idx});
-        comp.stampMatrix(&mna, current_group_2_idx);
-    }
-
-    return mna;
-}
-
-fn printMNAMatrix(
-    mat: *const matrix.Matrix(FloatType),
-    nodes: []const NetList.Node,
-    group_2: []const usize,
-) void {
-    const total_variable_count = nodes.len - 1 + group_2.len;
-    std.debug.assert(mat.row_count == total_variable_count);
-    std.debug.assert(mat.col_count == total_variable_count + 1);
-
-    for (0..total_variable_count) |row| {
-        if (row >= nodes.len - 1) {
-            std.debug.print("i{}: ", .{group_2[row - (nodes.len - 1)]});
-        } else {
-            std.debug.print("v{}: ", .{row + 1});
-        }
-
-        for (0..total_variable_count) |col| {
-            std.debug.print("{}", .{mat.data[row][col]});
-            if (col >= nodes.len - 1) {
-                std.debug.print("*i{} ", .{group_2[col - (nodes.len - 1)]});
+        for (0..total_variable_count) |row| {
+            if (row >= nodes.len - 1) {
+                std.debug.print("i{}: ", .{group_2[row - (nodes.len - 1)]});
             } else {
-                std.debug.print("*v{} ", .{col + 1});
+                std.debug.print("v{}: ", .{row + 1});
             }
 
-            if (col != total_variable_count - 1) {
-                std.debug.print(" + ", .{});
+            for (0..total_variable_count) |col| {
+                std.debug.print("{}", .{mat.data[row][col]});
+                if (col >= nodes.len - 1) {
+                    std.debug.print("*i{} ", .{group_2[col - (nodes.len - 1)]});
+                } else {
+                    std.debug.print("*v{} ", .{col + 1});
+                }
+
+                if (col != total_variable_count - 1) {
+                    std.debug.print(" + ", .{});
+                }
             }
-        }
 
-        std.debug.print("= {}", .{mat.data[row][total_variable_count]});
+            std.debug.print("= {}", .{mat.data[row][total_variable_count]});
 
-        std.debug.print("\n", .{});
-    }
-}
-
-pub fn analyse(allocator: std.mem.Allocator) void {
-    // group edges:
-    // - group 1(i1): all elements whose current will be eliminated
-    // - group 2(i2): all other elements
-
-    // since we include all nodes, theres no need to explicitly store their order
-    // however we store i2 elements
-
-    var group_2 = std.ArrayListUnmanaged(usize){};
-    defer group_2.deinit(allocator);
-
-    // TODO: include currents that are control variables
-    // TODO: include currents that we want to inspect
-    for (0.., components.items) |idx, comp| {
-        switch (comp.inner) {
-            .voltage_source => {
-                group_2.append(allocator, idx) catch {
-                    std.log.err("Failed to build netlist", .{});
-                    return;
-                };
-            },
-            else => {},
+            std.debug.print("\n", .{});
         }
     }
-
-    var netlist = buildNetList(allocator) catch {
-        std.log.err("Failed to build netlist", .{});
-        return;
-    };
-    defer netlist.deinit();
-
-    // create matrix (|v| + |i2| X |v| + |i2| + 1)
-    // iterate over all elements and stamp them onto the matrix
-    var mna = createMNAMatrix(allocator, netlist.nodes.items, group_2.items) catch {
-        std.log.err("Failed to build netlist", .{});
-        return;
-    };
-    mna.mat.dump();
-    printMNAMatrix(&mna.mat, netlist.nodes.items, group_2.items);
-
-    // solve the matrix with Gauss elimination
-    mna.mat.gaussJordanElimination();
-    mna.mat.dump();
-    printMNAMatrix(&mna.mat, netlist.nodes.items, group_2.items);
-}
+};

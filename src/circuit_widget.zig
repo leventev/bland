@@ -35,7 +35,7 @@ pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     try win.keybinds.putNoClobber(allocator, "pin_placement_mode", .{ .key = .p });
 }
 
-fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
+fn checkForKeybinds(ev: dvui.Event.Key) !void {
     if (ev.matchBind("normal_mode") and ev.action == .down) {
         circuit.placement_mode = .none;
     }
@@ -75,7 +75,7 @@ fn checkForKeybinds(allocator: std.mem.Allocator, ev: dvui.Event.Key) !void {
     }
 
     if (ev.matchBind("analyse") and ev.action == .down) {
-        circuit.analyse(allocator);
+        circuit.main_circuit.analyse();
     }
 
     if (ev.matchBind("open_debug_window") and ev.action == .down) {
@@ -104,7 +104,7 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                 mouse_pos,
                                 circuit.placement_rotation,
                             );
-                            if (circuit.canPlaceComponent(
+                            if (circuit.main_circuit.canPlaceComponent(
                                 circuit.held_component,
                                 grid_pos,
                                 circuit.placement_rotation,
@@ -118,7 +118,10 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                     .terminal_node_ids = undefined,
                                 };
                                 try comp.setNewComponentName();
-                                try circuit.components.append(comp);
+                                try circuit.main_circuit.components.append(
+                                    circuit.main_circuit.allocator,
+                                    comp,
+                                );
                             }
                         } else if (circuit.placement_mode == .wire) {
                             if (circuit.held_wire_p1) |p1| {
@@ -139,8 +142,11 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                     .pos = p1,
                                 };
 
-                                if (wire.length != 0 and circuit.canPlaceWire(wire)) {
-                                    try circuit.wires.append(wire);
+                                if (wire.length != 0 and circuit.main_circuit.canPlaceWire(wire)) {
+                                    try circuit.main_circuit.wires.append(
+                                        circuit.main_circuit.allocator,
+                                        wire,
+                                    );
                                     circuit.held_wire_p1 = null;
                                 }
                             } else {
@@ -169,7 +175,7 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
             },
             .key => |key_ev| {
                 if (ev.target_widgetId != null) continue;
-                try checkForKeybinds(allocator, key_ev);
+                try checkForKeybinds(key_ev);
             },
             .text => {},
         }
@@ -188,7 +194,7 @@ fn renderHoldingComponent(circuit_rect: dvui.Rect.Physical) void {
         circuit.placement_rotation,
     );
 
-    const can_place = circuit.canPlaceComponent(
+    const can_place = circuit.main_circuit.canPlaceComponent(
         circuit.held_component,
         grid_pos,
         circuit.placement_rotation,
@@ -222,7 +228,7 @@ fn renderHoldingWire(circuit_rect: dvui.Rect.Physical) void {
         .pos = p1,
     };
 
-    const can_place = circuit.canPlaceWire(wire);
+    const can_place = circuit.main_circuit.canPlaceWire(wire);
     const render_type = if (can_place)
         ComponentRenderType.holding
     else
@@ -460,7 +466,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
-    for (0.., circuit.components.items) |i, comp| {
+    for (0.., circuit.main_circuit.components.items) |i, comp| {
         const render_type: ComponentRenderType = if (i == sidebar.selected_component_id)
             ComponentRenderType.selected
         else if (i == sidebar.hovered_component_id)
@@ -483,7 +489,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         comp.render(circuit_rect, render_type);
     }
 
-    for (circuit.wires.items) |wire| {
+    for (circuit.main_circuit.wires.items) |wire| {
         var it = wire.iterator();
         while (it.next()) |gpos| {
             // ensure key existsterm

@@ -280,7 +280,7 @@ pub fn renderWire(
     }
 }
 
-fn renderToolbox(allocator: std.mem.Allocator) bool {
+fn renderToolbox() bool {
     var toolbox = dvui.box(@src(), .{
         .dir = .vertical,
     }, .{
@@ -352,7 +352,7 @@ fn renderToolbox(allocator: std.mem.Allocator) bool {
         }
 
         if (dvui.menuItemLabel(@src(), "Analyse", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.analyse(allocator);
+            circuit.main_circuit.analyse();
             fw.close();
         }
     }
@@ -375,7 +375,7 @@ fn renderToolbox(allocator: std.mem.Allocator) bool {
 }
 
 pub fn render(allocator: std.mem.Allocator) !bool {
-    if (!renderToolbox(allocator))
+    if (!renderToolbox())
         return false;
 
     var paned = dvui.paned(

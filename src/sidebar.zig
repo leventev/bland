@@ -50,7 +50,7 @@ pub fn renderComponentList() void {
     );
     defer scroll.deinit();
 
-    for (0.., circuit.components.items) |i, comp| {
+    for (0.., circuit.main_circuit.components.items) |i, comp| {
         const bg = if (selected_component_id == i)
             dvui.themeGet().color(.highlight, .fill)
         else
@@ -136,7 +136,7 @@ pub fn renderPropertyBox() void {
         );
         defer scroll.deinit();
 
-        var selected_comp = &circuit.components.items[comp_id];
+        var selected_comp = &circuit.main_circuit.components.items[comp_id];
 
         dvui.label(@src(), "name", .{}, .{
             .color_text = dvui.themeGet().color(.content, .text),

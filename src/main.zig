@@ -14,10 +14,11 @@ const allocator = gpa.allocator();
 fn init(win: *dvui.Window) !void {
     _ = win;
 
-    circuit.components = std.array_list.Managed(component.Component).init(allocator);
-    circuit.wires = std.array_list.Managed(circuit.Wire).init(allocator);
-    defer circuit.components.deinit();
-    defer circuit.wires.deinit();
+    circuit.main_circuit = circuit.Circuit{
+        .allocator = allocator,
+        .components = std.ArrayList(component.Component){},
+        .wires = std.ArrayList(circuit.Wire){},
+    };
 
     try dvui.addFont(global.font_name, global.font_data, null);
     try dvui.addFont(global.bold_font_name, global.bold_font_data, null);
