@@ -269,7 +269,9 @@ pub const NetList = struct {
             node.connected_terminals.deinit(self.allocator);
         }
 
-        for (self.components.items) |comp| {
+        for (self.components.items) |*comp| {
+            // TODO: comp.deinit()
+            comp.inner.deinit(self.allocator);
             self.allocator.free(comp.name);
             self.allocator.free(comp.terminal_node_ids);
         }
@@ -327,7 +329,7 @@ pub const NetList = struct {
     // currents are included in group 2
     // since we will add currents used by CCVS, etc later too
     // so the name group_2 is misleading
-    fn createMNAMatrix(self: *const NetList, group_2: []const usize) !MNA {
+    fn createMNAMatrix(self: *NetList, group_2: []const usize) !MNA {
         // create matrix (|v| + |i2| X |v| + |i2| + 1)
         // where v is all nodes except ground
         // the last column is the RHS of the equation Ax=b
@@ -365,7 +367,7 @@ pub const NetList = struct {
         }
     };
 
-    pub fn analyse(self: *const NetList, currents_watched: []const usize) !AnalysationResult {
+    pub fn analyse(self: *NetList, currents_watched: []const usize) !AnalysationResult {
         // group edges:
         // - group 1(i1): all elements whose current will be eliminated
         // - group 2(i2): all other elements
@@ -378,7 +380,7 @@ pub const NetList = struct {
         defer group_2.deinit(self.allocator);
 
         // TODO: include currents that are control variables
-        for (0.., self.components.items) |idx, comp| {
+        for (0.., self.components.items) |idx, *comp| {
             var already_in = false;
             for (group_2.items) |group_2_comp_id| {
                 if (group_2_comp_id == idx) {
@@ -391,6 +393,23 @@ pub const NetList = struct {
 
             switch (comp.inner) {
                 .voltage_source => {
+                    group_2.append(self.allocator, idx) catch {
+                        @panic("Failed to build netlist");
+                    };
+                },
+                .ccvs => |*inner| {
+                    const controller_comp_idx = self.findComponentByName(
+                        inner.controller_name,
+                    ) orelse @panic("TODO");
+
+                    inner.controller_group_2_idx = group_2.items.len;
+
+                    // controller's current
+                    group_2.append(self.allocator, controller_comp_idx) catch {
+                        @panic("Failed to build netlist");
+                    };
+
+                    // ccvs's current
                     group_2.append(self.allocator, idx) catch {
                         @panic("Failed to build netlist");
                     };
@@ -439,6 +458,14 @@ pub const NetList = struct {
         }
 
         return res;
+    }
+
+    pub fn findComponentByName(self: *const NetList, name: []const u8) ?usize {
+        for (self.components.items, 0..) |comp, i| {
+            if (std.mem.eql(u8, comp.name, name)) return i;
+        }
+
+        return null;
     }
 };
 
@@ -651,16 +678,29 @@ pub const Circuit = struct {
         return true;
     }
 
-    pub fn analyse(circuit: *const Circuit) void {
-        var netlist = NetList.fromCircuit(circuit) catch {
+    pub fn analyse(self: *const Circuit) void {
+        var netlist = NetList.fromCircuit(self) catch {
             std.log.err("Failed to build netlist", .{});
             return;
         };
         defer netlist.deinit();
 
-        _ = netlist.analyse(&.{}) catch {
+        var res = netlist.analyse(&.{}) catch {
             @panic("TODO");
         };
+        defer res.deinit(self.allocator);
+
+        for (res.voltages, 0..) |v, idx| {
+            std.log.info("v{}: {d}", .{ idx, v });
+        }
+
+        for (res.currents, 0..) |current, idx| {
+            if (current) |c| {
+                std.log.info("i{}: {d}", .{ idx, c });
+            } else {
+                std.log.info("i{}: ?", .{idx});
+            }
+        }
     }
 };
 

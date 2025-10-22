@@ -156,7 +156,6 @@ pub fn renderPropertyBox() void {
         });
 
         if (dvui.firstFrame(te.data().id) or selected_component_changed) {
-            selected_component_changed = false;
             te.textSet(selected_comp.name, false);
         }
 
@@ -165,6 +164,8 @@ pub fn renderPropertyBox() void {
         te.deinit();
 
         selected_comp.renderPropertyBox();
+
+        selected_component_changed = false;
     }
 }
 

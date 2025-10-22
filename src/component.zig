@@ -91,6 +91,7 @@ pub const Component = struct {
         voltage_source,
         current_source,
         capacitor,
+        ccvs,
 
         fn module(comptime self: InnerType) type {
             return switch (self) {
@@ -99,6 +100,7 @@ pub const Component = struct {
                 .current_source => @import("components/current_source.zig"),
                 .capacitor => @import("components/capacitor.zig"),
                 .ground => @import("components/ground.zig"),
+                .ccvs => @import("components/ccvs.zig"),
             };
         }
 
@@ -111,9 +113,9 @@ pub const Component = struct {
             }
         }
 
-        pub fn defaultValue(self: InnerType) Inner {
+        pub fn defaultValue(self: InnerType, allocator: std.mem.Allocator) !Inner {
             switch (self) {
-                inline else => |x| return x.module().defaultValue(),
+                inline else => |x| return x.module().defaultValue(allocator),
             }
         }
 
@@ -195,6 +197,7 @@ pub const Component = struct {
         voltage_source: circuit.FloatType,
         current_source: circuit.FloatType,
         capacitor: circuit.FloatType,
+        ccvs: InnerType.ccvs.module().Inner,
 
         pub fn render(
             self: *const Inner,
@@ -245,6 +248,13 @@ pub const Component = struct {
                     mna,
                     current_group_2_idx,
                 ),
+            }
+        }
+
+        pub fn deinit(self: *Inner, allocator: std.mem.Allocator) void {
+            switch (@as(InnerType, self.*)) {
+                inline else => {},
+                .ccvs => @field(self, @tagName(InnerType.ccvs)).deinit(allocator),
             }
         }
     };

@@ -340,6 +340,12 @@ fn renderToolbox() bool {
             circuit.held_component = .capacitor;
             fw.close();
         }
+
+        if (dvui.menuItemLabel(@src(), "Current controlled voltage source", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .ccvs;
+            fw.close();
+        }
     }
 
     if (dvui.menuItemLabel(@src(), "Circuit", .{ .submenu = true }, .{})) |r| {

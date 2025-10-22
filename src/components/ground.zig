@@ -16,7 +16,7 @@ const FloatType = circuit.FloatType;
 
 var ground_counter: usize = 0;
 
-pub fn defaultValue() Component.Inner {
+pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
     return Component.Inner{ .ground = {} };
 }
 

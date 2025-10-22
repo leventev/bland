@@ -15,7 +15,7 @@ const FloatType = circuit.FloatType;
 
 var voltage_source_counter: usize = 0;
 
-pub fn defaultValue() Component.Inner {
+pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
     return Component.Inner{ .voltage_source = 5 };
 }
 pub fn setNewComponentName(buff: []u8) ![]u8 {
@@ -257,7 +257,12 @@ pub fn renderPropertyBox(v: *FloatType) void {
     });
 }
 
-pub fn stampMatrix(v: FloatType, terminal_node_ids: []const usize, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
+pub fn stampMatrix(
+    v: FloatType,
+    terminal_node_ids: []const usize,
+    mna: *circuit.MNA,
+    current_group_2_idx: ?usize,
+) void {
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 

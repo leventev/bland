@@ -111,7 +111,7 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                             )) {
                                 var comp = component.Component{
                                     .pos = grid_pos,
-                                    .inner = circuit.held_component.defaultValue(),
+                                    .inner = try circuit.held_component.defaultValue(allocator),
                                     .rotation = circuit.placement_rotation,
                                     .name_buffer = try allocator.alloc(u8, component.max_component_name_length),
                                     .name = &.{},
