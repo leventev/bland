@@ -172,7 +172,9 @@ pub fn gridPositionFromPos(
 pub const NetList = struct {
     allocator: std.mem.Allocator,
     nodes: std.ArrayListUnmanaged(Node),
-    components: std.ArrayListUnmanaged(component.Component),
+    components: std.ArrayListUnmanaged(Component),
+
+    pub const ground_node_id = 0;
 
     pub const Terminal = struct {
         component_id: usize,
@@ -185,17 +187,26 @@ pub const NetList = struct {
         voltage: ?FloatType,
     };
 
+    pub const Component = struct {
+        inner: component.Component.Inner,
+        name: []const u8,
+        // TODO: this is a duplicate since we already store the terminal nodes
+        // connected to the nodes
+        terminal_node_ids: []const usize,
+    };
+
     pub fn init(allocator: std.mem.Allocator) !NetList {
         var nodes = std.ArrayListUnmanaged(Node){};
         try nodes.append(allocator, .{
-            .id = 0,
-            .connected_terminals = std.ArrayListUnmanaged(Terminal),
+            .id = ground_node_id,
+            .connected_terminals = std.ArrayListUnmanaged(Terminal){},
             .voltage = 0,
         });
 
         return NetList{
             .allocator = allocator,
             .nodes = nodes,
+            .components = std.ArrayList(NetList.Component){},
         };
     }
 
@@ -203,11 +214,35 @@ pub const NetList = struct {
         const next_id = self.nodes.items.len;
         try self.nodes.append(self.allocator, .{
             .id = next_id,
-            .connected_terminals = std.ArrayListUnmanaged(Terminal),
+            .connected_terminals = std.ArrayListUnmanaged(Terminal){},
             .voltage = null,
         });
 
         return next_id;
+    }
+
+    //pub fn addComponentNoConnection(self: *NetList, inner: component.Component.Inner) !usize {
+    //    const id = self.components.items.len;
+    //    try self.components.append(self.allocator, comp);
+    //    return id;
+    //}
+
+    pub fn addComponent(
+        self: *NetList,
+        inner: component.Component.Inner,
+        name: []const u8,
+        node_ids: []const usize,
+    ) !usize {
+        const id = self.components.items.len;
+        try self.components.append(self.allocator, NetList.Component{
+            .inner = inner,
+            .name = try self.allocator.dupe(u8, name),
+            .terminal_node_ids = try self.allocator.dupe(usize, node_ids),
+        });
+        for (node_ids, 0..) |node_id, term_id| {
+            try self.addComponentConnection(node_id, id, term_id);
+        }
+        return id;
     }
 
     pub fn addComponentConnection(
@@ -218,9 +253,9 @@ pub const NetList = struct {
     ) !void {
         // TODO: error instead of assert
         std.debug.assert(node_id < self.nodes.items.len);
-        std.debug.assert(comp_id < self.components.len);
+        std.debug.assert(comp_id < self.components.items.len);
 
-        self.nodes.items[node_id].connected_terminals.append(
+        try self.nodes.items[node_id].connected_terminals.append(
             self.allocator,
             NetList.Terminal{
                 .component_id = comp_id,
@@ -233,6 +268,12 @@ pub const NetList = struct {
         for (self.nodes.items) |*node| {
             node.connected_terminals.deinit(self.allocator);
         }
+
+        for (self.components.items) |comp| {
+            self.allocator.free(comp.name);
+            self.allocator.free(comp.terminal_node_ids);
+        }
+
         self.nodes.deinit(self.allocator);
         self.components.deinit(self.allocator);
         self.* = undefined;
@@ -262,10 +303,23 @@ pub const NetList = struct {
             node_terminals.items,
         );
 
+        var netlist_comps = try std.ArrayList(NetList.Component).initCapacity(
+            circuit.allocator,
+            circuit.components.items.len,
+        );
+
+        for (circuit.components.items) |comp| {
+            try netlist_comps.append(circuit.allocator, .{
+                .inner = comp.inner,
+                .name = try circuit.allocator.dupe(u8, comp.name),
+                .terminal_node_ids = try circuit.allocator.dupe(usize, &comp.terminal_node_ids),
+            });
+        }
+
         return NetList{
             .allocator = circuit.allocator,
             .nodes = nodes,
-            .components = try circuit.components.clone(circuit.allocator),
+            .components = netlist_comps,
         };
     }
 
@@ -295,10 +349,96 @@ pub const NetList = struct {
 
         for (0.., self.components.items) |idx, comp| {
             const current_group_2_idx = std.mem.indexOf(usize, group_2, &.{idx});
-            comp.stampMatrix(&mna, current_group_2_idx);
+            comp.inner.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx);
         }
 
         return mna;
+    }
+
+    pub const AnalysationResult = struct {
+        voltages: []FloatType,
+        currents: []?FloatType,
+
+        pub fn deinit(self: *AnalysationResult, allocator: std.mem.Allocator) void {
+            allocator.free(self.voltages);
+            allocator.free(self.currents);
+        }
+    };
+
+    pub fn analyse(self: *const NetList, currents_watched: []const usize) !AnalysationResult {
+        // group edges:
+        // - group 1(i1): all elements whose current will be eliminated
+        // - group 2(i2): all other elements
+
+        // since we include all nodes, theres no need to explicitly store their order
+        // however we store i2 elements
+
+        var group_2 = std.ArrayListUnmanaged(usize){};
+        try group_2.appendSlice(self.allocator, currents_watched);
+        defer group_2.deinit(self.allocator);
+
+        // TODO: include currents that are control variables
+        for (0.., self.components.items) |idx, comp| {
+            var already_in = false;
+            for (group_2.items) |group_2_comp_id| {
+                if (group_2_comp_id == idx) {
+                    already_in = true;
+                    break;
+                }
+            }
+
+            if (already_in) continue;
+
+            switch (comp.inner) {
+                .voltage_source => {
+                    group_2.append(self.allocator, idx) catch {
+                        @panic("Failed to build netlist");
+                    };
+                },
+                else => {},
+            }
+        }
+
+        // create matrix (|v| + |i2| X |v| + |i2| + 1)
+        // iterate over all elements and stamp them onto the matrix
+        var mna = self.createMNAMatrix(group_2.items) catch {
+            @panic("Failed to build netlist");
+        };
+        defer mna.deinit(self.allocator);
+        //mna.mat.dump();
+        //mna.print(self.nodes.items, group_2.items);
+
+        // solve the matrix with Gauss elimination
+        mna.mat.gaussJordanElimination();
+        //mna.mat.dump();
+        //mna.print(self.nodes.items, group_2.items);
+
+        var res = AnalysationResult{
+            .voltages = try self.allocator.alloc(
+                FloatType,
+                self.nodes.items.len,
+            ),
+            .currents = try self.allocator.alloc(
+                ?FloatType,
+                self.components.items.len,
+            ),
+        };
+
+        res.voltages[0] = 0;
+        for (1..self.nodes.items.len) |i| {
+            res.voltages[i] = mna.mat.data[i - 1][mna.mat.col_count - 1];
+        }
+
+        // null out currents
+        for (0..self.components.items.len) |i| {
+            res.currents[i] = null;
+        }
+
+        for (group_2.items, 0..) |current_idx, i| {
+            res.currents[current_idx] = mna.mat.data[self.nodes.items.len + i - 1][mna.mat.col_count - 1];
+        }
+
+        return res;
     }
 };
 
@@ -512,49 +652,15 @@ pub const Circuit = struct {
     }
 
     pub fn analyse(circuit: *const Circuit) void {
-        // group edges:
-        // - group 1(i1): all elements whose current will be eliminated
-        // - group 2(i2): all other elements
-
-        // since we include all nodes, theres no need to explicitly store their order
-        // however we store i2 elements
-
-        var group_2 = std.ArrayListUnmanaged(usize){};
-        defer group_2.deinit(circuit.allocator);
-
-        // TODO: include currents that are control variables
-        // TODO: include currents that we want to inspect
-        for (0.., circuit.components.items) |idx, comp| {
-            switch (comp.inner) {
-                .voltage_source => {
-                    group_2.append(circuit.allocator, idx) catch {
-                        std.log.err("Failed to build netlist", .{});
-                        return;
-                    };
-                },
-                else => {},
-            }
-        }
-
         var netlist = NetList.fromCircuit(circuit) catch {
             std.log.err("Failed to build netlist", .{});
             return;
         };
         defer netlist.deinit();
 
-        // create matrix (|v| + |i2| X |v| + |i2| + 1)
-        // iterate over all elements and stamp them onto the matrix
-        var mna = netlist.createMNAMatrix(group_2.items) catch {
-            std.log.err("Failed to build netlist", .{});
-            return;
+        _ = netlist.analyse(&.{}) catch {
+            @panic("TODO");
         };
-        mna.mat.dump();
-        mna.print(netlist.nodes.items, group_2.items);
-
-        // solve the matrix with Gauss elimination
-        mna.mat.gaussJordanElimination();
-        mna.mat.dump();
-        mna.print(netlist.nodes.items, group_2.items);
     }
 };
 
@@ -693,6 +799,10 @@ pub const MNA = struct {
         };
     }
 
+    pub fn deinit(self: *MNA, allocator: std.mem.Allocator) void {
+        self.mat.deinit(allocator);
+    }
+
     pub fn stampVoltageVoltage(
         self: *MNA,
         row_voltage_id: usize,
@@ -786,3 +896,113 @@ pub const MNA = struct {
         }
     }
 };
+
+const tolerance = 1e-6;
+
+fn checkCurrent(
+    res: *const NetList.AnalysationResult,
+    current_id: usize,
+    expected: FloatType,
+) !void {
+    // TODO: check polarity???
+    try std.testing.expect(current_id < res.currents.len);
+    try std.testing.expect(res.currents[current_id] != null);
+    const actual = res.currents[current_id].?;
+
+    const expected_abs = @abs(expected);
+    const expected_actual = @abs(actual);
+    try std.testing.expectApproxEqRel(expected_abs, expected_actual, tolerance);
+}
+
+fn checkVoltage(
+    res: *const NetList.AnalysationResult,
+    voltage_id: usize,
+    expected: FloatType,
+) !void {
+    try std.testing.expect(voltage_id < res.voltages.len);
+    const actual = res.voltages[voltage_id];
+    try std.testing.expectApproxEqRel(expected, actual, tolerance);
+}
+
+test "single resistor" {
+    const gpa = std.testing.allocator;
+    var netlist = try NetList.init(gpa);
+    defer netlist.deinit();
+
+    const gnd_id: usize = NetList.ground_node_id;
+    const vs_plus_id = try netlist.allocateNode();
+
+    const v1 = 11.46;
+    const r1 = 34.6898;
+
+    const v1_comp_idx = try netlist.addComponent(
+        component.Component.Inner{ .voltage_source = v1 },
+        "V1",
+        &.{ vs_plus_id, gnd_id },
+    );
+
+    const r1_comp_idx = try netlist.addComponent(
+        component.Component.Inner{ .resistor = r1 },
+        "R1",
+        &.{ vs_plus_id, gnd_id },
+    );
+
+    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx });
+    defer res.deinit(netlist.allocator);
+
+    // currents
+    const current = v1 / r1;
+    try checkCurrent(&res, v1_comp_idx, current);
+    try checkCurrent(&res, r1_comp_idx, current);
+
+    // voltages
+    try checkVoltage(&res, gnd_id, 0);
+    try checkVoltage(&res, vs_plus_id, v1);
+}
+
+test "voltage divider" {
+    const gpa = std.testing.allocator;
+    var netlist = try NetList.init(gpa);
+    defer netlist.deinit();
+
+    const gnd_id: usize = NetList.ground_node_id;
+    const vs_plus_id = try netlist.allocateNode();
+    const middle_id = try netlist.allocateNode();
+
+    const v1 = 5.0;
+    const r1 = 24.5;
+    const r2 = 343.5;
+
+    const v1_comp_idx = try netlist.addComponent(
+        component.Component.Inner{ .voltage_source = v1 },
+        "V1",
+        &.{ vs_plus_id, gnd_id },
+    );
+
+    const r1_comp_idx = try netlist.addComponent(
+        component.Component.Inner{ .resistor = r1 },
+        "R1",
+        &.{ middle_id, vs_plus_id },
+    );
+
+    const r2_comp_idx = try netlist.addComponent(
+        component.Component.Inner{ .resistor = r2 },
+        "R2",
+        &.{ gnd_id, middle_id },
+    );
+
+    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
+    defer res.deinit(netlist.allocator);
+
+    // currents
+    const current = v1 / (r1 + r2);
+    try checkCurrent(&res, v1_comp_idx, current);
+    try checkCurrent(&res, r1_comp_idx, current);
+    try checkCurrent(&res, r2_comp_idx, current);
+
+    // voltages
+    try checkVoltage(&res, gnd_id, 0);
+    try checkVoltage(&res, vs_plus_id, v1);
+    const middle_node_voltage = v1 * (r2 / (r1 + r2));
+    try checkVoltage(&res, middle_id, middle_node_voltage);
+}

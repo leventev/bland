@@ -94,10 +94,9 @@ pub fn Matrix(comptime T: type) type {
                     // now `row` contains the index of the row that contains the pivot
 
                     // scale the row so the leading coefficient is 1
-                    if (self.data[p_row][col] != 1) {
-                        self.scaleRow(row, 1 / self.data[p_row][col]);
+                    if (self.data[row][col] != 1) {
+                        self.scaleRow(row, 1 / self.data[row][col]);
                     }
-
                     // set all the other row leading coefficients to 0
                     for (0..self.row_count) |other_row| {
                         if (other_row == row) continue;
