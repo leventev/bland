@@ -2,8 +2,8 @@ const std = @import("std");
 
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
-const component = @import("component.zig");
-const circuit = @import("circuit.zig");
+pub const component = @import("component.zig");
+pub const circuit = @import("circuit.zig");
 const circuit_widget = @import("circuit_widget.zig");
 
 const dvui = @import("dvui");
