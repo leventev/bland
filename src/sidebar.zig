@@ -50,7 +50,7 @@ pub fn renderComponentList() void {
     );
     defer scroll.deinit();
 
-    for (0.., circuit.main_circuit.components.items) |i, comp| {
+    for (0.., circuit.main_circuit.graphic_components.items) |i, graphic_comp| {
         const bg = if (selected_component_id == i)
             dvui.themeGet().color(.highlight, .fill)
         else
@@ -73,7 +73,7 @@ pub fn renderComponentList() void {
         bw.processEvents();
         bw.drawBackground();
 
-        dvui.labelNoFmt(@src(), comp.name, .{}, .{
+        dvui.labelNoFmt(@src(), graphic_comp.comp.name, .{}, .{
             .id_extra = 0,
             .expand = .horizontal,
             .color_text = dvui.themeGet().color(.control, .text),
@@ -136,7 +136,8 @@ pub fn renderPropertyBox() void {
         );
         defer scroll.deinit();
 
-        var selected_comp = &circuit.main_circuit.components.items[comp_id];
+        var selected_graphic_comp = &circuit.main_circuit.graphic_components.items[comp_id];
+        var comp = &selected_graphic_comp.comp;
 
         dvui.label(@src(), "name", .{}, .{
             .color_text = dvui.themeGet().color(.content, .text),
@@ -145,7 +146,7 @@ pub fn renderPropertyBox() void {
 
         var te = dvui.textEntry(@src(), .{
             .text = .{
-                .buffer = selected_comp.name_buffer,
+                .buffer = comp.name_buffer,
             },
         }, .{
             .color_fill = dvui.themeGet().color(.control, .fill),
@@ -156,15 +157,13 @@ pub fn renderPropertyBox() void {
         });
 
         if (dvui.firstFrame(te.data().id) or selected_component_changed) {
-            te.textSet(selected_comp.name, false);
+            te.textSet(comp.name, false);
         }
 
-        selected_comp.name = te.getText();
-
+        comp.name = te.getText();
         te.deinit();
 
-        selected_comp.renderPropertyBox();
-
+        comp.renderPropertyBox();
         selected_component_changed = false;
     }
 }

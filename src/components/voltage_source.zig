@@ -7,6 +7,8 @@ const global = @import("../global.zig");
 
 const dvui = @import("dvui");
 
+const MNA = @import("../mna.zig").MNA;
+
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
@@ -260,7 +262,7 @@ pub fn renderPropertyBox(v: *FloatType) void {
 pub fn stampMatrix(
     v: FloatType,
     terminal_node_ids: []const usize,
-    mna: *circuit.MNA,
+    mna: *MNA,
     current_group_2_idx: ?usize,
 ) void {
     const v_plus = terminal_node_ids[0];

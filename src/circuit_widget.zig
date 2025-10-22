@@ -109,18 +109,20 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                 grid_pos,
                                 circuit.placement_rotation,
                             )) {
-                                var comp = component.Component{
+                                var graphic_comp = component.GraphicComponent{
                                     .pos = grid_pos,
-                                    .inner = try circuit.held_component.defaultValue(allocator),
                                     .rotation = circuit.placement_rotation,
-                                    .name_buffer = try allocator.alloc(u8, component.max_component_name_length),
-                                    .name = &.{},
-                                    .terminal_node_ids = undefined,
+                                    .comp = component.Component{
+                                        .name_buffer = try allocator.alloc(u8, component.max_component_name_length),
+                                        .name = &.{},
+                                        .inner = try circuit.held_component.defaultValue(allocator),
+                                        .terminal_node_ids = try allocator.alloc(usize, 2),
+                                    },
                                 };
-                                try comp.setNewComponentName();
-                                try circuit.main_circuit.components.append(
+                                try graphic_comp.comp.setNewComponentName();
+                                try circuit.main_circuit.graphic_components.append(
                                     circuit.main_circuit.allocator,
-                                    comp,
+                                    graphic_comp,
                                 );
                             }
                         } else if (circuit.placement_mode == .wire) {
@@ -466,7 +468,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
-    for (0.., circuit.main_circuit.components.items) |i, comp| {
+    for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
         const render_type: ComponentRenderType = if (i == sidebar.selected_component_id)
             ComponentRenderType.selected
         else if (i == sidebar.hovered_component_id)

@@ -8,6 +8,8 @@ const sidebar = @import("../sidebar.zig");
 
 const dvui = @import("dvui");
 
+const MNA = @import("../mna.zig").MNA;
+
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
@@ -28,6 +30,16 @@ pub const Inner = struct {
         self.controller_name = &.{};
         self.coefficient = 0;
         self.controller_group_2_idx = null;
+    }
+
+    pub fn clone(self: *const Inner, allocator: std.mem.Allocator) !Inner {
+        const name_buff = try allocator.dupe(u8, self.controller_name_buff);
+        return Inner{
+            .controller_name_buff = name_buff,
+            .controller_name = name_buff[0..self.controller_name.len],
+            .coefficient = self.coefficient,
+            .controller_group_2_idx = null,
+        };
     }
 };
 
@@ -293,7 +305,7 @@ pub fn renderPropertyBox(inner: *Inner) void {
 pub fn stampMatrix(
     inner: Inner,
     terminal_node_ids: []const usize,
-    mna: *circuit.MNA,
+    mna: *MNA,
     current_group_2_idx: ?usize,
 ) void {
     const v_plus = terminal_node_ids[0];

@@ -6,6 +6,8 @@ pub const component = @import("component.zig");
 pub const circuit = @import("circuit.zig");
 const circuit_widget = @import("circuit_widget.zig");
 
+pub const NetList = @import("netlist.zig").NetList;
+
 const dvui = @import("dvui");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -14,9 +16,9 @@ const allocator = gpa.allocator();
 fn init(win: *dvui.Window) !void {
     _ = win;
 
-    circuit.main_circuit = circuit.Circuit{
+    circuit.main_circuit = circuit.GraphicCircuit{
         .allocator = allocator,
-        .components = std.ArrayList(component.Component){},
+        .graphic_components = std.ArrayList(component.GraphicComponent){},
         .wires = std.ArrayList(circuit.Wire){},
     };
 
