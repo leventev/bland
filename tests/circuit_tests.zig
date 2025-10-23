@@ -3,7 +3,7 @@ const bland = @import("bland");
 const circuit = bland.circuit;
 const component = bland.component;
 
-const NetList = circuit.NetList;
+const NetList = bland.NetList;
 const FloatType = circuit.FloatType;
 
 const tolerance = 1e-6;
