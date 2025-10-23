@@ -4,6 +4,7 @@ const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
+const sidebar = @import("../sidebar.zig");
 
 const dvui = @import("dvui");
 
@@ -13,16 +14,47 @@ const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
 
-const FloatType = circuit.FloatType;
+var cccs_counter: usize = 0;
 
-var current_source_counter: usize = 0;
+pub const Inner = struct {
+    controller_name_buff: []u8,
+    controller_name: []u8,
+    multiplier: circuit.FloatType,
 
-pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .current_source = 1 };
+    // set by netlist.analyse
+    controller_group_2_idx: ?usize,
+
+    pub fn deinit(self: *Inner, allocator: std.mem.Allocator) void {
+        allocator.free(self.controller_name_buff);
+        self.controller_name_buff = &.{};
+        self.controller_name = &.{};
+        self.multiplier = 0;
+        self.controller_group_2_idx = null;
+    }
+
+    pub fn clone(self: *const Inner, allocator: std.mem.Allocator) !Inner {
+        const name_buff = try allocator.dupe(u8, self.controller_name_buff);
+        return Inner{
+            .controller_name_buff = name_buff,
+            .controller_name = name_buff[0..self.controller_name.len],
+            .multiplier = self.coefficient,
+            .controller_group_2_idx = null,
+        };
+    }
+};
+
+pub fn defaultValue(allocator: std.mem.Allocator) !Component.Inner {
+    return Component.Inner{ .cccs = .{
+        .controller_name_buff = try allocator.alloc(u8, component.max_component_name_length),
+        .controller_name = &.{},
+        .multiplier = 0,
+        .controller_group_2_idx = null,
+    } };
 }
+
 pub fn setNewComponentName(buff: []u8) ![]u8 {
-    current_source_counter += 1;
-    return std.fmt.bufPrint(buff, "I{}", .{current_source_counter});
+    cccs_counter += 1;
+    return std.fmt.bufPrint(buff, "CCCS{}", .{cccs_counter});
 }
 
 pub fn getTerminals(
@@ -45,8 +77,11 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-fn formatValue(value: FloatType, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}A", .{value});
+fn formatValue(inner: Inner, buf: []u8) !?[]const u8 {
+    return try std.fmt.bufPrint(buf, "{d}*I({s})", .{
+        inner.multiplier,
+        inner.controller_name,
+    });
 }
 
 pub fn render(
@@ -54,7 +89,7 @@ pub fn render(
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?FloatType,
+    value: ?Inner,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
@@ -64,6 +99,8 @@ pub fn render(
     const arrow_len = 20;
     const arrowhead_len = 5;
     const wire_len = (total_len - middle_len) / 2;
+
+    const diamond_off = middle_len / 2;
 
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
@@ -93,16 +130,11 @@ pub fn render(
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
 
-            path.addArc(
-                dvui.Point.Physical{
-                    .x = pos.x + global.grid_size,
-                    .y = pos.y,
-                },
-                middle_len / 2,
-                dvui.math.pi * 2,
-                0,
-                false,
-            );
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_len, .y = pos.y });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_len + diamond_off, .y = pos.y - diamond_off });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_len + 2 * diamond_off, .y = pos.y });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_len + diamond_off, .y = pos.y + diamond_off });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_len, .y = pos.y });
 
             path.build().stroke(.{
                 .color = render_colors.component_color,
@@ -188,16 +220,11 @@ pub fn render(
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
 
-            path.addArc(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y + global.grid_size,
-                },
-                middle_len / 2,
-                dvui.math.pi * 2,
-                0,
-                false,
-            );
+            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_len });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x - diamond_off, .y = pos.y + wire_len + diamond_off });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_len + 2 * diamond_off });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + diamond_off, .y = pos.y + wire_len + diamond_off });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_len });
 
             path.build().stroke(.{
                 .color = render_colors.component_color,
@@ -268,24 +295,14 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(current: *FloatType) void {
-    dvui.label(@src(), "current", .{}, .{
+pub fn renderPropertyBox(inner: *Inner) void {
+    dvui.label(@src(), "multiplier", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    var box = dvui.box(
-        @src(),
-        .{ .dir = .horizontal },
-        .{
-            .expand = .horizontal,
-        },
-    );
-    defer box.deinit();
-
-    _ = dvui.textEntryNumber(@src(), FloatType, .{
-        .value = current,
-        .show_min_max = true,
+    _ = dvui.textEntryNumber(@src(), circuit.FloatType, .{
+        .value = &inner.multiplier,
     }, .{
         .color_fill = dvui.themeGet().color(.control, .fill),
         .color_text = dvui.themeGet().color(.content, .text),
@@ -294,17 +311,34 @@ pub fn renderPropertyBox(current: *FloatType) void {
         .margin = dvui.Rect.all(4),
     });
 
-    dvui.label(@src(), "A", .{}, .{
+    dvui.label(@src(), "controller name", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_title,
-        .margin = dvui.Rect.all(4),
-        .padding = dvui.Rect.all(4),
-        .gravity_y = 0.5,
+        .font = dvui.themeGet().font_body,
     });
+
+    var te = dvui.textEntry(@src(), .{
+        .text = .{
+            .buffer = inner.controller_name_buff,
+        },
+    }, .{
+        .color_fill = dvui.themeGet().color(.control, .fill),
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_body,
+        .expand = .horizontal,
+        .margin = dvui.Rect.all(4),
+    });
+
+    if (dvui.firstFrame(te.data().id) or sidebar.selected_component_changed) {
+        te.textSet(inner.controller_name, false);
+    }
+
+    inner.controller_name = te.getText();
+
+    te.deinit();
 }
 
 pub fn stampMatrix(
-    i: FloatType,
+    inner: Inner,
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
@@ -312,14 +346,16 @@ pub fn stampMatrix(
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 
-    // TODO: explain how stamping works
+    const controller_curr_idx = inner.controller_group_2_idx orelse @panic("?");
+
+    // TODO: explain stamping
     if (current_group_2_idx) |curr_idx| {
         mna.stampVoltageCurrent(v_plus, curr_idx, 1);
         mna.stampVoltageCurrent(v_minus, curr_idx, -1);
         mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
-        mna.stampCurrentRHS(curr_idx, i);
+        mna.stampCurrentCurrent(curr_idx, controller_curr_idx, -inner.multiplier);
     } else {
-        mna.stampVoltageRHS(v_plus, -i);
-        mna.stampVoltageRHS(v_minus, i);
+        mna.stampVoltageCurrent(v_plus, controller_curr_idx, -inner.multiplier);
+        mna.stampVoltageCurrent(v_minus, controller_curr_idx, inner.multiplier);
     }
 }

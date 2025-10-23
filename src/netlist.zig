@@ -279,6 +279,20 @@ pub const NetList = struct {
                     // ccvs's current
                     _ = try group_2.addComponent(self.allocator, idx);
                 },
+                .cccs => |*inner| {
+                    const controller_comp_idx = self.findComponentByName(
+                        inner.controller_name,
+                    ) orelse @panic("TODO");
+
+                    // controller's current
+                    inner.controller_group_2_idx = try group_2.addComponent(
+                        self.allocator,
+                        controller_comp_idx,
+                    );
+
+                    // ccvs's current
+                    _ = try group_2.addComponent(self.allocator, idx);
+                },
                 else => {},
             }
         }

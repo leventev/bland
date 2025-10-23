@@ -346,6 +346,12 @@ fn renderToolbox() bool {
             circuit.held_component = .ccvs;
             fw.close();
         }
+
+        if (dvui.menuItemLabel(@src(), "Current controlled current source", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .cccs;
+            fw.close();
+        }
     }
 
     if (dvui.menuItemLabel(@src(), "Circuit", .{ .submenu = true }, .{})) |r| {

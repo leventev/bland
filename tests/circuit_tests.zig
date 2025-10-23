@@ -5,7 +5,7 @@ const circuit = bland.circuit;
 const NetList = bland.NetList;
 const FloatType = circuit.FloatType;
 
-const tolerance = 1e-6;
+const tolerance = 1e-9;
 
 pub fn checkCurrent(
     res: *const NetList.AnalysationResult,
@@ -47,4 +47,5 @@ pub fn checkVoltage2(
 comptime {
     _ = @import("component/resistor.zig");
     _ = @import("component/ccvs.zig");
+    _ = @import("component/cccs.zig");
 }

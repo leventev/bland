@@ -115,6 +115,7 @@ pub const Component = struct {
         current_source,
         capacitor,
         ccvs,
+        cccs,
 
         fn module(comptime self: InnerType) type {
             return switch (self) {
@@ -124,6 +125,7 @@ pub const Component = struct {
                 .capacitor => @import("components/capacitor.zig"),
                 .ground => @import("components/ground.zig"),
                 .ccvs => @import("components/ccvs.zig"),
+                .cccs => @import("components/cccs.zig"),
             };
         }
 
@@ -221,6 +223,7 @@ pub const Component = struct {
         current_source: circuit.FloatType,
         capacitor: circuit.FloatType,
         ccvs: InnerType.ccvs.module().Inner,
+        cccs: InnerType.cccs.module().Inner,
 
         pub fn clone(self: *const Inner, allocator: std.mem.Allocator) !Inner {
             return switch (@as(InnerType, self.*)) {
@@ -290,6 +293,7 @@ pub const Component = struct {
             switch (@as(InnerType, self.*)) {
                 inline else => {},
                 .ccvs => @field(self, @tagName(InnerType.ccvs)).deinit(allocator),
+                .cccs => @field(self, @tagName(InnerType.cccs)).deinit(allocator),
             }
         }
     };

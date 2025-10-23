@@ -78,7 +78,7 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
 }
 
 fn formatValue(inner: Inner, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}I({s})", .{
+    return try std.fmt.bufPrint(buf, "{d}*I({s})", .{
         inner.transresistance,
         inner.controller_name,
     });
