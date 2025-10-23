@@ -19,7 +19,7 @@ var ccvs_counter: usize = 0;
 pub const Inner = struct {
     controller_name_buff: []u8,
     controller_name: []u8,
-    coefficient: circuit.FloatType,
+    transresistance: circuit.FloatType,
 
     // set by netlist.analyse
     controller_group_2_idx: ?usize,
@@ -28,7 +28,7 @@ pub const Inner = struct {
         allocator.free(self.controller_name_buff);
         self.controller_name_buff = &.{};
         self.controller_name = &.{};
-        self.coefficient = 0;
+        self.transresistance = 0;
         self.controller_group_2_idx = null;
     }
 
@@ -37,7 +37,7 @@ pub const Inner = struct {
         return Inner{
             .controller_name_buff = name_buff,
             .controller_name = name_buff[0..self.controller_name.len],
-            .coefficient = self.coefficient,
+            .transresistance = self.transresistance,
             .controller_group_2_idx = null,
         };
     }
@@ -47,7 +47,7 @@ pub fn defaultValue(allocator: std.mem.Allocator) !Component.Inner {
     return Component.Inner{ .ccvs = .{
         .controller_name_buff = try allocator.alloc(u8, component.max_component_name_length),
         .controller_name = &.{},
-        .coefficient = 0,
+        .transresistance = 0,
         .controller_group_2_idx = null,
     } };
 }
@@ -78,8 +78,8 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
 }
 
 fn formatValue(inner: Inner, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}{s}", .{
-        inner.coefficient,
+    return try std.fmt.bufPrint(buf, "{d}I({s})", .{
+        inner.transresistance,
         inner.controller_name,
     });
 }
@@ -252,29 +252,39 @@ pub fn render(
 }
 
 pub fn renderPropertyBox(inner: *Inner) void {
-    var box = dvui.box(
-        @src(),
-        .{ .dir = .vertical },
-        .{
-            .expand = .vertical,
-        },
-    );
-    defer box.deinit();
-
-    dvui.label(@src(), "coefficient", .{}, .{
+    dvui.label(@src(), "transresistance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    _ = dvui.textEntryNumber(@src(), circuit.FloatType, .{
-        .value = &inner.coefficient,
-    }, .{
-        .color_fill = dvui.themeGet().color(.control, .fill),
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-        .expand = .horizontal,
-        .margin = dvui.Rect.all(4),
-    });
+    {
+        var box = dvui.box(
+            @src(),
+            .{ .dir = .horizontal },
+            .{
+                .expand = .horizontal,
+            },
+        );
+        defer box.deinit();
+
+        _ = dvui.textEntryNumber(@src(), circuit.FloatType, .{
+            .value = &inner.transresistance,
+        }, .{
+            .color_fill = dvui.themeGet().color(.control, .fill),
+            .color_text = dvui.themeGet().color(.content, .text),
+            .font = dvui.themeGet().font_body,
+            .expand = .horizontal,
+            .margin = dvui.Rect.all(4),
+        });
+
+        dvui.label(@src(), "\u{03A9}", .{}, .{
+            .color_text = dvui.themeGet().color(.content, .text),
+            .font = dvui.themeGet().font_title,
+            .margin = dvui.Rect.all(4),
+            .padding = dvui.Rect.all(4),
+            .gravity_y = 0.5,
+        });
+    }
 
     dvui.label(@src(), "controller name", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
@@ -323,6 +333,6 @@ pub fn stampMatrix(
     mna.stampCurrentCurrent(
         ccvs_curr_idx,
         controller_curr_idx,
-        -inner.coefficient,
+        -inner.transresistance,
     );
 }

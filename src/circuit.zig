@@ -393,17 +393,7 @@ pub const GraphicCircuit = struct {
         };
         defer res.deinit(self.allocator);
 
-        for (res.voltages, 0..) |v, idx| {
-            std.log.info("v{}: {d}", .{ idx, v });
-        }
-
-        for (res.currents, 0..) |current, idx| {
-            if (current) |c| {
-                std.log.info("i{}: {d}", .{ idx, c });
-            } else {
-                std.log.info("i{}: ?", .{idx});
-            }
-        }
+        res.dump();
     }
 };
 

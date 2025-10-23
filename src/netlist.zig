@@ -194,6 +194,58 @@ pub const NetList = struct {
             allocator.free(self.voltages);
             allocator.free(self.currents);
         }
+
+        pub fn dump(self: *const AnalysationResult) void {
+            for (self.voltages, 0..) |v, idx| {
+                std.debug.print("v{}: {d}\n", .{ idx, v });
+            }
+
+            for (self.currents, 0..) |current, idx| {
+                if (current) |c| {
+                    std.debug.print("i{}: {d}\n", .{ idx, c });
+                } else {
+                    std.debug.print("i{}: ?\n", .{idx});
+                }
+            }
+        }
+    };
+
+    const Group2 = struct {
+        arr: std.ArrayList(usize),
+
+        fn addComponents(
+            self: *Group2,
+            allocator: std.mem.Allocator,
+            comp_indices: []const usize,
+        ) !void {
+            for (comp_indices) |comp_idx| {
+                _ = try self.addComponent(allocator, comp_idx);
+            }
+        }
+
+        fn addComponent(
+            self: *Group2,
+            allocator: std.mem.Allocator,
+            comp_idx: usize,
+        ) !usize {
+            const idx = std.mem.indexOf(usize, self.arr.items, &.{comp_idx});
+            if (idx) |i| {
+                return i;
+            }
+
+            const group_2_id = self.arr.items.len;
+            try self.arr.append(allocator, comp_idx);
+
+            return group_2_id;
+        }
+
+        fn init() Group2 {
+            return Group2{ .arr = std.ArrayList(usize){} };
+        }
+
+        fn deinit(self: *Group2, allocator: std.mem.Allocator) void {
+            self.arr.deinit(allocator);
+        }
     };
 
     pub fn analyse(self: *NetList, currents_watched: []const usize) !AnalysationResult {
@@ -204,44 +256,28 @@ pub const NetList = struct {
         // since we include all nodes, theres no need to explicitly store their order
         // however we store i2 elements
 
-        var group_2 = std.ArrayListUnmanaged(usize){};
-        try group_2.appendSlice(self.allocator, currents_watched);
+        var group_2 = Group2.init();
+        try group_2.addComponents(self.allocator, currents_watched);
         defer group_2.deinit(self.allocator);
 
-        // TODO: include currents that are control variables
         for (0.., self.components.items) |idx, *comp| {
-            var already_in = false;
-            for (group_2.items) |group_2_comp_id| {
-                if (group_2_comp_id == idx) {
-                    already_in = true;
-                    break;
-                }
-            }
-
-            if (already_in) continue;
-
             switch (comp.inner) {
                 .voltage_source => {
-                    group_2.append(self.allocator, idx) catch {
-                        @panic("Failed to build netlist");
-                    };
+                    _ = try group_2.addComponent(self.allocator, idx);
                 },
                 .ccvs => |*inner| {
                     const controller_comp_idx = self.findComponentByName(
                         inner.controller_name,
                     ) orelse @panic("TODO");
 
-                    inner.controller_group_2_idx = group_2.items.len;
-
                     // controller's current
-                    group_2.append(self.allocator, controller_comp_idx) catch {
-                        @panic("Failed to build netlist");
-                    };
+                    inner.controller_group_2_idx = try group_2.addComponent(
+                        self.allocator,
+                        controller_comp_idx,
+                    );
 
                     // ccvs's current
-                    group_2.append(self.allocator, idx) catch {
-                        @panic("Failed to build netlist");
-                    };
+                    _ = try group_2.addComponent(self.allocator, idx);
                 },
                 else => {},
             }
@@ -249,17 +285,13 @@ pub const NetList = struct {
 
         // create matrix (|v| + |i2| X |v| + |i2| + 1)
         // iterate over all elements and stamp them onto the matrix
-        var mna = self.createMNAMatrix(group_2.items) catch {
+        var mna = self.createMNAMatrix(group_2.arr.items) catch {
             @panic("Failed to build netlist");
         };
         defer mna.deinit(self.allocator);
-        //mna.mat.dump();
-        //mna.print(self.nodes.items, group_2.items);
 
         // solve the matrix with Gauss elimination
         mna.mat.gaussJordanElimination();
-        //mna.mat.dump();
-        //mna.print(self.nodes.items, group_2.items);
 
         var res = AnalysationResult{
             .voltages = try self.allocator.alloc(
@@ -282,7 +314,7 @@ pub const NetList = struct {
             res.currents[i] = null;
         }
 
-        for (group_2.items, 0..) |current_idx, i| {
+        for (group_2.arr.items, 0..) |current_idx, i| {
             res.currents[current_idx] = mna.mat.data[self.nodes.items.len + i - 1][mna.mat.col_count - 1];
         }
 
