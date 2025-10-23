@@ -53,12 +53,16 @@ pub const GraphicComponent = struct {
     pub fn intersects(self: *const GraphicComponent, positions: []OccupiedGridPosition) bool {
         var buffer: [100]OccupiedGridPosition = undefined;
 
-        const self_positons = @as(Component.InnerType, self.comp.inner).getOccupiedGridPositions(
+        const self_positons = self.getOccupiedGridPositions(buffer[0..]);
+        return occupiedPointsIntersect(self_positons, positions);
+    }
+
+    pub fn getOccupiedGridPositions(self: *const GraphicComponent, position_buffer: []OccupiedGridPosition) []OccupiedGridPosition {
+        return @as(Component.InnerType, self.comp.inner).getOccupiedGridPositions(
             self.pos,
             self.rotation,
-            buffer[0..],
+            position_buffer[0..],
         );
-        return occupiedPointsIntersect(self_positons, positions);
     }
 };
 

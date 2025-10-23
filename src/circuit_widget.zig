@@ -440,11 +440,37 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
 
     const circuit_rect = circuit_area.data().rectScale().r;
 
+    // TODO: optimize this
+    var grid_positions = std.ArrayList(circuit.GridPosition){};
+    defer grid_positions.deinit(allocator);
+
+    for (circuit.main_circuit.graphic_components.items) |graphic_comp| {
+        // TODO
+        var buff: [100]component.OccupiedGridPosition = undefined;
+        const occupied_positions = graphic_comp.getOccupiedGridPositions(buff[0..]);
+        for (occupied_positions) |occupied_pos| {
+            try grid_positions.append(allocator, occupied_pos.pos);
+        }
+    }
+
     const count_x: usize = @intFromFloat(@divTrunc(circuit_rect.w, global.grid_size) + 1);
     const count_y: usize = @intFromFloat(@divTrunc(circuit_rect.h, global.grid_size) + 1);
 
     for (0..count_x) |i| {
         for (0..count_y) |j| {
+            var dont_render = false;
+            for (grid_positions.items) |grid_pos| {
+                if (grid_pos.eql(circuit.GridPosition{
+                    .x = @as(i32, @intCast(i)),
+                    .y = @as(i32, @intCast(j)),
+                })) {
+                    dont_render = true;
+                    break;
+                }
+            }
+
+            if (dont_render) continue;
+
             const x = circuit_rect.x + @as(f32, @floatFromInt(i)) * global.grid_size;
             const y = circuit_rect.y + @as(f32, @floatFromInt(j)) * global.grid_size;
 
