@@ -1,11 +1,11 @@
 const std = @import("std");
 const bland = @import("bland");
-const circuit = bland.circuit;
+const main = @import("main.zig");
 
+const circuit = bland.circuit;
 const NetList = bland.NetList;
 const FloatType = circuit.FloatType;
-
-const tolerance = 1e-9;
+const expectFloat = main.expectFloat;
 
 pub fn checkCurrent(
     res: *const NetList.AnalysationResult,
@@ -19,7 +19,7 @@ pub fn checkCurrent(
 
     const expected_abs = @abs(expected);
     const expected_actual = @abs(actual);
-    try std.testing.expectApproxEqRel(expected_abs, expected_actual, tolerance);
+    try expectFloat(FloatType, expected_abs, expected_actual);
 }
 
 pub fn checkVoltage(
@@ -29,7 +29,7 @@ pub fn checkVoltage(
 ) !void {
     try std.testing.expect(node_id < res.voltages.len);
     const actual = res.voltages[node_id];
-    try std.testing.expectApproxEqRel(expected, actual, tolerance);
+    try expectFloat(FloatType, expected, actual);
 }
 
 pub fn checkVoltage2(
@@ -41,7 +41,7 @@ pub fn checkVoltage2(
     try std.testing.expect(node1_id < res.voltages.len);
     try std.testing.expect(node2_id < res.voltages.len);
     const actual = res.voltages[node1_id] - res.voltages[node2_id];
-    try std.testing.expectApproxEqRel(expected, actual, tolerance);
+    try expectFloat(FloatType, expected, actual);
 }
 
 comptime {

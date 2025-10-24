@@ -2,11 +2,12 @@ const std = @import("std");
 
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
-pub const component = @import("component.zig");
-pub const circuit = @import("circuit.zig");
 const circuit_widget = @import("circuit_widget.zig");
 
+pub const component = @import("component.zig");
+pub const circuit = @import("circuit.zig");
 pub const NetList = @import("netlist.zig").NetList;
+pub const complex_matrix = @import("complex_matrix.zig");
 
 const dvui = @import("dvui");
 
