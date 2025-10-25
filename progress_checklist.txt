@@ -11,11 +11,13 @@
 [ ] add inductors
 [ ] display voltage/current-time graphs
 [ ] be able to save and load circuits
-[ ] more complex analysis methods
 [ ] be able to delete, move, copy, paste elements of the circuit
 [ ] add voltage controlled voltage sources
 [ ] add voltage controlled current sources
-[ ] add current controlled voltage sources
-[ ] add current controlled current sources
+[X] add current controlled voltage sources
+[X] add current controlled current sources
 [X] add node pins
 [ ] unit appropriate value text fields
+[ ] be able to export data
+[ ] specify values for frequency sweep
+[ ] bode plots
