@@ -381,7 +381,7 @@ pub const GraphicCircuit = struct {
         return true;
     }
 
-    pub fn analyse(self: *const GraphicCircuit) void {
+    pub fn analyseDC(self: *const GraphicCircuit) void {
         var netlist = NetList.fromCircuit(self) catch {
             std.log.err("Failed to build netlist", .{});
             return;
@@ -389,14 +389,39 @@ pub const GraphicCircuit = struct {
         defer netlist.deinit();
 
         // TODO
-        const frequency = 0;
-
-        var res = netlist.analyse(&.{}, frequency) catch {
+        var report = netlist.analyseDC(&.{}) catch {
             @panic("TODO");
         };
-        defer res.deinit(self.allocator);
+        defer report.deinit(self.allocator);
 
-        res.dump();
+        report.dump();
+    }
+
+    pub fn analyseFrequencySweep(self: *const GraphicCircuit) void {
+        var netlist = NetList.fromCircuit(self) catch {
+            std.log.err("Failed to build netlist", .{});
+            return;
+        };
+        defer netlist.deinit();
+
+        // TODO:
+        const freq_per_decade = 100;
+        const start_freq_exponent = 0;
+        const end_freq_exponent = 7;
+        const total_freqs = freq_per_decade * (end_freq_exponent - start_freq_exponent);
+        for (0..total_freqs) |i| {
+            const exponent: FloatType = @as(FloatType, @floatFromInt(i)) / freq_per_decade;
+            const frequency: FloatType = std.math.pow(FloatType, 10, exponent);
+
+            // TODO
+            var report = netlist.analyseAC(&.{}, frequency) catch {
+                @panic("TODO");
+            };
+            defer report.deinit(self.allocator);
+
+            const res = report.values.ac;
+            _ = res;
+        }
     }
 };
 

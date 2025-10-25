@@ -16,7 +16,7 @@ const FloatType = circuit.FloatType;
 var capacitor_counter: usize = 0;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .capacitor = 1 };
+    return Component.Inner{ .capacitor = 0.001 };
 }
 
 pub fn setNewComponentName(buff: []u8) ![]u8 {
@@ -236,6 +236,8 @@ pub fn renderPropertyBox(c: *FloatType) void {
     });
 }
 
+const Complex = std.math.Complex(FloatType);
+
 pub fn stampMatrix(
     c: FloatType,
     terminal_node_ids: []const usize,
@@ -243,13 +245,23 @@ pub fn stampMatrix(
     current_group_2_idx: ?usize,
     angular_frequency: FloatType,
 ) void {
-    _ = angular_frequency;
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 
-    _ = c;
-    _ = mna;
-    _ = current_group_2_idx;
-    _ = v_plus;
-    _ = v_minus;
+    const y = Complex.init(0, angular_frequency * c);
+    const z = y.reciprocal();
+
+    // TODO: explain how stamping works
+    if (current_group_2_idx) |curr_idx| {
+        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+        mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+        mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+        mna.stampCurrentCurrentComplex(curr_idx, curr_idx, z.neg());
+    } else {
+        mna.stampVoltageVoltageComplex(v_plus, v_plus, y);
+        mna.stampVoltageVoltageComplex(v_plus, v_minus, y.neg());
+        mna.stampVoltageVoltageComplex(v_minus, v_plus, y.neg());
+        mna.stampVoltageVoltageComplex(v_minus, v_minus, y);
+    }
 }

@@ -363,8 +363,13 @@ fn renderToolbox() bool {
             fw.close();
         }
 
-        if (dvui.menuItemLabel(@src(), "Analyse", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.main_circuit.analyse();
+        if (dvui.menuItemLabel(@src(), "DC Analysis", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.main_circuit.analyseDC();
+            fw.close();
+        }
+
+        if (dvui.menuItemLabel(@src(), "Frequency Sweep Analysis", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.main_circuit.analyseFrequencySweep();
             fw.close();
         }
     }

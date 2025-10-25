@@ -162,14 +162,16 @@ pub const NetList = struct {
         self: *NetList,
         group_2: []const usize,
         angular_frequency: FloatType,
+        ac_analysis: bool,
     ) !MNA {
         // create matrix (|v| + |i2| X |v| + |i2| + 1)
         // where v is all nodes except ground
         // the last column is the RHS of the equation Ax=b
         // basically (A|b) where b is an (|v| + |i2| X 1) matrix
 
-        std.debug.assert(angular_frequency >= 0);
-        const ac_analysis = angular_frequency > 0;
+        if (!ac_analysis) {
+            std.debug.assert(angular_frequency == 0);
+        }
 
         var mna = try MNA.init(
             self.allocator,
@@ -280,21 +282,39 @@ pub const NetList = struct {
         return group_2;
     }
 
-    pub fn analyse(
+    pub fn analyseDC(
+        self: *NetList,
+        currents_watched: []const usize,
+    ) !MNA.AnalysisReport {
+        var group_2 = try self.createGroup2(currents_watched);
+        defer group_2.deinit(self.allocator);
+
+        // create matrix (|v| + |i2| X |v| + |i2| + 1)
+        // iterate over all elements and stamp them onto the matrix
+        var mna = self.createMNAMatrix(group_2.arr.items, 0, false) catch {
+            @panic("Failed to build netlist");
+        };
+        defer mna.deinit(self.allocator);
+
+        // solve the matrix with Gauss elimination
+        const res = try mna.solve(self.allocator);
+        return res;
+    }
+
+    pub fn analyseAC(
         self: *NetList,
         currents_watched: []const usize,
         frequency: FloatType,
     ) !MNA.AnalysisReport {
         std.debug.assert(frequency >= 0);
-
-        const angular_frequency = std.math.pi * frequency;
+        const angular_frequency = 2 * std.math.pi * frequency;
 
         var group_2 = try self.createGroup2(currents_watched);
         defer group_2.deinit(self.allocator);
 
         // create matrix (|v| + |i2| X |v| + |i2| + 1)
         // iterate over all elements and stamp them onto the matrix
-        var mna = self.createMNAMatrix(group_2.arr.items, angular_frequency) catch {
+        var mna = self.createMNAMatrix(group_2.arr.items, angular_frequency, true) catch {
             @panic("Failed to build netlist");
         };
         defer mna.deinit(self.allocator);

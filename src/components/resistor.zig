@@ -17,7 +17,7 @@ const FloatType = circuit.FloatType;
 var resistor_counter: usize = 0;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .resistor = 4.5 };
+    return Component.Inner{ .resistor = 1 };
 }
 
 pub fn setNewComponentName(buff: []u8) ![]u8 {

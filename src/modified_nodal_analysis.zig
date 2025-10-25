@@ -101,6 +101,23 @@ pub const MNA = struct {
         }
     }
 
+    fn addComplexToMatrixCell(
+        self: *MNA,
+        row: usize,
+        col: usize,
+        val: Complex,
+    ) void {
+        switch (self.mat) {
+            .dc => |_| {
+                @panic("trying to add complex to a real MNA");
+            },
+            .ac => |*mat| {
+                const prev_val = mat.data[row][col];
+                mat.data[row][col] = prev_val.add(val);
+            },
+        }
+    }
+
     pub fn stampVoltageVoltage(
         self: *MNA,
         row_voltage_id: usize,
@@ -153,7 +170,11 @@ pub const MNA = struct {
         self.addRealToMatrixCell(row, col, val);
     }
 
-    pub fn stampVoltageRHS(self: *MNA, row_voltage_id: usize, val: FloatType) void {
+    pub fn stampVoltageRHS(
+        self: *MNA,
+        row_voltage_id: usize,
+        val: FloatType,
+    ) void {
         // ignore ground
         if (row_voltage_id == 0) return;
 
@@ -162,10 +183,89 @@ pub const MNA = struct {
         self.addRealToMatrixCell(row, col, val);
     }
 
-    pub fn stampCurrentRHS(self: *MNA, row_current_id: usize, val: FloatType) void {
+    pub fn stampCurrentRHS(
+        self: *MNA,
+        row_current_id: usize,
+        val: FloatType,
+    ) void {
         const row = self.nodes.len - 1 + row_current_id;
         const col = self.nodes.len + self.group_2.len - 1;
         self.addRealToMatrixCell(row, col, val);
+    }
+
+    pub fn stampVoltageVoltageComplex(
+        self: *MNA,
+        row_voltage_id: usize,
+        col_voltage_id: usize,
+        val: Complex,
+    ) void {
+        // ignore grounds
+        if (row_voltage_id == 0 or col_voltage_id == 0) return;
+        const row = row_voltage_id - 1;
+        const col = col_voltage_id - 1;
+        self.addComplexToMatrixCell(row, col, val);
+    }
+
+    pub fn stampVoltageCurrentComplex(
+        self: *MNA,
+        row_voltage_id: usize,
+        col_current_id: usize,
+        val: Complex,
+    ) void {
+        // ignore grounds
+        if (row_voltage_id == 0) return;
+
+        const row = row_voltage_id - 1;
+        const col = self.nodes.len - 1 + col_current_id;
+        self.addComplexToMatrixCell(row, col, val);
+    }
+
+    pub fn stampCurrentCurrentComplex(
+        self: *MNA,
+        row_current_id: usize,
+        col_current_id: usize,
+        val: Complex,
+    ) void {
+        const row = self.nodes.len - 1 + row_current_id;
+        const col = self.nodes.len - 1 + col_current_id;
+        self.addComplexToMatrixCell(row, col, val);
+    }
+
+    pub fn stampCurrentVoltageComplex(
+        self: *MNA,
+        row_current_id: usize,
+        col_voltage_id: usize,
+        val: Complex,
+    ) void {
+        // ignore ground
+        if (col_voltage_id == 0) return;
+
+        const row = self.nodes.len - 1 + row_current_id;
+        const col = col_voltage_id - 1;
+        self.addComplexToMatrixCell(row, col, val);
+    }
+
+    pub fn stampVoltageRHSComplex(
+        self: *MNA,
+        row_voltage_id: usize,
+        val: Complex,
+    ) void {
+        // ignore ground
+        if (row_voltage_id == 0) return;
+
+        const row = row_voltage_id - 1;
+        const col = self.nodes.len + self.group_2.len - 1;
+        self.addComplexToMatrixCell(row, col, val);
+    }
+
+    pub fn stampCurrentRHSComplex(
+        self: *MNA,
+        row_current_id: usize,
+        val: Complex,
+    ) void {
+        const row = self.nodes.len - 1 + row_current_id;
+        const col = self.nodes.len + self.group_2.len - 1;
+        self.addComplexToMatrixCell(row, col, val);
     }
 
     fn print(

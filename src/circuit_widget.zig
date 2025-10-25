@@ -75,7 +75,7 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
     }
 
     if (ev.matchBind("analyse") and ev.action == .down) {
-        circuit.main_circuit.analyse();
+        circuit.main_circuit.analyseDC();
     }
 
     if (ev.matchBind("open_debug_window") and ev.action == .down) {
