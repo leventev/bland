@@ -6,9 +6,9 @@ const component = bland.component;
 
 const NetList = bland.NetList;
 const FloatType = circuit.FloatType;
-const checkCurrent = circuit_testing.checkCurrent;
-const checkVoltage = circuit_testing.checkVoltage;
-const checkVoltage2 = circuit_testing.checkVoltage2;
+const checkCurrentDC = circuit_testing.checkCurrentDC;
+const checkVoltageDC = circuit_testing.checkVoltageDC;
+const checkVoltage2DC = circuit_testing.checkVoltage2DC;
 
 test "isolated current controlled current source" {
     const gpa = std.testing.allocator;
@@ -71,26 +71,26 @@ test "isolated current controlled current source" {
         r2_comp_idx,
         r3_comp_idx,
         cccs_comp_idx,
-    });
+    }, 0);
     defer res.deinit(netlist.allocator);
 
     // currents
     const controller_current = v1 / r1;
-    try checkCurrent(&res, v1_comp_idx, controller_current);
-    try checkCurrent(&res, r1_comp_idx, controller_current);
+    try checkCurrentDC(&res, v1_comp_idx, controller_current);
+    try checkCurrentDC(&res, r1_comp_idx, controller_current);
 
     const cccs_current = cccs_multiplier * controller_current;
-    try checkCurrent(&res, r2_comp_idx, cccs_current);
-    try checkCurrent(&res, r3_comp_idx, cccs_current);
-    try checkCurrent(&res, cccs_comp_idx, cccs_current);
+    try checkCurrentDC(&res, r2_comp_idx, cccs_current);
+    try checkCurrentDC(&res, r3_comp_idx, cccs_current);
+    try checkCurrentDC(&res, cccs_comp_idx, cccs_current);
 
     // voltages
     const r2_voltage = cccs_current * r2;
     const r3_voltage = -cccs_current * r3;
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs1_plus_id, v1);
-    try checkVoltage(&res, cccs_neg_id, r2_voltage);
-    try checkVoltage(&res, cccs_plus_id, r3_voltage);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs1_plus_id, v1);
+    try checkVoltageDC(&res, cccs_neg_id, r2_voltage);
+    try checkVoltageDC(&res, cccs_plus_id, r3_voltage);
 }
 
 test "coupled current controlled current source" {
@@ -142,21 +142,21 @@ test "coupled current controlled current source" {
         r1_comp_idx,
         r2_comp_idx,
         cccs_comp_idx,
-    });
+    }, 0);
     defer res.deinit(netlist.allocator);
 
     // currents
     const r1_current = v1 / (r1 + r2 * (cccs_multiplier + 1));
     const cccs_current = r1_current * cccs_multiplier;
     const r2_current = cccs_current + r1_current;
-    try checkCurrent(&res, v1_comp_idx, -r1_current);
-    try checkCurrent(&res, r1_comp_idx, r1_current);
-    try checkCurrent(&res, r2_comp_idx, r2_current);
-    try checkCurrent(&res, cccs_comp_idx, cccs_current);
+    try checkCurrentDC(&res, v1_comp_idx, -r1_current);
+    try checkCurrentDC(&res, r1_comp_idx, r1_current);
+    try checkCurrentDC(&res, r2_comp_idx, r2_current);
+    try checkCurrentDC(&res, cccs_comp_idx, cccs_current);
 
     // voltages
     const cccs_voltage = r2_current * r2;
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs_plus_id, v1);
-    try checkVoltage(&res, cccs_plus_id, cccs_voltage);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs_plus_id, v1);
+    try checkVoltageDC(&res, cccs_plus_id, cccs_voltage);
 }

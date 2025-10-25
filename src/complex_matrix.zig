@@ -8,6 +8,16 @@ fn complex_div(comptime T: type, a: Complex(T), b: Complex(T)) Complex(T) {
     return a.mul(b.reciprocal());
 }
 
+pub fn prettyPrintComplex(comptime T: type, z: Complex(T)) void {
+    if (z.im == 0) {
+        std.debug.print("({}) ", .{z.re});
+    } else if (z.im < 0) {
+        std.debug.print("({} - j{}) ", .{ z.re, -z.im });
+    } else {
+        std.debug.print("({} + j{}) ", .{ z.re, z.im });
+    }
+}
+
 pub fn ComplexMatrix(comptime T: type) type {
     return struct {
         row_count: usize,
@@ -48,14 +58,8 @@ pub fn ComplexMatrix(comptime T: type) type {
         pub fn dump(self: ComplexMatrix(T)) void {
             for (0..self.row_count) |row| {
                 for (0..self.col_count) |col| {
-                    const c = self.data[row][col];
-                    if (c.im == 0) {
-                        std.debug.print("({}) ", .{c.re});
-                    } else if (c.im < 0) {
-                        std.debug.print("({} - j{}) ", .{ c.re, -c.im });
-                    } else {
-                        std.debug.print("({} + j{}) ", .{ c.re, c.im });
-                    }
+                    const z = self.data[row][col];
+                    prettyPrintComplex(T, z);
                 }
                 std.debug.print("\n", .{});
             }

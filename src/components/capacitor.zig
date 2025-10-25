@@ -4,15 +4,13 @@ const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
-
+const modified_nodal_analysis = @import("../modified_nodal_analysis.zig");
 const dvui = @import("dvui");
 
-const MNA = @import("../mna.zig").MNA;
-
+const MNA = modified_nodal_analysis.MNA;
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
-
 const FloatType = circuit.FloatType;
 
 var capacitor_counter: usize = 0;
@@ -243,7 +241,9 @@ pub fn stampMatrix(
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
+    angular_frequency: FloatType,
 ) void {
+    _ = angular_frequency;
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 

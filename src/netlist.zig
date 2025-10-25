@@ -5,7 +5,10 @@ const component = @import("component.zig");
 const FloatType = circuit.FloatType;
 const GraphicCircuit = circuit.GraphicCircuit;
 const Component = component.Component;
-const MNA = @import("mna.zig").MNA;
+const modified_nodal_analysis = @import("modified_nodal_analysis.zig");
+const MNA = modified_nodal_analysis.MNA;
+const ComplexMNA = modified_nodal_analysis.ComplexMNA;
+const Complex = std.math.Complex(FloatType);
 
 // TODO: use u32 instead of usize for IDs?
 pub const NetList = struct {
@@ -14,6 +17,7 @@ pub const NetList = struct {
     components: std.ArrayListUnmanaged(Component),
 
     pub const ground_node_id = 0;
+    pub const AnalysisReport = MNA.AnalysisReport;
 
     pub const Terminal = struct {
         component_id: usize,
@@ -154,61 +158,41 @@ pub const NetList = struct {
         };
     }
 
-    // TODO: instead of group 2 pass the components whose
-    // currents are included in group 2
-    // since we will add currents used by CCVS, etc later too
-    // so the name group_2 is misleading
-    fn createMNAMatrix(self: *NetList, group_2: []const usize) !MNA {
+    fn createMNAMatrix(
+        self: *NetList,
+        group_2: []const usize,
+        angular_frequency: FloatType,
+    ) !MNA {
         // create matrix (|v| + |i2| X |v| + |i2| + 1)
         // where v is all nodes except ground
         // the last column is the RHS of the equation Ax=b
         // basically (A|b) where b is an (|v| + |i2| X 1) matrix
 
-        const total_variable_count = self.nodes.items.len - 1 + group_2.len;
+        std.debug.assert(angular_frequency >= 0);
+        const ac_analysis = angular_frequency > 0;
 
         var mna = try MNA.init(
             self.allocator,
             self.nodes.items,
             group_2,
+            self.components.items.len,
+            ac_analysis,
         );
 
-        for (0..total_variable_count) |row| {
-            for (0..total_variable_count + 1) |col| {
-                mna.mat.data[row][col] = 0;
-            }
-        }
+        mna.zero();
 
         for (0.., self.components.items) |idx, comp| {
             const current_group_2_idx = std.mem.indexOf(usize, group_2, &.{idx});
-            comp.inner.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx);
+            comp.inner.stampMatrix(
+                comp.terminal_node_ids,
+                &mna,
+                current_group_2_idx,
+                angular_frequency,
+            );
         }
 
         return mna;
     }
-
-    pub const AnalysationResult = struct {
-        voltages: []FloatType,
-        currents: []?FloatType,
-
-        pub fn deinit(self: *AnalysationResult, allocator: std.mem.Allocator) void {
-            allocator.free(self.voltages);
-            allocator.free(self.currents);
-        }
-
-        pub fn dump(self: *const AnalysationResult) void {
-            for (self.voltages, 0..) |v, idx| {
-                std.debug.print("v{}: {d}\n", .{ idx, v });
-            }
-
-            for (self.currents, 0..) |current, idx| {
-                if (current) |c| {
-                    std.debug.print("i{}: {d}\n", .{ idx, c });
-                } else {
-                    std.debug.print("i{}: ?\n", .{idx});
-                }
-            }
-        }
-    };
 
     const Group2 = struct {
         arr: std.ArrayList(usize),
@@ -248,17 +232,13 @@ pub const NetList = struct {
         }
     };
 
-    pub fn analyse(self: *NetList, currents_watched: []const usize) !AnalysationResult {
+    fn createGroup2(self: *NetList, currents_watched: []const usize) !Group2 {
         // group edges:
         // - group 1(i1): all elements whose current will be eliminated
         // - group 2(i2): all other elements
 
-        // since we include all nodes, theres no need to explicitly store their order
-        // however we store i2 elements
-
         var group_2 = Group2.init();
         try group_2.addComponents(self.allocator, currents_watched);
-        defer group_2.deinit(self.allocator);
 
         for (0.., self.components.items) |idx, *comp| {
             switch (comp.inner) {
@@ -297,41 +277,30 @@ pub const NetList = struct {
             }
         }
 
+        return group_2;
+    }
+
+    pub fn analyse(
+        self: *NetList,
+        currents_watched: []const usize,
+        frequency: FloatType,
+    ) !MNA.AnalysisReport {
+        std.debug.assert(frequency >= 0);
+
+        const angular_frequency = std.math.pi * frequency;
+
+        var group_2 = try self.createGroup2(currents_watched);
+        defer group_2.deinit(self.allocator);
+
         // create matrix (|v| + |i2| X |v| + |i2| + 1)
         // iterate over all elements and stamp them onto the matrix
-        var mna = self.createMNAMatrix(group_2.arr.items) catch {
+        var mna = self.createMNAMatrix(group_2.arr.items, angular_frequency) catch {
             @panic("Failed to build netlist");
         };
         defer mna.deinit(self.allocator);
 
         // solve the matrix with Gauss elimination
-        mna.mat.gaussJordanElimination();
-
-        var res = AnalysationResult{
-            .voltages = try self.allocator.alloc(
-                FloatType,
-                self.nodes.items.len,
-            ),
-            .currents = try self.allocator.alloc(
-                ?FloatType,
-                self.components.items.len,
-            ),
-        };
-
-        res.voltages[0] = 0;
-        for (1..self.nodes.items.len) |i| {
-            res.voltages[i] = mna.mat.data[i - 1][mna.mat.col_count - 1];
-        }
-
-        // null out currents
-        for (0..self.components.items.len) |i| {
-            res.currents[i] = null;
-        }
-
-        for (group_2.arr.items, 0..) |current_idx, i| {
-            res.currents[current_idx] = mna.mat.data[self.nodes.items.len + i - 1][mna.mat.col_count - 1];
-        }
-
+        const res = try mna.solve(self.allocator);
         return res;
     }
 

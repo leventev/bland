@@ -3,7 +3,9 @@ const std = @import("std");
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
-const MNA = @import("mna.zig").MNA;
+const modified_nodal_analysis = @import("modified_nodal_analysis.zig");
+const MNA = modified_nodal_analysis.MNA;
+const FloatType = circuit.FloatType;
 
 const dvui = @import("dvui");
 
@@ -281,6 +283,7 @@ pub const Component = struct {
             terminal_node_ids: []const usize,
             mna: *MNA,
             current_group_2_idx: ?usize,
+            angular_frequency: FloatType,
         ) void {
             switch (@as(InnerType, self.*)) {
                 .ground => {},
@@ -289,6 +292,7 @@ pub const Component = struct {
                     terminal_node_ids,
                     mna,
                     current_group_2_idx,
+                    angular_frequency,
                 ),
             }
         }

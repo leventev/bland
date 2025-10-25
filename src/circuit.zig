@@ -388,7 +388,10 @@ pub const GraphicCircuit = struct {
         };
         defer netlist.deinit();
 
-        var res = netlist.analyse(&.{}) catch {
+        // TODO
+        const frequency = 0;
+
+        var res = netlist.analyse(&.{}, frequency) catch {
             @panic("TODO");
         };
         defer res.deinit(self.allocator);

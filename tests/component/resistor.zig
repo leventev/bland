@@ -6,9 +6,9 @@ const component = bland.component;
 
 const NetList = bland.NetList;
 const FloatType = circuit.FloatType;
-const checkCurrent = circuit_testing.checkCurrent;
-const checkVoltage = circuit_testing.checkVoltage;
-const checkVoltage2 = circuit_testing.checkVoltage2;
+const checkCurrentDC = circuit_testing.checkCurrentDC;
+const checkVoltageDC = circuit_testing.checkVoltageDC;
+const checkVoltage2DC = circuit_testing.checkVoltage2DC;
 
 test "ohm's law" {
     const gpa = std.testing.allocator;
@@ -33,17 +33,17 @@ test "ohm's law" {
         &.{ vs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx });
+    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx }, 0);
     defer res.deinit(netlist.allocator);
 
     // currents
     const current = v1 / r1;
-    try checkCurrent(&res, v1_comp_idx, current);
-    try checkCurrent(&res, r1_comp_idx, current);
+    try checkCurrentDC(&res, v1_comp_idx, current);
+    try checkCurrentDC(&res, r1_comp_idx, current);
 
     // voltages
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs_plus_id, v1);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs_plus_id, v1);
 }
 
 test "voltage divider" {
@@ -77,20 +77,20 @@ test "voltage divider" {
         &.{ gnd_id, middle_id },
     );
 
-    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
+    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx }, 0);
     defer res.deinit(netlist.allocator);
 
     // currents
     const current = v1 / (r1 + r2);
-    try checkCurrent(&res, v1_comp_idx, current);
-    try checkCurrent(&res, r1_comp_idx, current);
-    try checkCurrent(&res, r2_comp_idx, current);
+    try checkCurrentDC(&res, v1_comp_idx, current);
+    try checkCurrentDC(&res, r1_comp_idx, current);
+    try checkCurrentDC(&res, r2_comp_idx, current);
 
     // voltages
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs_plus_id, v1);
     const middle_node_voltage = v1 * (r2 / (r1 + r2));
-    try checkVoltage(&res, middle_id, middle_node_voltage);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs_plus_id, v1);
+    try checkVoltageDC(&res, middle_id, middle_node_voltage);
 }
 
 test "voltage divider many" {
@@ -103,7 +103,15 @@ test "voltage divider many" {
 
     const v1: FloatType = 137.53;
 
-    const r_list = [_]FloatType{ 46.3, 0.67, 10000, 304.5, 9.998, 4.5, 800 };
+    const r_list = [_]FloatType{
+        46.3,
+        0.67,
+        10000,
+        304.5,
+        9.998,
+        4.5,
+        800,
+    };
     var r_comp_idxs: [r_list.len]usize = undefined;
 
     // there are N-1 nodes between N resistors but we append
@@ -132,7 +140,7 @@ test "voltage divider many" {
     );
 
     const currents_watched = .{v1_comp_idx} ++ r_comp_idxs;
-    var res = try netlist.analyse(&currents_watched);
+    var res = try netlist.analyse(&currents_watched, 0);
     defer res.deinit(netlist.allocator);
 
     comptime var total_resistance: FloatType = 0;
@@ -143,19 +151,19 @@ test "voltage divider many" {
     // currents
     const current = v1 / total_resistance;
     for (currents_watched) |comp_idx| {
-        try checkCurrent(&res, comp_idx, current);
+        try checkCurrentDC(&res, comp_idx, current);
     }
 
     // voltages
     positive_side_node = vs_plus_id;
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs_plus_id, v1);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs_plus_id, v1);
 
     positive_side_node = vs_plus_id;
     for (r_list, 0..) |resistance, i| {
         const negative_side_node = node_ids[i];
         const voltage = v1 * (resistance / total_resistance);
-        try checkVoltage2(&res, positive_side_node, negative_side_node, voltage);
+        try checkVoltage2DC(&res, positive_side_node, negative_side_node, voltage);
         positive_side_node = negative_side_node;
     }
 }
@@ -190,20 +198,20 @@ test "current divider" {
         &.{ vs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
+    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx }, 0);
     defer res.deinit(netlist.allocator);
 
     // currents
     const total_current = v1 * (1 / r1 + 1 / r2);
     const current1 = v1 / r1;
     const current2 = v1 / r2;
-    try checkCurrent(&res, r1_comp_idx, current1);
-    try checkCurrent(&res, r2_comp_idx, current2);
-    try checkCurrent(&res, v1_comp_idx, total_current);
+    try checkCurrentDC(&res, r1_comp_idx, current1);
+    try checkCurrentDC(&res, r2_comp_idx, current2);
+    try checkCurrentDC(&res, v1_comp_idx, total_current);
 
     // voltages
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs_plus_id, v1);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs_plus_id, v1);
 }
 
 test "current divider many" {
@@ -222,7 +230,15 @@ test "current divider many" {
         &.{ vs_plus_id, gnd_id },
     );
 
-    const r_list = [_]FloatType{ 4.1, 6.8, 9.45, 123.45, 300.555, 10987.00123, 0.005 };
+    const r_list = [_]FloatType{
+        4.1,
+        6.8,
+        9.45,
+        123.45,
+        300.555,
+        10987.00123,
+        0.005,
+    };
     var r_comp_idxs: [r_list.len]usize = undefined;
     inline for (r_list, 0..) |resistance, i| {
         r_comp_idxs[i] = try netlist.addComponent(
@@ -233,7 +249,7 @@ test "current divider many" {
     }
 
     const currents_watched = .{v1_comp_idx} ++ r_comp_idxs;
-    var res = try netlist.analyse(&currents_watched);
+    var res = try netlist.analyse(&currents_watched, 0);
     defer res.deinit(netlist.allocator);
 
     comptime var total_resistance: FloatType = 0;
@@ -244,12 +260,12 @@ test "current divider many" {
     // currents
     const total_current = v1 * total_resistance;
     for (r_list, 0..) |r, i| {
-        try checkCurrent(&res, v1_comp_idx, total_current);
+        try checkCurrentDC(&res, v1_comp_idx, total_current);
         const current = v1 / r;
-        try checkCurrent(&res, r_comp_idxs[i], current);
+        try checkCurrentDC(&res, r_comp_idxs[i], current);
     }
 
     // voltages
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs_plus_id, v1);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs_plus_id, v1);
 }

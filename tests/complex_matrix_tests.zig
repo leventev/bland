@@ -42,6 +42,8 @@ fn testMatrix(input: []const []const Complex, output: []const []const Complex) !
     }
 }
 
+// source for the inputs: https://www.math.uwaterloo.ca/~jmckinno/Math225/Week9/Lecture3i.pdf
+
 test "complex matrix 1" {
     const input: []const []const Complex = &.{
         &.{ z(1, 0), z(0, 1), z(-3, 1), z(-1, -1) },

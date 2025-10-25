@@ -5,21 +5,21 @@ const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const sidebar = @import("../sidebar.zig");
-
+const modified_nodal_analysis = @import("../modified_nodal_analysis.zig");
 const dvui = @import("dvui");
 
-const MNA = @import("../mna.zig").MNA;
-
+const MNA = modified_nodal_analysis.MNA;
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
+const FloatType = circuit.FloatType;
 
 var ccvs_counter: usize = 0;
 
 pub const Inner = struct {
     controller_name_buff: []u8,
     controller_name: []u8,
-    transresistance: circuit.FloatType,
+    transresistance: FloatType,
 
     // set by netlist.analyse
     controller_group_2_idx: ?usize,
@@ -267,7 +267,7 @@ pub fn renderPropertyBox(inner: *Inner) void {
         );
         defer box.deinit();
 
-        _ = dvui.textEntryNumber(@src(), circuit.FloatType, .{
+        _ = dvui.textEntryNumber(@src(), FloatType, .{
             .value = &inner.transresistance,
         }, .{
             .color_fill = dvui.themeGet().color(.control, .fill),
@@ -317,7 +317,9 @@ pub fn stampMatrix(
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
+    angular_frequency: FloatType,
 ) void {
+    _ = angular_frequency;
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 

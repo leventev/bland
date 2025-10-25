@@ -6,9 +6,9 @@ const component = bland.component;
 
 const NetList = bland.NetList;
 const FloatType = circuit.FloatType;
-const checkCurrent = circuit_testing.checkCurrent;
-const checkVoltage = circuit_testing.checkVoltage;
-const checkVoltage2 = circuit_testing.checkVoltage2;
+const checkCurrentDC = circuit_testing.checkCurrentDC;
+const checkVoltageDC = circuit_testing.checkVoltageDC;
+const checkVoltage2DC = circuit_testing.checkVoltage2DC;
 
 test "isolated current controlled voltage source" {
     const gpa = std.testing.allocator;
@@ -71,25 +71,25 @@ test "isolated current controlled voltage source" {
         v2_comp_idx,
         r2_comp_idx,
         ccvs_comp_idx,
-    });
+    }, 0);
     defer res.deinit(netlist.allocator);
 
     // currents
     const controller_current = v1 / r1;
-    try checkCurrent(&res, v1_comp_idx, controller_current);
-    try checkCurrent(&res, r1_comp_idx, controller_current);
+    try checkCurrentDC(&res, v1_comp_idx, controller_current);
+    try checkCurrentDC(&res, r1_comp_idx, controller_current);
 
     const ccvs_voltage = ccvs_transresistance * controller_current;
     const r2_current = (ccvs_voltage + v2) / r2;
-    try checkCurrent(&res, r2_comp_idx, r2_current);
-    try checkCurrent(&res, v2_comp_idx, r2_current);
-    try checkCurrent(&res, ccvs_comp_idx, r2_current);
+    try checkCurrentDC(&res, r2_comp_idx, r2_current);
+    try checkCurrentDC(&res, v2_comp_idx, r2_current);
+    try checkCurrentDC(&res, ccvs_comp_idx, r2_current);
 
     // voltages
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs1_plus_id, v1);
-    try checkVoltage(&res, vs2_plus_id, v2);
-    try checkVoltage(&res, ccvs_plus_id, v2 + ccvs_voltage);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs1_plus_id, v1);
+    try checkVoltageDC(&res, vs2_plus_id, v2);
+    try checkVoltageDC(&res, ccvs_plus_id, v2 + ccvs_voltage);
 }
 
 test "coupled current controlled voltage source" {
@@ -141,21 +141,21 @@ test "coupled current controlled voltage source" {
         r1_comp_idx,
         r2_comp_idx,
         ccvs_comp_idx,
-    });
+    }, 0);
     defer res.deinit(netlist.allocator);
 
     // currents
     const r1_current = v1 / (r1 + ccvs_transresistance);
     const r2_current = ccvs_transresistance * r1_current / r2;
     const ccvs_current = r1_current - r2_current;
-    try checkCurrent(&res, v1_comp_idx, -r1_current);
-    try checkCurrent(&res, r1_comp_idx, r1_current);
-    try checkCurrent(&res, r2_comp_idx, r2_current);
-    try checkCurrent(&res, ccvs_comp_idx, ccvs_current);
+    try checkCurrentDC(&res, v1_comp_idx, -r1_current);
+    try checkCurrentDC(&res, r1_comp_idx, r1_current);
+    try checkCurrentDC(&res, r2_comp_idx, r2_current);
+    try checkCurrentDC(&res, ccvs_comp_idx, ccvs_current);
 
     // voltages
     const ccvs_voltage = r1_current * ccvs_transresistance;
-    try checkVoltage(&res, gnd_id, 0);
-    try checkVoltage(&res, vs_plus_id, v1);
-    try checkVoltage(&res, ccvs_plus_id, ccvs_voltage);
+    try checkVoltageDC(&res, gnd_id, 0);
+    try checkVoltageDC(&res, vs_plus_id, v1);
+    try checkVoltageDC(&res, ccvs_plus_id, ccvs_voltage);
 }
