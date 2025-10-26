@@ -33,7 +33,7 @@ test "ohm's law" {
         &.{ vs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx }, 0);
+    var res = try netlist.analyseDC(&.{ v1_comp_idx, r1_comp_idx });
     defer res.deinit(netlist.allocator);
 
     // currents
@@ -77,7 +77,7 @@ test "voltage divider" {
         &.{ gnd_id, middle_id },
     );
 
-    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx }, 0);
+    var res = try netlist.analyseDC(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
     defer res.deinit(netlist.allocator);
 
     // currents
@@ -140,7 +140,7 @@ test "voltage divider many" {
     );
 
     const currents_watched = .{v1_comp_idx} ++ r_comp_idxs;
-    var res = try netlist.analyse(&currents_watched, 0);
+    var res = try netlist.analyseDC(&currents_watched);
     defer res.deinit(netlist.allocator);
 
     comptime var total_resistance: FloatType = 0;
@@ -198,7 +198,7 @@ test "current divider" {
         &.{ vs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyse(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx }, 0);
+    var res = try netlist.analyseDC(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
     defer res.deinit(netlist.allocator);
 
     // currents
@@ -249,7 +249,7 @@ test "current divider many" {
     }
 
     const currents_watched = .{v1_comp_idx} ++ r_comp_idxs;
-    var res = try netlist.analyse(&currents_watched, 0);
+    var res = try netlist.analyseDC(&currents_watched);
     defer res.deinit(netlist.allocator);
 
     comptime var total_resistance: FloatType = 0;

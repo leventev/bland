@@ -5,7 +5,7 @@ const renderer = @import("renderer.zig");
 const global = @import("global.zig");
 const matrix = @import("matrix.zig");
 
-const NetList = @import("netlist.zig").NetList;
+const NetList = @import("NetList.zig");
 
 const dvui = @import("dvui");
 

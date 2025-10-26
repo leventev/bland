@@ -1,14 +1,11 @@
 const std = @import("std");
-
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
-const modified_nodal_analysis = @import("modified_nodal_analysis.zig");
-const MNA = modified_nodal_analysis.MNA;
-const FloatType = circuit.FloatType;
-
+const MNA = @import("MNA.zig");
 const dvui = @import("dvui");
 
+const FloatType = circuit.FloatType;
 const GridPosition = circuit.GridPosition;
 
 pub const OccupiedGridPosition = struct {

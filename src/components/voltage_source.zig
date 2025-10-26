@@ -4,11 +4,8 @@ const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
-
+const MNA = @import("../MNA.zig");
 const dvui = @import("dvui");
-
-const modified_nodal_analysis = @import("../modified_nodal_analysis.zig");
-const MNA = modified_nodal_analysis.MNA;
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;

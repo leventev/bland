@@ -65,13 +65,13 @@ test "isolated current controlled voltage source" {
         &.{ ccvs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyse(&.{
+    var res = try netlist.analyseDC(&.{
         v1_comp_idx,
         r1_comp_idx,
         v2_comp_idx,
         r2_comp_idx,
         ccvs_comp_idx,
-    }, 0);
+    });
     defer res.deinit(netlist.allocator);
 
     // currents
@@ -136,12 +136,12 @@ test "coupled current controlled voltage source" {
         &.{ ccvs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyse(&.{
+    var res = try netlist.analyseDC(&.{
         v1_comp_idx,
         r1_comp_idx,
         r2_comp_idx,
         ccvs_comp_idx,
-    }, 0);
+    });
     defer res.deinit(netlist.allocator);
 
     // currents
