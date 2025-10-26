@@ -43,6 +43,10 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "bland", .module = exe_mod },
             },
         }),
+        .test_runner = .{
+            .path = b.path("tests/test_runner.zig"),
+            .mode = .simple,
+        },
     });
 
     const test_step = b.step("test", "Run unit tests");
