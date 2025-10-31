@@ -13,28 +13,30 @@ const checkVoltage2DC = circuit_testing.checkVoltage2DC;
 test "ohm's law" {
     const gpa = std.testing.allocator;
     var netlist = try NetList.init(gpa);
-    defer netlist.deinit();
+    defer netlist.deinit(gpa);
 
     const gnd_id: usize = NetList.ground_node_id;
-    const vs_plus_id = try netlist.allocateNode();
+    const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: FloatType = 11.46;
     const r1: FloatType = 34.6898;
 
     const v1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r1 },
         "R1",
         &.{ vs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyseDC(&.{ v1_comp_idx, r1_comp_idx });
-    defer res.deinit(netlist.allocator);
+    var res = try netlist.analyseDC(gpa, &.{ v1_comp_idx, r1_comp_idx });
+    defer res.deinit(gpa);
 
     // currents
     const current = v1 / r1;
@@ -49,36 +51,46 @@ test "ohm's law" {
 test "voltage divider" {
     const gpa = std.testing.allocator;
     var netlist = try NetList.init(gpa);
-    defer netlist.deinit();
+    defer netlist.deinit(gpa);
 
     const gnd_id: usize = NetList.ground_node_id;
-    const vs_plus_id = try netlist.allocateNode();
-    const middle_id = try netlist.allocateNode();
+    const vs_plus_id = try netlist.allocateNode(gpa);
+    const middle_id = try netlist.allocateNode(gpa);
 
     const v1: FloatType = 5.0;
     const r1: FloatType = 24.5;
     const r2: FloatType = 343.5;
 
     const v1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r1 },
         "R1",
         &.{ middle_id, vs_plus_id },
     );
 
     const r2_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r2 },
         "R2",
         &.{ gnd_id, middle_id },
     );
 
-    var res = try netlist.analyseDC(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
-    defer res.deinit(netlist.allocator);
+    var res = try netlist.analyseDC(
+        gpa,
+        &.{
+            v1_comp_idx,
+            r1_comp_idx,
+            r2_comp_idx,
+        },
+    );
+    defer res.deinit(gpa);
 
     // currents
     const current = v1 / (r1 + r2);
@@ -96,10 +108,10 @@ test "voltage divider" {
 test "voltage divider many" {
     const gpa = std.testing.allocator;
     var netlist = try NetList.init(gpa);
-    defer netlist.deinit();
+    defer netlist.deinit(gpa);
 
     const gnd_id: usize = NetList.ground_node_id;
-    const vs_plus_id = try netlist.allocateNode();
+    const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: FloatType = 137.53;
 
@@ -118,7 +130,7 @@ test "voltage divider many" {
     // the ground node at the end so its easier to add resistors
     var node_ids: [r_list.len]usize = undefined;
     for (0..node_ids.len - 1) |i| {
-        node_ids[i] = try netlist.allocateNode();
+        node_ids[i] = try netlist.allocateNode(gpa);
     }
     node_ids[r_list.len - 1] = gnd_id;
 
@@ -126,6 +138,7 @@ test "voltage divider many" {
     inline for (r_list, 0..) |resistance, i| {
         const negative_side_node = node_ids[i];
         r_comp_idxs[i] = try netlist.addComponent(
+            gpa,
             .{ .resistor = resistance },
             std.fmt.comptimePrint("R{}", .{i + 1}),
             &.{ positive_side_node, negative_side_node },
@@ -134,14 +147,15 @@ test "voltage divider many" {
     }
 
     const v1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const currents_watched = .{v1_comp_idx} ++ r_comp_idxs;
-    var res = try netlist.analyseDC(&currents_watched);
-    defer res.deinit(netlist.allocator);
+    var res = try netlist.analyseDC(gpa, &currents_watched);
+    defer res.deinit(gpa);
 
     comptime var total_resistance: FloatType = 0;
     comptime for (r_list) |r| {
@@ -171,35 +185,38 @@ test "voltage divider many" {
 test "current divider" {
     const gpa = std.testing.allocator;
     var netlist = try NetList.init(gpa);
-    defer netlist.deinit();
+    defer netlist.deinit(gpa);
 
     const gnd_id: usize = NetList.ground_node_id;
-    const vs_plus_id = try netlist.allocateNode();
+    const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: FloatType = 678.666;
     const r1: FloatType = 320.001;
     const r2: FloatType = 800.0;
 
     const v1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r1 },
         "R1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const r2_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r2 },
         "R2",
         &.{ vs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyseDC(&.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
-    defer res.deinit(netlist.allocator);
+    var res = try netlist.analyseDC(gpa, &.{ v1_comp_idx, r1_comp_idx, r2_comp_idx });
+    defer res.deinit(gpa);
 
     // currents
     const total_current = v1 * (1 / r1 + 1 / r2);
@@ -217,14 +234,15 @@ test "current divider" {
 test "current divider many" {
     const gpa = std.testing.allocator;
     var netlist = try NetList.init(gpa);
-    defer netlist.deinit();
+    defer netlist.deinit(gpa);
 
     const gnd_id: usize = NetList.ground_node_id;
-    const vs_plus_id = try netlist.allocateNode();
+    const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: FloatType = 678.666;
 
     const v1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
@@ -242,6 +260,7 @@ test "current divider many" {
     var r_comp_idxs: [r_list.len]usize = undefined;
     inline for (r_list, 0..) |resistance, i| {
         r_comp_idxs[i] = try netlist.addComponent(
+            gpa,
             .{ .resistor = resistance },
             std.fmt.comptimePrint("R{}", .{i + 1}),
             &.{ vs_plus_id, gnd_id },
@@ -249,8 +268,8 @@ test "current divider many" {
     }
 
     const currents_watched = .{v1_comp_idx} ++ r_comp_idxs;
-    var res = try netlist.analyseDC(&currents_watched);
-    defer res.deinit(netlist.allocator);
+    var res = try netlist.analyseDC(gpa, &currents_watched);
+    defer res.deinit(gpa);
 
     comptime var total_resistance: FloatType = 0;
     comptime for (r_list) |r| {

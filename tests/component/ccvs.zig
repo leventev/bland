@@ -13,35 +13,38 @@ const checkVoltage2DC = circuit_testing.checkVoltage2DC;
 test "isolated current controlled voltage source" {
     const gpa = std.testing.allocator;
     var netlist = try NetList.init(gpa);
-    defer netlist.deinit();
+    defer netlist.deinit(gpa);
 
     const gnd_id: usize = NetList.ground_node_id;
 
     // controller circuit
-    const vs1_plus_id = try netlist.allocateNode();
+    const vs1_plus_id = try netlist.allocateNode(gpa);
     const v1: FloatType = 314.59;
     const r1: FloatType = 50;
 
     const v1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v1 },
         "V1",
         &.{ vs1_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r1 },
         "R1",
         &.{ vs1_plus_id, gnd_id },
     );
 
     // ccvs circuit
-    const ccvs_plus_id = try netlist.allocateNode();
-    const vs2_plus_id = try netlist.allocateNode();
+    const ccvs_plus_id = try netlist.allocateNode(gpa);
+    const vs2_plus_id = try netlist.allocateNode(gpa);
     const ccvs_transresistance: FloatType = 77.6;
     const v2: FloatType = 42.42;
     const r2: FloatType = 634.4;
 
     const v2_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v2 },
         "V2",
         &.{ vs2_plus_id, gnd_id },
@@ -49,6 +52,7 @@ test "isolated current controlled voltage source" {
 
     const controller_name = try gpa.dupe(u8, "R1");
     const ccvs_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .ccvs = .{
             .controller_name_buff = controller_name,
             .controller_name = controller_name,
@@ -60,19 +64,23 @@ test "isolated current controlled voltage source" {
     );
 
     const r2_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r2 },
         "R2",
         &.{ ccvs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyseDC(&.{
-        v1_comp_idx,
-        r1_comp_idx,
-        v2_comp_idx,
-        r2_comp_idx,
-        ccvs_comp_idx,
-    });
-    defer res.deinit(netlist.allocator);
+    var res = try netlist.analyseDC(
+        gpa,
+        &.{
+            v1_comp_idx,
+            r1_comp_idx,
+            v2_comp_idx,
+            r2_comp_idx,
+            ccvs_comp_idx,
+        },
+    );
+    defer res.deinit(gpa);
 
     // currents
     const controller_current = v1 / r1;
@@ -95,11 +103,11 @@ test "isolated current controlled voltage source" {
 test "coupled current controlled voltage source" {
     const gpa = std.testing.allocator;
     var netlist = try NetList.init(gpa);
-    defer netlist.deinit();
+    defer netlist.deinit(gpa);
 
     const gnd_id: usize = NetList.ground_node_id;
-    const vs_plus_id = try netlist.allocateNode();
-    const ccvs_plus_id = try netlist.allocateNode();
+    const vs_plus_id = try netlist.allocateNode(gpa);
+    const ccvs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: FloatType = 901.456;
     const r1: FloatType = 150.4;
@@ -107,12 +115,14 @@ test "coupled current controlled voltage source" {
     const r2: FloatType = 333.33;
 
     const v1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r1 },
         "R1",
         &.{ vs_plus_id, ccvs_plus_id },
@@ -120,6 +130,7 @@ test "coupled current controlled voltage source" {
 
     const controller_name = try gpa.dupe(u8, "R1");
     const ccvs_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .ccvs = .{
             .controller_name_buff = controller_name,
             .controller_name = controller_name,
@@ -131,18 +142,22 @@ test "coupled current controlled voltage source" {
     );
 
     const r2_comp_idx = try netlist.addComponent(
+        gpa,
         component.Component.Inner{ .resistor = r2 },
         "R2",
         &.{ ccvs_plus_id, gnd_id },
     );
 
-    var res = try netlist.analyseDC(&.{
-        v1_comp_idx,
-        r1_comp_idx,
-        r2_comp_idx,
-        ccvs_comp_idx,
-    });
-    defer res.deinit(netlist.allocator);
+    var res = try netlist.analyseDC(
+        gpa,
+        &.{
+            v1_comp_idx,
+            r1_comp_idx,
+            r2_comp_idx,
+            ccvs_comp_idx,
+        },
+    );
+    defer res.deinit(gpa);
 
     // currents
     const r1_current = v1 / (r1 + ccvs_transresistance);

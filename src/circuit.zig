@@ -4,6 +4,7 @@ const component = @import("component.zig");
 const renderer = @import("renderer.zig");
 const global = @import("global.zig");
 const matrix = @import("matrix.zig");
+const complex_matrix = @import("complex_matrix.zig");
 
 const NetList = @import("NetList.zig");
 
@@ -386,10 +387,10 @@ pub const GraphicCircuit = struct {
             std.log.err("Failed to build netlist", .{});
             return;
         };
-        defer netlist.deinit();
+        defer netlist.deinit(self.allocator);
 
         // TODO
-        var report = netlist.analyseDC(&.{}) catch {
+        var report = netlist.analyseDC(self.allocator, &.{}) catch {
             @panic("TODO");
         };
         defer report.deinit(self.allocator);
@@ -397,30 +398,44 @@ pub const GraphicCircuit = struct {
         report.dump();
     }
 
-    pub fn analyseFrequencySweep(self: *const GraphicCircuit) void {
+    pub fn analyseFrequencySweep(
+        self: *const GraphicCircuit,
+        start_freq: FloatType,
+        end_freq: FloatType,
+        freq_count: usize,
+    ) void {
+        // TODO: make these into errors
+        std.debug.assert(start_freq >= 0);
+        std.debug.assert(end_freq > start_freq);
+        std.debug.assert(freq_count > 0);
+
         var netlist = NetList.fromCircuit(self) catch {
             std.log.err("Failed to build netlist", .{});
             return;
         };
-        defer netlist.deinit();
+        defer netlist.deinit(self.allocator);
 
-        // TODO:
-        const freq_per_decade = 100;
-        const start_freq_exponent = 0;
-        const end_freq_exponent = 7;
-        const total_freqs = freq_per_decade * (end_freq_exponent - start_freq_exponent);
-        for (0..total_freqs) |i| {
-            const exponent: FloatType = @as(FloatType, @floatFromInt(i)) / freq_per_decade;
-            const frequency: FloatType = std.math.pow(FloatType, 10, exponent);
+        var fw_report = netlist.analyseFrequencySweep(
+            self.allocator,
+            start_freq,
+            end_freq,
+            freq_count,
+        ) catch {
+            std.log.err("frequency sweep faied", .{});
+            return;
+        };
+        defer fw_report.deinit(self.allocator);
 
-            // TODO
-            var report = netlist.analyseAC(&.{}, frequency) catch {
-                @panic("TODO");
-            };
-            defer report.deinit(self.allocator);
+        for (0..netlist.nodes.items.len) |i| {
+            const voltage_for_freqs = fw_report.getVoltage(i);
 
-            const res = report.values.ac;
-            _ = res;
+            std.debug.print("V{}: ", .{i});
+
+            for (voltage_for_freqs) |val| {
+                std.debug.print("{}, ", .{val.magnitude()});
+            }
+
+            std.debug.print("\n", .{});
         }
     }
 };

@@ -369,7 +369,7 @@ fn renderToolbox() bool {
         }
 
         if (dvui.menuItemLabel(@src(), "Frequency Sweep Analysis", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.main_circuit.analyseFrequencySweep();
+            circuit.main_circuit.analyseFrequencySweep(1, 1e7, 70);
             fw.close();
         }
     }
