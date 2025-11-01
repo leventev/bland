@@ -1,11 +1,11 @@
 const std = @import("std");
 const bland = @import("bland");
 const circuit_testing = @import("../circuit_tests.zig");
-const circuit = bland.circuit;
-const component = bland.component;
 
+const Component = bland.Component;
 const NetList = bland.NetList;
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
+
 const checkCurrentDC = circuit_testing.checkCurrentDC;
 const checkVoltageDC = circuit_testing.checkVoltageDC;
 const checkVoltage2DC = circuit_testing.checkVoltage2DC;
@@ -19,19 +19,19 @@ test "isolated current controlled current source" {
 
     // controller circuit
     const vs1_plus_id = try netlist.allocateNode(gpa);
-    const v1: FloatType = 813.91;
-    const r1: FloatType = 966.2222;
+    const v1: Float = 813.91;
+    const r1: Float = 966.2222;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = v1 },
         "V1",
         &.{ vs1_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r1 },
+        Component.Device{ .resistor = r1 },
         "R1",
         &.{ vs1_plus_id, gnd_id },
     );
@@ -39,20 +39,20 @@ test "isolated current controlled current source" {
     // ccvs circuit
     const cccs_plus_id = try netlist.allocateNode(gpa);
     const cccs_neg_id = try netlist.allocateNode(gpa);
-    const cccs_multiplier: FloatType = 8.443;
-    const r2: FloatType = 470;
-    const r3: FloatType = 6988.5;
+    const cccs_multiplier: Float = 8.443;
+    const r2: Float = 470;
+    const r3: Float = 6988.5;
 
     const r2_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r2 },
+        Component.Device{ .resistor = r2 },
         "R2",
         &.{ cccs_neg_id, gnd_id },
     );
 
     const r3_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r3 },
+        Component.Device{ .resistor = r3 },
         "R3",
         &.{ cccs_plus_id, gnd_id },
     );
@@ -60,7 +60,7 @@ test "isolated current controlled current source" {
     const controller_name = try gpa.dupe(u8, "R1");
     const cccs_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .cccs = .{
+        Component.Device{ .cccs = .{
             .controller_name_buff = controller_name,
             .controller_name = controller_name,
             .multiplier = cccs_multiplier,
@@ -110,28 +110,28 @@ test "coupled current controlled current source" {
     const vs_plus_id = try netlist.allocateNode(gpa);
     const cccs_plus_id = try netlist.allocateNode(gpa);
 
-    const v1: FloatType = 33.3;
-    const r1: FloatType = 6.919;
-    const cccs_multiplier: FloatType = 5.4;
-    const r2: FloatType = 36.8;
+    const v1: Float = 33.3;
+    const r1: Float = 6.919;
+    const cccs_multiplier: Float = 5.4;
+    const r2: Float = 36.8;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r1 },
+        Component.Device{ .resistor = r1 },
         "R1",
         &.{ vs_plus_id, cccs_plus_id },
     );
 
     const r2_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r2 },
+        Component.Device{ .resistor = r2 },
         "R2",
         &.{ cccs_plus_id, gnd_id },
     );
@@ -139,7 +139,7 @@ test "coupled current controlled current source" {
     const controller_name = try gpa.dupe(u8, "R1");
     const cccs_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .cccs = .{
+        Component.Device{ .cccs = .{
             .controller_name_buff = controller_name,
             .controller_name = controller_name,
             .multiplier = cccs_multiplier,

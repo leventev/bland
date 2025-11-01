@@ -4,6 +4,18 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const lib_mod = b.createModule(.{
+        .root_source_file = b.path("lib/bland.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const bland_lib = b.addLibrary(.{
+        .name = "bland",
+        .linkage = .static,
+        .root_module = lib_mod,
+    });
+
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -15,6 +27,7 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
+    exe.linkLibrary(bland_lib);
     exe.linkLibC();
 
     b.installArtifact(exe);
@@ -35,12 +48,12 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addImport("dvui", dvui.module("dvui_sdl3"));
 
-    const unit_tests = b.addTest(.{
+    const lib_unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tests/main.zig"),
             .target = target,
             .imports = &.{
-                .{ .name = "bland", .module = exe_mod },
+                .{ .name = "bland", .module = lib_mod },
             },
         }),
         .test_runner = .{
@@ -50,7 +63,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const test_step = b.step("test", "Run unit tests");
-    const run_unit_tests = b.addRunArtifact(unit_tests);
+    const run_unit_tests = b.addRunArtifact(lib_unit_tests);
     run_unit_tests.skip_foreign_checks = true;
     test_step.dependOn(&run_unit_tests.step);
 

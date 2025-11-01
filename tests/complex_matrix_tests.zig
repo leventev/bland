@@ -2,14 +2,12 @@ const std = @import("std");
 const bland = @import("bland");
 const main = @import("main.zig");
 
-const circuit = bland.circuit;
-const FloatType = circuit.FloatType;
-const complex_matrix = bland.complex_matrix;
-const ComplexMatrix = complex_matrix.ComplexMatrix;
-const Complex = std.math.Complex(FloatType);
+const Float = bland.Float;
+const ComplexMatrix = bland.ComplexMatrix;
+const Complex = std.math.Complex(Float);
 const expectFloat = main.expectFloat;
 
-fn z(comptime re: FloatType, comptime im: FloatType) Complex {
+fn z(comptime re: Float, comptime im: Float) Complex {
     return Complex{
         .re = re,
         .im = im,
@@ -18,7 +16,7 @@ fn z(comptime re: FloatType, comptime im: FloatType) Complex {
 
 fn testMatrix(input: []const []const Complex, output: []const []const Complex) !void {
     const gpa = std.testing.allocator;
-    var mat = try ComplexMatrix(FloatType).init(
+    var mat = try ComplexMatrix(Float).init(
         gpa,
         input.len,
         input[0].len,
@@ -36,8 +34,8 @@ fn testMatrix(input: []const []const Complex, output: []const []const Complex) !
     for (output, 0..) |row, row_idx| {
         for (row, 0..) |expected, col_idx| {
             const actual = mat.data[row_idx][col_idx];
-            try expectFloat(FloatType, expected.re, actual.re);
-            try expectFloat(FloatType, expected.im, actual.im);
+            try expectFloat(Float, expected.re, actual.re);
+            try expectFloat(Float, expected.im, actual.im);
         }
     }
 }

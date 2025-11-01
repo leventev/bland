@@ -1,11 +1,10 @@
 const std = @import("std");
 const bland = @import("bland");
 const circuit_testing = @import("../circuit_tests.zig");
-const circuit = bland.circuit;
-const component = bland.component;
 
+const Component = bland.Component;
 const NetList = bland.NetList;
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
 const checkCurrentDC = circuit_testing.checkCurrentDC;
 const checkVoltageDC = circuit_testing.checkVoltageDC;
 const checkVoltage2DC = circuit_testing.checkVoltage2DC;
@@ -19,19 +18,19 @@ test "isolated current controlled voltage source" {
 
     // controller circuit
     const vs1_plus_id = try netlist.allocateNode(gpa);
-    const v1: FloatType = 314.59;
-    const r1: FloatType = 50;
+    const v1: Float = 314.59;
+    const r1: Float = 50;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = v1 },
         "V1",
         &.{ vs1_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r1 },
+        Component.Device{ .resistor = r1 },
         "R1",
         &.{ vs1_plus_id, gnd_id },
     );
@@ -39,13 +38,13 @@ test "isolated current controlled voltage source" {
     // ccvs circuit
     const ccvs_plus_id = try netlist.allocateNode(gpa);
     const vs2_plus_id = try netlist.allocateNode(gpa);
-    const ccvs_transresistance: FloatType = 77.6;
-    const v2: FloatType = 42.42;
-    const r2: FloatType = 634.4;
+    const ccvs_transresistance: Float = 77.6;
+    const v2: Float = 42.42;
+    const r2: Float = 634.4;
 
     const v2_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .voltage_source = v2 },
+        Component.Device{ .voltage_source = v2 },
         "V2",
         &.{ vs2_plus_id, gnd_id },
     );
@@ -53,7 +52,7 @@ test "isolated current controlled voltage source" {
     const controller_name = try gpa.dupe(u8, "R1");
     const ccvs_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .ccvs = .{
+        Component.Device{ .ccvs = .{
             .controller_name_buff = controller_name,
             .controller_name = controller_name,
             .transresistance = ccvs_transresistance,
@@ -65,7 +64,7 @@ test "isolated current controlled voltage source" {
 
     const r2_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r2 },
+        Component.Device{ .resistor = r2 },
         "R2",
         &.{ ccvs_plus_id, gnd_id },
     );
@@ -109,21 +108,21 @@ test "coupled current controlled voltage source" {
     const vs_plus_id = try netlist.allocateNode(gpa);
     const ccvs_plus_id = try netlist.allocateNode(gpa);
 
-    const v1: FloatType = 901.456;
-    const r1: FloatType = 150.4;
-    const ccvs_transresistance: FloatType = 3.4;
-    const r2: FloatType = 333.33;
+    const v1: Float = 901.456;
+    const r1: Float = 150.4;
+    const ccvs_transresistance: Float = 3.4;
+    const r2: Float = 333.33;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = v1 },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
 
     const r1_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r1 },
+        Component.Device{ .resistor = r1 },
         "R1",
         &.{ vs_plus_id, ccvs_plus_id },
     );
@@ -131,7 +130,7 @@ test "coupled current controlled voltage source" {
     const controller_name = try gpa.dupe(u8, "R1");
     const ccvs_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .ccvs = .{
+        Component.Device{ .ccvs = .{
             .controller_name_buff = controller_name,
             .controller_name = controller_name,
             .transresistance = ccvs_transresistance,
@@ -143,7 +142,7 @@ test "coupled current controlled voltage source" {
 
     const r2_comp_idx = try netlist.addComponent(
         gpa,
-        component.Component.Inner{ .resistor = r2 },
+        Component.Device{ .resistor = r2 },
         "R2",
         &.{ ccvs_plus_id, gnd_id },
     );
