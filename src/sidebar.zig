@@ -146,7 +146,7 @@ pub fn renderPropertyBox() void {
 
         var te = dvui.textEntry(@src(), .{
             .text = .{
-                .buffer = comp.name_buffer,
+                .buffer = selected_graphic_comp.name_buffer,
             },
         }, .{
             .color_fill = dvui.themeGet().color(.control, .fill),
@@ -163,7 +163,7 @@ pub fn renderPropertyBox() void {
         comp.name = te.getText();
         te.deinit();
 
-        comp.renderPropertyBox();
+        selected_graphic_comp.renderPropertyBox();
         selected_component_changed = false;
     }
 }

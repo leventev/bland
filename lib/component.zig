@@ -4,14 +4,20 @@ const MNA = @import("MNA.zig");
 
 const FloatType = bland.Float;
 
+pub const resistor_module = @import("components/resistor.zig");
+pub const voltage_source_module = @import("components/voltage_source.zig");
+pub const current_source_module = @import("components/current_source.zig");
+pub const capacitor_module = @import("components/capacitor.zig");
+pub const ground_module = @import("components/ground.zig");
+pub const ccvs_module = @import("components/ccvs.zig");
+pub const cccs_module = @import("components/cccs.zig");
+
+pub const max_component_name_length = 20;
+
 pub const Component = struct {
     device: Device,
     terminal_node_ids: []usize,
 
-    // name_buffer is max_component_name_length bytes long allocated
-    // name is either a slice into name_buffer or copied when creating a netlist
-    // when cloned => name_buffer == name
-    name_buffer: []u8,
     name: []u8,
 
     pub fn deinit(self: *Component, allocator: std.mem.Allocator) void {
@@ -30,14 +36,20 @@ pub const Component = struct {
 
         fn module(comptime self: DeviceType) type {
             return switch (self) {
-                .resistor => @import("components/resistor.zig"),
-                .voltage_source => @import("components/voltage_source.zig"),
-                .current_source => @import("components/current_source.zig"),
-                .capacitor => @import("components/capacitor.zig"),
-                .ground => @import("components/ground.zig"),
-                .ccvs => @import("components/ccvs.zig"),
-                .cccs => @import("components/cccs.zig"),
+                .resistor => resistor_module,
+                .voltage_source => voltage_source_module,
+                .current_source => current_source_module,
+                .capacitor => capacitor_module,
+                .ground => ground_module,
+                .ccvs => ccvs_module,
+                .cccs => cccs_module,
             };
+        }
+
+        pub fn defaultValue(self: DeviceType, allocator: std.mem.Allocator) !Device {
+            switch (self) {
+                inline else => |x| return x.module().defaultValue(allocator),
+            }
         }
     };
 
@@ -49,53 +61,6 @@ pub const Component = struct {
         capacitor: FloatType,
         ccvs: DeviceType.ccvs.module().Inner,
         cccs: DeviceType.cccs.module().Inner,
-
-        //pub fn clone(self: *const Device, allocator: std.mem.Allocator) !Inner {
-        //    return switch (@as(InnerType, self.*)) {
-        //        inline else => self.*,
-        //        .ccvs => Inner{
-        //            .ccvs = try @field(
-        //                self,
-        //                @tagName(InnerType.ccvs),
-        //            ).clone(allocator),
-        //        },
-        //    };
-        //}
-
-        //pub fn render(
-        //    self: *const Inner,
-        //    circuit_rect: dvui.Rect.Physical,
-        //    pos: GridPosition,
-        //    rot: Rotation,
-        //    name: []const u8,
-        //    render_type: renderer.ComponentRenderType,
-        //) void {
-        //    switch (@as(InnerType, self.*)) {
-        //        .ground => InnerType.ground.module().render(
-        //            circuit_rect,
-        //            pos,
-        //            rot,
-        //            render_type,
-        //        ),
-        //        inline else => |x| InnerType.module(x).render(
-        //            circuit_rect,
-        //            pos,
-        //            rot,
-        //            name,
-        //            @field(self, @tagName(x)),
-        //            render_type,
-        //        ),
-        //    }
-        //}
-        //
-        //pub fn renderPropertyBox(self: *Inner) void {
-        //    switch (@as(InnerType, self.*)) {
-        //        .ground => {},
-        //        inline else => |x| x.module().renderPropertyBox(
-        //            &@field(self, @tagName(x)),
-        //        ),
-        //    }
-        //}
 
         pub fn stampMatrix(
             self: *const Device,

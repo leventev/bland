@@ -1,5 +1,6 @@
 const std = @import("std");
 const dvui = @import("dvui");
+const bland = @import("bland");
 
 const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
@@ -99,7 +100,8 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                 switch (mouse_ev.action) {
                     .press => {
                         if (circuit.placement_mode == .component) {
-                            const grid_pos = circuit.held_component.gridPositionFromScreenPos(
+                            const grid_pos = component.gridPositionFromScreenPos(
+                                circuit.held_component,
                                 circuit_rect,
                                 mouse_pos,
                                 circuit.placement_rotation,
@@ -112,14 +114,14 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                 var graphic_comp = component.GraphicComponent{
                                     .pos = grid_pos,
                                     .rotation = circuit.placement_rotation,
-                                    .comp = component.Component{
-                                        .name_buffer = try allocator.alloc(u8, component.max_component_name_length),
+                                    .name_buffer = try allocator.alloc(u8, bland.component.max_component_name_length),
+                                    .comp = bland.Component{
                                         .name = &.{},
-                                        .inner = try circuit.held_component.defaultValue(allocator),
+                                        .device = try circuit.held_component.defaultValue(allocator),
                                         .terminal_node_ids = try allocator.alloc(usize, 2),
                                     },
                                 };
-                                try graphic_comp.comp.setNewComponentName();
+                                try graphic_comp.setNewComponentName();
                                 try circuit.main_circuit.graphic_components.append(
                                     circuit.main_circuit.allocator,
                                     graphic_comp,
@@ -190,7 +192,8 @@ const GridPositionWireConnection = struct {
 };
 
 fn renderHoldingComponent(circuit_rect: dvui.Rect.Physical) void {
-    const grid_pos = circuit.held_component.gridPositionFromScreenPos(
+    const grid_pos = component.gridPositionFromScreenPos(
+        circuit.held_component,
         circuit_rect,
         mouse_pos,
         circuit.placement_rotation,
@@ -206,7 +209,8 @@ fn renderHoldingComponent(circuit_rect: dvui.Rect.Physical) void {
     else
         ComponentRenderType.unable_to_place;
 
-    circuit.held_component.renderHolding(
+    component.renderComponentHolding(
+        circuit.held_component,
         circuit_rect,
         grid_pos,
         circuit.placement_rotation,

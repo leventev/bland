@@ -4,10 +4,8 @@ const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const circuit_widget = @import("circuit_widget.zig");
 
-pub const component = @import("component.zig");
-pub const circuit = @import("circuit.zig");
-pub const NetList = @import("NetList.zig");
-pub const complex_matrix = @import("complex_matrix.zig");
+const component = @import("component.zig");
+const circuit = @import("circuit.zig");
 
 const dvui = @import("dvui");
 

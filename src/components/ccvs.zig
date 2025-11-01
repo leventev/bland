@@ -1,55 +1,21 @@
 const std = @import("std");
+const bland = @import("bland");
 const component = @import("../component.zig");
 const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const sidebar = @import("../sidebar.zig");
-const MNA = @import("../MNA.zig");
 const dvui = @import("dvui");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
 
 var ccvs_counter: usize = 0;
 
-pub const Inner = struct {
-    controller_name_buff: []u8,
-    controller_name: []u8,
-    transresistance: FloatType,
-
-    // set by netlist.analyse
-    controller_group_2_idx: ?usize,
-
-    pub fn deinit(self: *Inner, allocator: std.mem.Allocator) void {
-        allocator.free(self.controller_name_buff);
-        self.controller_name_buff = &.{};
-        self.controller_name = &.{};
-        self.transresistance = 0;
-        self.controller_group_2_idx = null;
-    }
-
-    pub fn clone(self: *const Inner, allocator: std.mem.Allocator) !Inner {
-        const name_buff = try allocator.dupe(u8, self.controller_name_buff);
-        return Inner{
-            .controller_name_buff = name_buff,
-            .controller_name = name_buff[0..self.controller_name.len],
-            .transresistance = self.transresistance,
-            .controller_group_2_idx = null,
-        };
-    }
-};
-
-pub fn defaultValue(allocator: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .ccvs = .{
-        .controller_name_buff = try allocator.alloc(u8, component.max_component_name_length),
-        .controller_name = &.{},
-        .transresistance = 0,
-        .controller_group_2_idx = null,
-    } };
-}
+const ccvs_module = bland.component.ccvs_module;
 
 pub fn setNewComponentName(buff: []u8) ![]u8 {
     ccvs_counter += 1;
@@ -76,19 +42,12 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-fn formatValue(inner: Inner, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}*I({s})", .{
-        inner.transresistance,
-        inner.controller_name,
-    });
-}
-
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?Inner,
+    value: ?ccvs_module.Inner,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
@@ -103,7 +62,7 @@ pub fn render(
     const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| formatValue(
+    const value_str = if (value) |val| ccvs_module.formatValue(
         val,
         buff[0..],
     ) catch unreachable else null;
@@ -250,7 +209,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(inner: *Inner) void {
+pub fn renderPropertyBox(inner: *ccvs_module.Inner) void {
     dvui.label(@src(), "transresistance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
@@ -266,7 +225,7 @@ pub fn renderPropertyBox(inner: *Inner) void {
         );
         defer box.deinit();
 
-        _ = dvui.textEntryNumber(@src(), FloatType, .{
+        _ = dvui.textEntryNumber(@src(), Float, .{
             .value = &inner.transresistance,
         }, .{
             .color_fill = dvui.themeGet().color(.control, .fill),
@@ -309,31 +268,4 @@ pub fn renderPropertyBox(inner: *Inner) void {
     inner.controller_name = te.getText();
 
     te.deinit();
-}
-
-pub fn stampMatrix(
-    inner: Inner,
-    terminal_node_ids: []const usize,
-    mna: *MNA,
-    current_group_2_idx: ?usize,
-    angular_frequency: FloatType,
-) void {
-    _ = angular_frequency;
-    const v_plus = terminal_node_ids[0];
-    const v_minus = terminal_node_ids[1];
-
-    const ccvs_curr_idx = current_group_2_idx orelse @panic("Invalid ccvs stamp");
-    const controller_curr_idx = inner.controller_group_2_idx orelse @panic("?");
-
-    // TODO: explain stamping
-    mna.stampVoltageCurrent(v_plus, ccvs_curr_idx, 1);
-    mna.stampVoltageCurrent(v_minus, ccvs_curr_idx, -1);
-
-    mna.stampCurrentVoltage(ccvs_curr_idx, v_plus, 1);
-    mna.stampCurrentVoltage(ccvs_curr_idx, v_minus, -1);
-    mna.stampCurrentCurrent(
-        ccvs_curr_idx,
-        controller_curr_idx,
-        -inner.transresistance,
-    );
 }

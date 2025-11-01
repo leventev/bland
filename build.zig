@@ -47,6 +47,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.root_module.addImport("dvui", dvui.module("dvui_sdl3"));
+    exe.root_module.addImport("bland", lib_mod);
 
     const lib_unit_tests = b.addTest(.{
         .root_module = b.createModule(.{

@@ -1,6 +1,6 @@
 const std = @import("std");
 const complex_matrix = @import("complex_matrix.zig");
-const component = @import("component.zig");
+pub const component = @import("component.zig");
 
 pub const NetList = @import("NetList.zig");
 pub const Float = f64;

@@ -1,22 +1,18 @@
 const std = @import("std");
+const bland = @import("bland");
 const component = @import("../component.zig");
 const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
-const MNA = @import("../MNA.zig");
 const dvui = @import("dvui");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
 
 var capacitor_counter: usize = 0;
-
-pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .capacitor = 0.001 };
-}
 
 pub fn setNewComponentName(buff: []u8) ![]u8 {
     capacitor_counter += 1;
@@ -43,16 +39,12 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-fn formatValue(value: FloatType, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}F", .{value});
-}
-
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?FloatType,
+    value: ?Float,
     render_type: renderer.ComponentRenderType,
 ) void {
     const wire_pixel_len = 55;
@@ -64,7 +56,7 @@ pub fn render(
     const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| formatValue(
+    const value_str = if (value) |val| bland.component.capacitor_module.formatValue(
         val,
         buff[0..],
     ) catch unreachable else null;
@@ -199,7 +191,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(c: *FloatType) void {
+pub fn renderPropertyBox(c: *Float) void {
     dvui.label(@src(), "capacitance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
@@ -214,10 +206,10 @@ pub fn renderPropertyBox(c: *FloatType) void {
     );
     defer box.deinit();
 
-    _ = dvui.textEntryNumber(@src(), FloatType, .{
+    _ = dvui.textEntryNumber(@src(), Float, .{
         .value = c,
         .show_min_max = true,
-        .min = std.math.floatMin(FloatType),
+        .min = std.math.floatMin(Float),
     }, .{
         .color_fill = dvui.themeGet().color(.control, .fill),
         .color_text = dvui.themeGet().color(.content, .text),
@@ -233,34 +225,4 @@ pub fn renderPropertyBox(c: *FloatType) void {
         .padding = dvui.Rect.all(4),
         .gravity_y = 0.5,
     });
-}
-
-const Complex = std.math.Complex(FloatType);
-
-pub fn stampMatrix(
-    c: FloatType,
-    terminal_node_ids: []const usize,
-    mna: *MNA,
-    current_group_2_idx: ?usize,
-    angular_frequency: FloatType,
-) void {
-    const v_plus = terminal_node_ids[0];
-    const v_minus = terminal_node_ids[1];
-
-    const y = Complex.init(0, angular_frequency * c);
-    const z = y.reciprocal();
-
-    // TODO: explain how stamping works
-    if (current_group_2_idx) |curr_idx| {
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentVoltage(curr_idx, v_plus, 1);
-        mna.stampCurrentVoltage(curr_idx, v_minus, -1);
-        mna.stampCurrentCurrentComplex(curr_idx, curr_idx, z.neg());
-    } else {
-        mna.stampVoltageVoltageComplex(v_plus, v_plus, y);
-        mna.stampVoltageVoltageComplex(v_plus, v_minus, y.neg());
-        mna.stampVoltageVoltageComplex(v_minus, v_plus, y.neg());
-        mna.stampVoltageVoltageComplex(v_minus, v_minus, y);
-    }
 }

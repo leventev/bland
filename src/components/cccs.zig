@@ -1,55 +1,21 @@
 const std = @import("std");
+const bland = @import("bland");
 const component = @import("../component.zig");
 const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const sidebar = @import("../sidebar.zig");
-const MNA = @import("../MNA.zig");
 const dvui = @import("dvui");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
+
+const cccs_module = bland.component.cccs_module;
 
 var cccs_counter: usize = 0;
-
-pub const Inner = struct {
-    controller_name_buff: []u8,
-    controller_name: []u8,
-    multiplier: FloatType,
-
-    // set by netlist.analyse
-    controller_group_2_idx: ?usize,
-
-    pub fn deinit(self: *Inner, allocator: std.mem.Allocator) void {
-        allocator.free(self.controller_name_buff);
-        self.controller_name_buff = &.{};
-        self.controller_name = &.{};
-        self.multiplier = 0;
-        self.controller_group_2_idx = null;
-    }
-
-    pub fn clone(self: *const Inner, allocator: std.mem.Allocator) !Inner {
-        const name_buff = try allocator.dupe(u8, self.controller_name_buff);
-        return Inner{
-            .controller_name_buff = name_buff,
-            .controller_name = name_buff[0..self.controller_name.len],
-            .multiplier = self.coefficient,
-            .controller_group_2_idx = null,
-        };
-    }
-};
-
-pub fn defaultValue(allocator: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .cccs = .{
-        .controller_name_buff = try allocator.alloc(u8, component.max_component_name_length),
-        .controller_name = &.{},
-        .multiplier = 0,
-        .controller_group_2_idx = null,
-    } };
-}
 
 pub fn setNewComponentName(buff: []u8) ![]u8 {
     cccs_counter += 1;
@@ -76,19 +42,12 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-fn formatValue(inner: Inner, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}*I({s})", .{
-        inner.multiplier,
-        inner.controller_name,
-    });
-}
-
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?Inner,
+    value: ?cccs_module.Inner,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
@@ -105,7 +64,7 @@ pub fn render(
     const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| formatValue(
+    const value_str = if (value) |val| cccs_module.formatValue(
         val,
         buff[0..],
     ) catch unreachable else null;
@@ -294,13 +253,13 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(inner: *Inner) void {
+pub fn renderPropertyBox(inner: *cccs_module.Inner) void {
     dvui.label(@src(), "multiplier", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    _ = dvui.textEntryNumber(@src(), FloatType, .{
+    _ = dvui.textEntryNumber(@src(), Float, .{
         .value = &inner.multiplier,
     }, .{
         .color_fill = dvui.themeGet().color(.control, .fill),
@@ -334,30 +293,4 @@ pub fn renderPropertyBox(inner: *Inner) void {
     inner.controller_name = te.getText();
 
     te.deinit();
-}
-
-pub fn stampMatrix(
-    inner: Inner,
-    terminal_node_ids: []const usize,
-    mna: *MNA,
-    current_group_2_idx: ?usize,
-    angular_frequency: FloatType,
-) void {
-    _ = angular_frequency;
-
-    const v_plus = terminal_node_ids[0];
-    const v_minus = terminal_node_ids[1];
-
-    const controller_curr_idx = inner.controller_group_2_idx orelse @panic("?");
-
-    // TODO: explain stamping
-    if (current_group_2_idx) |curr_idx| {
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
-        mna.stampCurrentCurrent(curr_idx, controller_curr_idx, -inner.multiplier);
-    } else {
-        mna.stampVoltageCurrent(v_plus, controller_curr_idx, -inner.multiplier);
-        mna.stampVoltageCurrent(v_minus, controller_curr_idx, inner.multiplier);
-    }
 }

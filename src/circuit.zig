@@ -1,16 +1,11 @@
 const std = @import("std");
-
+const bland = @import("bland");
 const component = @import("component.zig");
 const renderer = @import("renderer.zig");
 const global = @import("global.zig");
-const matrix = @import("matrix.zig");
-const complex_matrix = @import("complex_matrix.zig");
-
-const NetList = @import("NetList.zig");
-
 const dvui = @import("dvui");
 
-pub const FloatType = f64;
+const NetList = bland.NetList;
 
 pub const PlacementMode = enum {
     none,
@@ -120,7 +115,7 @@ pub const Wire = struct {
 
 pub var placement_mode: PlacementMode = .none;
 
-pub var held_component: component.Component.InnerType = .resistor;
+pub var held_component: bland.Component.DeviceType = .resistor;
 pub var placement_rotation: Rotation = .right;
 
 pub var held_wire_p1: ?GridPosition = null;
@@ -306,8 +301,8 @@ pub const GraphicCircuit = struct {
     fn nodeHasGround(self: *const GraphicCircuit, terminals: []const NetList.Terminal) bool {
         for (terminals) |term| {
             const graphic_comp = self.graphic_components.items[term.component_id];
-            const comp_type = @as(component.Component.InnerType, graphic_comp.comp.inner);
-            if (comp_type == component.Component.InnerType.ground) {
+            const comp_type = @as(bland.Component.DeviceType, graphic_comp.comp.device);
+            if (comp_type == bland.Component.DeviceType.ground) {
                 return true;
             }
         }
@@ -363,12 +358,17 @@ pub const GraphicCircuit = struct {
 
     pub fn canPlaceComponent(
         self: *const GraphicCircuit,
-        comp_type: component.Component.InnerType,
+        comp_type: bland.Component.DeviceType,
         pos: GridPosition,
         rotation: Rotation,
     ) bool {
         var buffer: [100]component.OccupiedGridPosition = undefined;
-        const positions = comp_type.getOccupiedGridPositions(pos, rotation, buffer[0..]);
+        const positions = component.deviceOccupiedGridPositions(
+            comp_type,
+            pos,
+            rotation,
+            buffer[0..],
+        );
         for (self.graphic_components.items) |comp| {
             if (comp.intersects(positions)) return false;
         }
@@ -382,8 +382,53 @@ pub const GraphicCircuit = struct {
         return true;
     }
 
+    pub fn createNetlist(self: *const GraphicCircuit) !NetList {
+        var node_terminals = std.ArrayListUnmanaged(
+            std.ArrayListUnmanaged(NetList.Terminal),
+        ){};
+        defer node_terminals.deinit(self.allocator);
+
+        var remaining_terminals = try self.getAllTerminals();
+        defer remaining_terminals.deinit();
+
+        try self.traverseWiresForNodes(
+            &remaining_terminals,
+            &node_terminals,
+        );
+
+        try findAllDirectConnections(
+            self.allocator,
+            &remaining_terminals,
+            &node_terminals,
+        );
+
+        const nodes = try self.mergeGroundNodes(
+            node_terminals.items,
+        );
+
+        var netlist_comps = try std.ArrayList(bland.Component).initCapacity(
+            self.allocator,
+            self.graphic_components.items.len,
+        );
+
+        // TODO: graphic_comp.comp is not deep copied here and that might cause
+        // some kind of issue later, we should either do a deep copy
+        // or be 100% sure the memory stays valid until we are done
+        for (self.graphic_components.items) |graphic_comp| {
+            try netlist_comps.append(
+                self.allocator,
+                graphic_comp.comp,
+            );
+        }
+
+        return NetList{
+            .nodes = nodes,
+            .components = netlist_comps,
+        };
+    }
+
     pub fn analyseDC(self: *const GraphicCircuit) void {
-        var netlist = NetList.fromCircuit(self) catch {
+        var netlist = self.createNetlist() catch {
             std.log.err("Failed to build netlist", .{});
             return;
         };
@@ -400,8 +445,8 @@ pub const GraphicCircuit = struct {
 
     pub fn analyseFrequencySweep(
         self: *const GraphicCircuit,
-        start_freq: FloatType,
-        end_freq: FloatType,
+        start_freq: bland.Float,
+        end_freq: bland.Float,
         freq_count: usize,
     ) void {
         // TODO: make these into errors
@@ -409,7 +454,7 @@ pub const GraphicCircuit = struct {
         std.debug.assert(end_freq > start_freq);
         std.debug.assert(freq_count > 0);
 
-        var netlist = NetList.fromCircuit(self) catch {
+        var netlist = self.createNetlist() catch {
             std.log.err("Failed to build netlist", .{});
             return;
         };

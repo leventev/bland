@@ -1,23 +1,22 @@
 const std = @import("std");
+const bland = @import("bland");
 const component = @import("../component.zig");
 const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
-const MNA = @import("../MNA.zig");
 const dvui = @import("dvui");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
 
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
+
+const current_source_module = bland.component.current_source_module;
 
 var current_source_counter: usize = 0;
 
-pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .current_source = 1 };
-}
 pub fn setNewComponentName(buff: []u8) ![]u8 {
     current_source_counter += 1;
     return std.fmt.bufPrint(buff, "I{}", .{current_source_counter});
@@ -43,16 +42,12 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-fn formatValue(value: FloatType, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}A", .{value});
-}
-
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?FloatType,
+    value: ?Float,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
@@ -67,7 +62,7 @@ pub fn render(
     const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| formatValue(
+    const value_str = if (value) |val| current_source_module.formatValue(
         val,
         buff[0..],
     ) catch unreachable else null;
@@ -266,7 +261,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(current: *FloatType) void {
+pub fn renderPropertyBox(current: *Float) void {
     dvui.label(@src(), "current", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
@@ -281,7 +276,7 @@ pub fn renderPropertyBox(current: *FloatType) void {
     );
     defer box.deinit();
 
-    _ = dvui.textEntryNumber(@src(), FloatType, .{
+    _ = dvui.textEntryNumber(@src(), Float, .{
         .value = current,
         .show_min_max = true,
     }, .{
@@ -299,27 +294,4 @@ pub fn renderPropertyBox(current: *FloatType) void {
         .padding = dvui.Rect.all(4),
         .gravity_y = 0.5,
     });
-}
-
-pub fn stampMatrix(
-    i: FloatType,
-    terminal_node_ids: []const usize,
-    mna: *MNA,
-    current_group_2_idx: ?usize,
-    angular_frequency: FloatType,
-) void {
-    _ = angular_frequency;
-    const v_plus = terminal_node_ids[0];
-    const v_minus = terminal_node_ids[1];
-
-    // TODO: explain how stamping works
-    if (current_group_2_idx) |curr_idx| {
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
-        mna.stampCurrentRHS(curr_idx, i);
-    } else {
-        mna.stampVoltageRHS(v_plus, -i);
-        mna.stampVoltageRHS(v_minus, i);
-    }
 }

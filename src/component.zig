@@ -1,19 +1,46 @@
 const std = @import("std");
+const dvui = @import("dvui");
+const bland = @import("bland");
+const circuit = @import("circuit.zig");
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
-const circuit = @import("circuit.zig");
-const MNA = @import("MNA.zig");
-const dvui = @import("dvui");
 
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
 const GridPosition = circuit.GridPosition;
+const Rotation = circuit.Rotation;
+const Component = bland.Component;
+const Device = Component.Device;
+const DeviceType = Component.DeviceType;
+
+const resistor_graphics_module = @import("components/resistor.zig");
+const voltage_source_graphics_module = @import("components/voltage_source.zig");
+const current_source_graphics_module = @import("components/current_source.zig");
+const capacitor_graphics_module = @import("components/capacitor.zig");
+const ground_graphics_module = @import("components/ground.zig");
+const ccvs_graphics_module = @import("components/ccvs.zig");
+const cccs_graphics_module = @import("components/cccs.zig");
+
+fn graphics_module(comptime self: DeviceType) type {
+    return switch (self) {
+        .resistor => resistor_graphics_module,
+        .voltage_source => voltage_source_graphics_module,
+        .current_source => current_source_graphics_module,
+        .capacitor => capacitor_graphics_module,
+        .ground => ground_graphics_module,
+        .ccvs => ccvs_graphics_module,
+        .cccs => cccs_graphics_module,
+    };
+}
 
 pub const OccupiedGridPosition = struct {
     pos: GridPosition,
     terminal: bool,
 };
 
-pub fn occupiedPointsIntersect(occupied1: []OccupiedGridPosition, occupied2: []OccupiedGridPosition) bool {
+pub fn occupiedPointsIntersect(
+    occupied1: []OccupiedGridPosition,
+    occupied2: []OccupiedGridPosition,
+) bool {
     for (occupied1) |p1| {
         for (occupied2) |p2| {
             if (p1.pos.eql(p2.pos) and (!p1.terminal or !p2.terminal)) return true;
@@ -22,25 +49,139 @@ pub fn occupiedPointsIntersect(occupied1: []OccupiedGridPosition, occupied2: []O
     return false;
 }
 
-pub const max_component_name_length = 20;
+pub fn renderComponent(
+    device: *const Device,
+    circuit_rect: dvui.Rect.Physical,
+    pos: GridPosition,
+    rot: Rotation,
+    name: []const u8,
+    render_type: renderer.ComponentRenderType,
+) void {
+    switch (@as(DeviceType, device.*)) {
+        .ground => graphics_module(DeviceType.ground).render(
+            circuit_rect,
+            pos,
+            rot,
+            render_type,
+        ),
+        inline else => |x| graphics_module(x).render(
+            circuit_rect,
+            pos,
+            rot,
+            name,
+            @field(device, @tagName(x)),
+            render_type,
+        ),
+    }
+}
 
-const Rotation = circuit.Rotation;
+pub fn renderComponentHolding(
+    dev_type: DeviceType,
+    circuit_rect: dvui.Rect.Physical,
+    pos: GridPosition,
+    rot: Rotation,
+    render_type: renderer.ComponentRenderType,
+) void {
+    switch (dev_type) {
+        .ground => graphics_module(DeviceType.ground).render(
+            circuit_rect,
+            pos,
+            rot,
+            render_type,
+        ),
+        inline else => |x| graphics_module(x).render(
+            circuit_rect,
+            pos,
+            rot,
+            null,
+            null,
+            render_type,
+        ),
+    }
+}
+
+pub fn deviceOccupiedGridPositions(
+    self: DeviceType,
+    pos: GridPosition,
+    rotation: Rotation,
+    occupied: []OccupiedGridPosition,
+) []OccupiedGridPosition {
+    switch (self) {
+        inline else => |x| return graphics_module(x).getOccupiedGridPositions(
+            pos,
+            rotation,
+            occupied,
+        ),
+    }
+}
+
+fn deviceCenterForMouse(self: DeviceType, pos: GridPosition, rotation: Rotation) GridPosition {
+    switch (self) {
+        inline else => |x| return graphics_module(x).centerForMouse(
+            pos,
+            rotation,
+        ),
+    }
+}
+
+pub fn deviceGetTerminals(
+    dev_type: DeviceType,
+    pos: GridPosition,
+    rotation: Rotation,
+    terminals_buff: []GridPosition,
+) []GridPosition {
+    switch (dev_type) {
+        inline else => |x| return graphics_module(x).getTerminals(
+            pos,
+            rotation,
+            terminals_buff,
+        ),
+    }
+}
+
+pub fn gridPositionFromScreenPos(
+    dev_type: DeviceType,
+    circuit_rect: dvui.Rect.Physical,
+    pos: dvui.Point.Physical,
+    rotation: Rotation,
+) GridPosition {
+    const grid_pos = circuit.gridPositionFromPos(circuit_rect, pos);
+    return deviceCenterForMouse(dev_type, grid_pos, rotation);
+}
 
 pub const GraphicComponent = struct {
     pos: GridPosition,
     rotation: Rotation,
+
     comp: Component,
 
+    // name_buffer is max_component_name_length bytes long allocated
+    // comp.name is a slice into name_buffer
+    name_buffer: []u8,
+
+    pub fn deinit(self: *Component, allocator: std.mem.Allocator) void {
+        allocator.free(self.name_buffer);
+        self.name = &.{};
+        allocator.free(self.terminal_node_ids);
+        self.inner.deinit(allocator);
+    }
+
     pub fn terminals(self: *const GraphicComponent, buffer: []GridPosition) []GridPosition {
-        return @as(Component.InnerType, self.comp.inner).getTerminals(
+        return deviceGetTerminals(
+            @as(Component.DeviceType, self.comp.device),
             self.pos,
             self.rotation,
             buffer[0..],
         );
     }
 
-    pub fn render(self: *const GraphicComponent, circuit_rect: dvui.Rect.Physical, render_type: renderer.ComponentRenderType) void {
-        self.comp.inner.render(
+    pub fn render(
+        self: *const GraphicComponent,
+        circuit_rect: dvui.Rect.Physical,
+        render_type: renderer.ComponentRenderType,
+    ) void {
+        renderComponent(
+            &self.comp.device,
             circuit_rect,
             self.pos,
             self.rotation,
@@ -56,250 +197,32 @@ pub const GraphicComponent = struct {
         return occupiedPointsIntersect(self_positons, positions);
     }
 
-    pub fn getOccupiedGridPositions(self: *const GraphicComponent, position_buffer: []OccupiedGridPosition) []OccupiedGridPosition {
-        return @as(Component.InnerType, self.comp.inner).getOccupiedGridPositions(
+    pub fn getOccupiedGridPositions(
+        self: *const GraphicComponent,
+        position_buffer: []OccupiedGridPosition,
+    ) []OccupiedGridPosition {
+        return deviceOccupiedGridPositions(
+            @as(Component.DeviceType, self.comp.device),
             self.pos,
             self.rotation,
             position_buffer[0..],
         );
     }
-};
 
-pub const Component = struct {
-    inner: Inner,
-    terminal_node_ids: []usize,
+    pub fn renderPropertyBox(self: *GraphicComponent) void {
+        switch (@as(DeviceType, self.comp.device)) {
+            .ground => {},
+            inline else => |x| graphics_module(x).renderPropertyBox(
+                &@field(self.comp.device, @tagName(x)),
+            ),
+        }
+    }
 
-    // name_buffer is max_component_name_length bytes long allocated
-    // name is either a slice into name_buffer or copied when creating a netlist
-    // when cloned => name_buffer == name
-    name_buffer: []u8,
-    name: []u8,
-
-    pub fn clone(self: *const Component, allocator: std.mem.Allocator) !Component {
-        const name = try allocator.dupe(u8, self.name);
-
-        return Component{
-            .inner = try self.inner.clone(allocator),
-            .terminal_node_ids = try allocator.dupe(usize, self.terminal_node_ids),
-            .name_buffer = name,
-            .name = name,
+    pub fn setNewComponentName(self: *GraphicComponent) !void {
+        self.comp.name = switch (@as(DeviceType, self.comp.device)) {
+            inline else => |x| try graphics_module(x).setNewComponentName(
+                self.name_buffer,
+            ),
         };
     }
-
-    pub fn deinit(self: *Component, allocator: std.mem.Allocator) void {
-        allocator.free(self.name_buffer);
-        self.name = &.{};
-        allocator.free(self.terminal_node_ids);
-        self.inner.deinit(allocator);
-    }
-
-    pub fn otherNode(self: *const Component, node_id: usize) usize {
-        if (self.terminal_node_ids[0] == node_id) return self.terminal_node_ids[1];
-        if (self.terminal_node_ids[1] == node_id) return self.terminal_node_ids[0];
-        @panic("invalid node id");
-    }
-
-    pub fn setNewComponentName(self: *Component) !void {
-        self.name = try @as(InnerType, self.inner).setNewComponentName(self.name_buffer);
-    }
-
-    pub fn renderPropertyBox(self: *Component) void {
-        self.inner.renderPropertyBox();
-    }
-
-    pub fn stampMatrix(self: *const Component, mna: *circuit.MNA, current_group_2_idx: ?usize) void {
-        self.inner.stampMatrix(&self.terminal_node_ids, mna, current_group_2_idx);
-    }
-
-    pub const InnerType = enum {
-        ground,
-        resistor,
-        voltage_source,
-        current_source,
-        capacitor,
-        ccvs,
-        cccs,
-
-        fn module(comptime self: InnerType) type {
-            return switch (self) {
-                .resistor => @import("components/resistor.zig"),
-                .voltage_source => @import("components/voltage_source.zig"),
-                .current_source => @import("components/current_source.zig"),
-                .capacitor => @import("components/capacitor.zig"),
-                .ground => @import("components/ground.zig"),
-                .ccvs => @import("components/ccvs.zig"),
-                .cccs => @import("components/cccs.zig"),
-            };
-        }
-
-        fn centerForMouse(self: InnerType, pos: GridPosition, rotation: Rotation) GridPosition {
-            switch (self) {
-                inline else => |x| return x.module().centerForMouse(
-                    pos,
-                    rotation,
-                ),
-            }
-        }
-
-        pub fn defaultValue(self: InnerType, allocator: std.mem.Allocator) !Inner {
-            switch (self) {
-                inline else => |x| return x.module().defaultValue(allocator),
-            }
-        }
-
-        fn setNewComponentName(self: InnerType, buff: []u8) ![]u8 {
-            switch (self) {
-                inline else => |x| return x.module().setNewComponentName(buff),
-            }
-        }
-
-        pub fn getTerminals(
-            self: InnerType,
-            pos: GridPosition,
-            rotation: Rotation,
-            terminals_buff: []GridPosition,
-        ) []GridPosition {
-            switch (self) {
-                inline else => |x| return x.module().getTerminals(
-                    pos,
-                    rotation,
-                    terminals_buff,
-                ),
-            }
-        }
-
-        pub fn getOccupiedGridPositions(
-            self: InnerType,
-            pos: GridPosition,
-            rotation: Rotation,
-            occupied: []OccupiedGridPosition,
-        ) []OccupiedGridPosition {
-            switch (self) {
-                inline else => |x| return x.module().getOccupiedGridPositions(
-                    pos,
-                    rotation,
-                    occupied,
-                ),
-            }
-        }
-
-        pub fn gridPositionFromScreenPos(
-            self: InnerType,
-            circuit_rect: dvui.Rect.Physical,
-            pos: dvui.Point.Physical,
-            rotation: Rotation,
-        ) GridPosition {
-            const grid_pos = circuit.gridPositionFromPos(circuit_rect, pos);
-            return self.centerForMouse(grid_pos, rotation);
-        }
-
-        pub fn renderHolding(
-            self: Component.InnerType,
-            circuit_rect: dvui.Rect.Physical,
-            pos: GridPosition,
-            rot: Rotation,
-            render_type: renderer.ComponentRenderType,
-        ) void {
-            switch (self) {
-                .ground => InnerType.ground.module().render(
-                    circuit_rect,
-                    pos,
-                    rot,
-                    render_type,
-                ),
-                inline else => |x| x.module().render(
-                    circuit_rect,
-                    pos,
-                    rot,
-                    null,
-                    null,
-                    render_type,
-                ),
-            }
-        }
-    };
-
-    pub const Inner = union(InnerType) {
-        ground,
-        resistor: circuit.FloatType,
-        voltage_source: circuit.FloatType,
-        current_source: circuit.FloatType,
-        capacitor: circuit.FloatType,
-        ccvs: InnerType.ccvs.module().Inner,
-        cccs: InnerType.cccs.module().Inner,
-
-        pub fn clone(self: *const Inner, allocator: std.mem.Allocator) !Inner {
-            return switch (@as(InnerType, self.*)) {
-                inline else => self.*,
-                .ccvs => Inner{
-                    .ccvs = try @field(
-                        self,
-                        @tagName(InnerType.ccvs),
-                    ).clone(allocator),
-                },
-            };
-        }
-
-        pub fn render(
-            self: *const Inner,
-            circuit_rect: dvui.Rect.Physical,
-            pos: GridPosition,
-            rot: Rotation,
-            name: []const u8,
-            render_type: renderer.ComponentRenderType,
-        ) void {
-            switch (@as(InnerType, self.*)) {
-                .ground => InnerType.ground.module().render(
-                    circuit_rect,
-                    pos,
-                    rot,
-                    render_type,
-                ),
-                inline else => |x| InnerType.module(x).render(
-                    circuit_rect,
-                    pos,
-                    rot,
-                    name,
-                    @field(self, @tagName(x)),
-                    render_type,
-                ),
-            }
-        }
-
-        pub fn renderPropertyBox(self: *Inner) void {
-            switch (@as(InnerType, self.*)) {
-                .ground => {},
-                inline else => |x| x.module().renderPropertyBox(
-                    &@field(self, @tagName(x)),
-                ),
-            }
-        }
-
-        pub fn stampMatrix(
-            self: *const Inner,
-            terminal_node_ids: []const usize,
-            mna: *MNA,
-            current_group_2_idx: ?usize,
-            angular_frequency: FloatType,
-        ) void {
-            switch (@as(InnerType, self.*)) {
-                .ground => {},
-                inline else => |x| x.module().stampMatrix(
-                    @field(self, @tagName(x)),
-                    terminal_node_ids,
-                    mna,
-                    current_group_2_idx,
-                    angular_frequency,
-                ),
-            }
-        }
-
-        pub fn deinit(self: *Inner, allocator: std.mem.Allocator) void {
-            switch (@as(InnerType, self.*)) {
-                inline else => {},
-                .ccvs => @field(self, @tagName(InnerType.ccvs)).deinit(allocator),
-                .cccs => @field(self, @tagName(InnerType.cccs)).deinit(allocator),
-            }
-        }
-    };
 };

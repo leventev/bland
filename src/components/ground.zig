@@ -1,10 +1,10 @@
 const std = @import("std");
+const bland = @import("bland");
 const component = @import("../component.zig");
 const circuit = @import("../circuit.zig");
 const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
-
 const dvui = @import("dvui");
 
 const Component = component.Component;
@@ -12,18 +12,12 @@ const GridPosition = circuit.GridPosition;
 const OccupiedGridPosition = component.OccupiedGridPosition;
 const Rotation = circuit.Rotation;
 
-const FloatType = circuit.FloatType;
+const Float = bland.Float;
 
 var ground_counter: usize = 0;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
     return Component.Inner{ .ground = {} };
-}
-
-pub fn formatValue(value: u32, buf: []u8) !?[]const u8 {
-    _ = value;
-    _ = buf;
-    return null;
 }
 
 pub fn setNewComponentName(buff: []u8) ![]u8 {

@@ -7,11 +7,11 @@ const Component = component.Component;
 const Float = bland.Float;
 const Complex = bland.Complex;
 
-pub fn defaultValue(_: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .capacitor = 0.001 };
+pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
+    return Component.Device{ .capacitor = 0.001 };
 }
 
-fn formatValue(value: Float, buf: []u8) !?[]const u8 {
+pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
     return try std.fmt.bufPrint(buf, "{d}F", .{value});
 }
 

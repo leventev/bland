@@ -33,8 +33,8 @@ pub const Inner = struct {
     }
 };
 
-pub fn defaultValue(allocator: std.mem.Allocator) !Component.Inner {
-    return Component.Inner{ .cccs = .{
+pub fn defaultValue(allocator: std.mem.Allocator) !Component.Device {
+    return Component.Device{ .cccs = .{
         .controller_name_buff = try allocator.alloc(u8, component.max_component_name_length),
         .controller_name = &.{},
         .multiplier = 0,
@@ -42,7 +42,7 @@ pub fn defaultValue(allocator: std.mem.Allocator) !Component.Inner {
     } };
 }
 
-fn formatValue(inner: Inner, buf: []u8) !?[]const u8 {
+pub fn formatValue(inner: Inner, buf: []u8) !?[]const u8 {
     return try std.fmt.bufPrint(buf, "{d}*I({s})", .{
         inner.multiplier,
         inner.controller_name,

@@ -114,48 +114,6 @@ pub fn deinit(self: *NetList, allocator: std.mem.Allocator) void {
     self.* = undefined;
 }
 
-//pub fn fromCircuit(graphic_circuit: *const GraphicCircuit) !NetList {
-//    var node_terminals = std.ArrayListUnmanaged(
-//        std.ArrayListUnmanaged(NetList.Terminal),
-//    ){};
-//    defer node_terminals.deinit(graphic_circuit.allocator);
-//
-//    var remaining_terminals = try graphic_circuit.getAllTerminals();
-//    defer remaining_terminals.deinit();
-//
-//    try graphic_circuit.traverseWiresForNodes(
-//        &remaining_terminals,
-//        &node_terminals,
-//    );
-//
-//    try circuit.findAllDirectConnections(
-//        graphic_circuit.allocator,
-//        &remaining_terminals,
-//        &node_terminals,
-//    );
-//
-//    const nodes = try graphic_circuit.mergeGroundNodes(
-//        node_terminals.items,
-//    );
-//
-//    var netlist_comps = try std.ArrayList(Component).initCapacity(
-//        graphic_circuit.allocator,
-//        graphic_circuit.graphic_components.items.len,
-//    );
-//
-//    for (graphic_circuit.graphic_components.items) |graphic_comp| {
-//        try netlist_comps.append(
-//            graphic_circuit.allocator,
-//            try graphic_comp.comp.clone(graphic_circuit.allocator),
-//        );
-//    }
-//
-//    return NetList{
-//        .nodes = nodes,
-//        .components = netlist_comps,
-//    };
-//}
-
 fn createMNAMatrix(
     self: *NetList,
     allocator: std.mem.Allocator,
