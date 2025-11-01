@@ -18,7 +18,7 @@ pub const Component = struct {
     device: Device,
     terminal_node_ids: []usize,
 
-    name: []u8,
+    name: []const u8,
 
     pub fn deinit(self: *Component, allocator: std.mem.Allocator) void {
         self.device.deinit(allocator);

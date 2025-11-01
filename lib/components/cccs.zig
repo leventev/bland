@@ -27,7 +27,7 @@ pub const Inner = struct {
         return Inner{
             .controller_name_buff = name_buff,
             .controller_name = name_buff[0..self.controller_name.len],
-            .multiplier = self.coefficient,
+            .multiplier = self.multiplier,
             .controller_group_2_idx = null,
         };
     }

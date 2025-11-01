@@ -67,11 +67,9 @@ pub fn addComponent(
     node_ids: []const usize,
 ) !usize {
     const id = self.components.items.len;
-    const name_buf = try allocator.dupe(u8, name);
     try self.components.append(allocator, Component{
         .device = device,
-        .name_buffer = name_buf,
-        .name = name_buf,
+        .name = name,
         .terminal_node_ids = try allocator.dupe(usize, node_ids),
     });
     for (node_ids, 0..) |node_id, term_id| {
