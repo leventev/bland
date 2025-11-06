@@ -329,12 +329,10 @@ pub const FrequencySweepReport = struct {
         const start_freq_exponent: Float = std.math.log10(start_freq);
         const end_freq_exponent: Float = std.math.log10(end_freq);
         const step: Float = (end_freq_exponent - start_freq_exponent) / @as(Float, @floatFromInt(frequency_count));
-        std.log.debug("{} {} {} {} {}", .{ start_freq, end_freq, start_freq_exponent, end_freq_exponent, frequency_count });
         for (0..frequency_count) |i| {
             const exp_off = @as(Float, @floatFromInt(i)) * step;
             const exponent: Float = start_freq_exponent + exp_off;
             const frequency: Float = std.math.pow(Float, 10, exponent);
-            std.log.debug("{} {} {}", .{ exp_off, exponent, frequency });
             frequency_values[i] = frequency;
         }
 
