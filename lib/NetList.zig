@@ -13,7 +13,8 @@ nodes: std.ArrayListUnmanaged(Node),
 components: std.ArrayListUnmanaged(Component),
 
 pub const ground_node_id = 0;
-pub const AnalysisReport = MNA.AnalysisReport;
+pub const DCAnalysisReport = MNA.DCAnalysisReport;
+pub const ACAnalysisReport = MNA.ACAnalysisReport;
 
 const NetList = @This();
 
@@ -245,7 +246,7 @@ pub fn analyseDC(
     self: *NetList,
     allocator: std.mem.Allocator,
     currents_watched: []const usize,
-) !MNA.AnalysisReport {
+) !MNA.DCAnalysisReport {
     var group_2 = try self.createGroup2(allocator, currents_watched);
     defer group_2.deinit(allocator);
 
@@ -257,7 +258,7 @@ pub fn analyseDC(
     defer mna.deinit(allocator);
 
     // solve the matrix with Gauss elimination
-    const res = try mna.solve(allocator);
+    const res = try mna.solveDC(allocator);
     return res;
 }
 
@@ -266,7 +267,7 @@ pub fn analyseAC(
     allocator: std.mem.Allocator,
     currents_watched: []const usize,
     frequency: Float,
-) !MNA.AnalysisReport {
+) !MNA.ACAnalysisReport {
     std.debug.assert(frequency >= 0);
     const angular_frequency = 2 * std.math.pi * frequency;
 
@@ -281,7 +282,7 @@ pub fn analyseAC(
     defer mna.deinit(allocator);
 
     // solve the matrix with Gauss elimination
-    const res = try mna.solve(allocator);
+    const res = try mna.solveAC(allocator);
     return res;
 }
 
@@ -355,7 +356,7 @@ pub const FrequencySweepReport = struct {
         const voltage_count = @divExact(self.all_voltages.len, self.frequency_values.len);
         std.debug.assert(node_idx < voltage_count);
         const start_idx = node_idx * self.frequency_values.len;
-        const end_idx = (node_idx + 1) * self.frequency_values.len - 1;
+        const end_idx = (node_idx + 1) * self.frequency_values.len;
         return self.all_voltages[start_idx..end_idx];
     }
 
@@ -364,8 +365,23 @@ pub const FrequencySweepReport = struct {
         const component_count = @divExact(self.all_currents.len, self.frequency_values.len);
         std.debug.assert(comp_idx < component_count);
         const start_idx = comp_idx * self.frequency_values.len;
-        const end_idx = (comp_idx + 1) * self.frequency_values.len - 1;
+        const end_idx = (comp_idx + 1) * self.frequency_values.len;
         return self.all_currents[start_idx..end_idx];
+    }
+
+    pub fn analysisReportForFreq(
+        self: *const FrequencySweepReport,
+        freq_idx: usize,
+        report_buff: *ACAnalysisReport,
+    ) void {
+        std.debug.assert(freq_idx < self.frequency_values.len);
+        for (0..report_buff.voltages.len) |idx| {
+            report_buff.voltages[idx] = self.getVoltage(idx)[freq_idx];
+        }
+
+        for (0..report_buff.currents.len) |idx| {
+            report_buff.currents[idx] = self.getCurrent(idx)[freq_idx];
+        }
     }
 };
 
@@ -375,6 +391,7 @@ pub fn analyseFrequencySweep(
     start_freq: Float,
     end_freq: Float,
     freq_count: usize,
+    group_2: []const usize,
 ) !FrequencySweepReport {
 
     // TODO: make these into errors
@@ -394,19 +411,17 @@ pub fn analyseFrequencySweep(
     // TODO:
     for (fw_report.frequency_values, 0..) |freq, freq_idx| {
         // TODO
-        var report = try self.analyseAC(allocator, &.{}, freq);
+        var report = try self.analyseAC(allocator, group_2, freq);
         defer report.deinit(allocator);
-
-        const res = report.values.ac;
 
         for (0..self.nodes.items.len) |node_idx| {
             const idx = node_idx * freq_count + freq_idx;
-            fw_report.all_voltages[idx] = res.voltages[node_idx];
+            fw_report.all_voltages[idx] = report.voltages[node_idx];
         }
 
         for (0..self.components.items.len) |comp_idx| {
             const idx = comp_idx * freq_count + freq_idx;
-            fw_report.all_currents[idx] = res.currents[comp_idx];
+            fw_report.all_currents[idx] = report.currents[comp_idx];
         }
     }
 

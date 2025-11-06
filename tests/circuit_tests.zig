@@ -4,22 +4,21 @@ const main = @import("main.zig");
 
 // TODO: export types and such in a nicer way
 const NetList = bland.NetList;
-const Float = bland.Float;
+const Float = main.Float;
+const Complex = main.Complex;
 const expectFloat = main.expectFloat;
-const Complex = std.math.Complex(Float);
+const expectComplex = main.expectComplex;
 
 pub fn checkCurrentDC(
-    report: *const NetList.AnalysisReport,
+    report: *const NetList.DCAnalysisReport,
     current_id: usize,
     expected: Float,
 ) !void {
     // TODO: check polarity???
+    try std.testing.expect(current_id < report.currents.len);
+    try std.testing.expect(report.currents[current_id] != null);
 
-    const res = report.values.dc;
-    try std.testing.expect(current_id < res.currents.len);
-    try std.testing.expect(res.currents[current_id] != null);
-
-    const actual = res.currents[current_id].?;
+    const actual = report.currents[current_id].?;
 
     const expected_abs = @abs(expected);
     const expected_actual = @abs(actual);
@@ -27,33 +26,71 @@ pub fn checkCurrentDC(
 }
 
 pub fn checkVoltageDC(
-    report: *const NetList.AnalysisReport,
+    report: *const NetList.DCAnalysisReport,
     node_id: usize,
     expected: Float,
 ) !void {
-    const res = report.values.dc;
-
-    try std.testing.expect(node_id < res.voltages.len);
-    const actual = res.voltages[node_id];
+    try std.testing.expect(node_id < report.voltages.len);
+    const actual = report.voltages[node_id];
     try expectFloat(Float, expected, actual);
 }
 
 pub fn checkVoltage2DC(
-    report: *const NetList.AnalysisReport,
+    report: *const NetList.DCAnalysisReport,
     node1_id: usize,
     node2_id: usize,
     expected: Float,
 ) !void {
-    const res = report.values.dc;
-
-    try std.testing.expect(node1_id < res.voltages.len);
-    try std.testing.expect(node2_id < res.voltages.len);
-    const actual = res.voltages[node1_id] - res.voltages[node2_id];
+    try std.testing.expect(node1_id < report.voltages.len);
+    try std.testing.expect(node2_id < report.voltages.len);
+    const actual = report.voltages[node1_id] - report.voltages[node2_id];
     try expectFloat(Float, expected, actual);
+}
+
+pub fn checkVoltageAC(
+    report: *const NetList.ACAnalysisReport,
+    node_id: usize,
+    expected: Complex,
+) !void {
+    try std.testing.expect(node_id < report.voltages.len);
+    const actual = report.voltages[node_id];
+    try expectComplex(expected, actual);
+}
+
+pub fn checkVoltage2AC(
+    report: *const NetList.ACAnalysisReport,
+    node1_id: usize,
+    node2_id: usize,
+    expected: Complex,
+) !void {
+    try std.testing.expect(node1_id < report.voltages.len);
+    try std.testing.expect(node2_id < report.voltages.len);
+    const actual = report.voltages[node1_id].sub(report.voltages[node2_id]);
+    try expectComplex(expected, actual);
+}
+
+pub fn checkCurrentAC(
+    report: *const NetList.ACAnalysisReport,
+    current_id: usize,
+    expected: Complex,
+) !void {
+    // TODO: check polarity???
+    // TODO: check phase too
+    try std.testing.expect(current_id < report.currents.len);
+    try std.testing.expect(report.currents[current_id] != null);
+
+    const actual = report.currents[current_id].?;
+
+    //const expected_re_abs = @abs(expected.re);
+    //const actual_re_abs = @abs(actual.re);
+    //const expected_im_abs = @abs(expected.im);
+    //const actual_im_abs = @abs(actual.im);
+    try expectComplex(expected, actual);
 }
 
 comptime {
     _ = @import("component/resistor.zig");
     _ = @import("component/ccvs.zig");
     _ = @import("component/cccs.zig");
+    _ = @import("component/capacitor.zig");
 }

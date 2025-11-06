@@ -9,28 +9,59 @@ pub fn main() !void {
     const test_count = builtin.test_functions.len;
 
     var passed_test_count: usize = 0;
+    var total_elapsed: i64 = 0;
 
-    const start = std.time.milliTimestamp();
+    // TODO: CLEANUP
     for (builtin.test_functions, 0..) |t, idx| {
+        const real_test_name_idx = std.mem.lastIndexOfScalar(u8, t.name, '.').?;
+        const real_test_name = t.name[real_test_name_idx + 1 ..];
+        // -5 to remove ".test"
+        const test_file_name = t.name[0 .. real_test_name_idx - 5];
+
+        const start = std.time.microTimestamp();
         t.func() catch |err| {
-            try stdout.print(
-                "\x1b[2m[ {}/{} ]\x1b[m \x1b[31m{s}\x1b[m ... \x1b[31;1mfailed\x1b[m: {}\n",
-                .{ idx + 1, test_count, t.name, err },
-            );
+            const elapsed = std.time.microTimestamp() - start;
+            total_elapsed += elapsed;
+
+            if (elapsed > 10_000) {
+                const elapsed_in_ms = @divFloor(elapsed, 1_000);
+                try stdout.print(
+                    "\x1b[2m[ {}/{} ]\x1b[m \x1b[38;5;139m{s}/\x1b[31m{s}\x1b[m ... \x1b[31;1mfailed\x1b[m: {}\x1b[m ... \x1b[34m{}ms\x1b[m\n",
+                    .{ idx + 1, test_count, test_file_name, real_test_name, err, elapsed_in_ms },
+                );
+            } else {
+                try stdout.print(
+                    "\x1b[2m[ {}/{} ]\x1b[m \x1b[38;5;139m{s}/\x1b[31m{s}\x1b[m ... \x1b[31;1mfailed\x1b[m: {}\x1b[m ... \x1b[34m{}\u{03BC}s\x1b[m\n",
+                    .{ idx + 1, test_count, test_file_name, real_test_name, err, elapsed },
+                );
+            }
+            try stdout.flush();
+
             continue;
         };
-        try stdout.print(
-            "\x1b[2m[ {}/{} ]\x1b[m \x1b[32m{s}\x1b[m ... \x1b[32;1mok\x1b[m\n",
-            .{ idx + 1, test_count, t.name },
-        );
+        const elapsed = std.time.microTimestamp() - start;
+        total_elapsed += elapsed;
+        if (elapsed > 10_000) {
+            const elapsed_in_ms = @divFloor(elapsed, 1_000);
+            try stdout.print(
+                "\x1b[2m[ {}/{} ]\x1b[m \x1b[38;5;139m{s}/\x1b[32m{s}\x1b[m ... \x1b[32;1mok \x1b[m ... \x1b[34m{}ms\x1b[m\n",
+                .{ idx + 1, test_count, test_file_name, real_test_name, elapsed_in_ms },
+            );
+        } else {
+            try stdout.print(
+                "\x1b[2m[ {}/{} ]\x1b[m \x1b[38;5;139m{s}/\x1b[32m{s}\x1b[m ... \x1b[32;1mok \x1b[m ... \x1b[34m{}\u{03BC}s\x1b[m\n",
+                .{ idx + 1, test_count, test_file_name, real_test_name, elapsed },
+            );
+        }
+        try stdout.flush();
+
         passed_test_count += 1;
     }
-    const elapsed = std.time.milliTimestamp() - start;
 
     try stdout.print("\n\x1b[2mTest report:\x1b[m\n", .{});
     try stdout.print(
         "\t\x1b[2mElapsed time:\x1b[m \x1b[34;1m{}ms\x1b[m\n",
-        .{elapsed},
+        .{@divFloor(total_elapsed, 1000)},
     );
     try stdout.print(
         "\t\x1b[2mTests passed:\x1b[m \x1b[32;1m{}\x1b[m \x1b[2mout of\x1b[m \x1b[34;1m{}\x1b[m\n",

@@ -305,138 +305,152 @@ fn print(
     }
 }
 
-pub fn solve(self: *MNA, allocator: std.mem.Allocator) !AnalysisReport {
-    switch (self.mat) {
-        .dc => |*mat| {
-            mat.gaussJordanElimination();
+pub fn solveDC(self: *MNA, allocator: std.mem.Allocator) !DCAnalysisReport {
+    var mat = self.mat.dc;
 
-            var dc_results = AnalysisReport.DC{
-                .voltages = try allocator.alloc(
-                    Float,
-                    self.nodes.len,
-                ),
-                .currents = try allocator.alloc(
-                    ?Float,
-                    self.component_count,
-                ),
-            };
+    mat.gaussJordanElimination();
 
-            dc_results.voltages[0] = 0;
-            for (1..self.nodes.len) |i| {
-                dc_results.voltages[i] = mat.data[i - 1][mat.col_count - 1];
-            }
+    var dc_results = try DCAnalysisReport.init(
+        allocator,
+        self.nodes.len,
+        self.component_count,
+    );
 
-            // null out currents
-            for (0..self.component_count) |i| {
-                dc_results.currents[i] = null;
-            }
-
-            for (self.group_2, 0..) |current_idx, i| {
-                dc_results.currents[current_idx] = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
-            }
-
-            return AnalysisReport{
-                .values = .{
-                    .dc = dc_results,
-                },
-            };
-        },
-        .ac => |*mat| {
-            mat.gaussJordanElimination();
-
-            var ac_results = AnalysisReport.AC{
-                .voltages = try allocator.alloc(
-                    Complex,
-                    self.nodes.len,
-                ),
-                .currents = try allocator.alloc(
-                    ?Complex,
-                    self.component_count,
-                ),
-            };
-
-            ac_results.voltages[0] = Complex.init(0, 0);
-            for (1..self.nodes.len) |i| {
-                ac_results.voltages[i] = mat.data[i - 1][mat.col_count - 1];
-            }
-
-            // null out currents
-            for (0..self.component_count) |i| {
-                ac_results.currents[i] = null;
-            }
-
-            for (self.group_2, 0..) |current_idx, i| {
-                ac_results.currents[current_idx] = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
-            }
-
-            return AnalysisReport{
-                .values = .{ .ac = ac_results },
-            };
-        },
+    dc_results.voltages[0] = 0;
+    for (1..self.nodes.len) |i| {
+        dc_results.voltages[i] = mat.data[i - 1][mat.col_count - 1];
     }
+
+    // null out currents
+    for (0..self.component_count) |i| {
+        dc_results.currents[i] = null;
+    }
+
+    for (self.group_2, 0..) |current_idx, i| {
+        dc_results.currents[current_idx] = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
+    }
+
+    return dc_results;
 }
 
-pub const AnalysisReport = struct {
-    pub const DC = struct {
-        voltages: []Float,
-        currents: []?Float,
-    };
+pub fn solveAC(self: *MNA, allocator: std.mem.Allocator) !ACAnalysisReport {
+    var mat = self.mat.ac;
 
-    pub const AC = struct {
-        voltages: []Complex,
-        currents: []?Complex,
-    };
+    mat.gaussJordanElimination();
 
-    values: union(enum) {
-        dc: DC,
-        ac: AC,
-    },
+    var ac_results = try ACAnalysisReport.init(
+        allocator,
+        self.nodes.len,
+        self.component_count,
+    );
 
-    pub fn deinit(self: *AnalysisReport, allocator: std.mem.Allocator) void {
-        switch (self.values) {
-            .dc => |res| {
-                allocator.free(res.voltages);
-                allocator.free(res.currents);
-            },
-            .ac => |res| {
-                allocator.free(res.voltages);
-                allocator.free(res.currents);
-            },
-        }
+    ac_results.voltages[0] = Complex.init(0, 0);
+    for (1..self.nodes.len) |i| {
+        ac_results.voltages[i] = mat.data[i - 1][mat.col_count - 1];
     }
 
-    pub fn dump(self: *const AnalysisReport) void {
-        switch (self.values) {
-            .dc => |res| {
-                for (res.voltages, 0..) |v, idx| {
-                    std.debug.print("v{}: {d}\n", .{ idx, v });
-                }
+    // null out currents
+    for (0..self.component_count) |i| {
+        ac_results.currents[i] = null;
+    }
 
-                for (res.currents, 0..) |current, idx| {
-                    if (current) |c| {
-                        std.debug.print("i{}: {d}\n", .{ idx, c });
-                    } else {
-                        std.debug.print("i{}: ?\n", .{idx});
-                    }
-                }
-            },
-            .ac => |res| {
-                for (res.voltages, 0..) |z, idx| {
-                    std.debug.print("v{}: ", .{idx});
-                    complex_matrix.prettyPrintComplex(Float, z);
-                    std.debug.print("\n", .{});
-                }
+    for (self.group_2, 0..) |current_idx, i| {
+        ac_results.currents[current_idx] = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
+    }
 
-                for (res.currents, 0..) |current, idx| {
-                    if (current) |z| {
-                        std.debug.print("i{}: ", .{idx});
-                        complex_matrix.prettyPrintComplex(Float, z);
-                        std.debug.print("\n", .{});
-                    } else {
-                        std.debug.print("i{}: ?\n", .{idx});
-                    }
-                }
-            },
+    return ac_results;
+}
+
+pub const DCAnalysisReport = struct {
+    voltages: []Float,
+    currents: []?Float,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        node_count: usize,
+        comp_count: usize,
+    ) !DCAnalysisReport {
+        return DCAnalysisReport{
+            .voltages = try allocator.alloc(
+                Float,
+                node_count,
+            ),
+            .currents = try allocator.alloc(
+                ?Float,
+                comp_count,
+            ),
+        };
+    }
+
+    pub fn deinit(
+        self: *DCAnalysisReport,
+        allocator: std.mem.Allocator,
+    ) void {
+        allocator.free(self.voltages);
+        allocator.free(self.currents);
+        self.* = undefined;
+    }
+
+    pub fn dump(self: *DCAnalysisReport) void {
+        for (self.voltages, 0..) |v, idx| {
+            std.debug.print("v{}: {d}\n", .{ idx, v });
+        }
+
+        for (self.currents, 0..) |current, idx| {
+            if (current) |c| {
+                std.debug.print("i{}: {d}\n", .{ idx, c });
+            } else {
+                std.debug.print("i{}: ?\n", .{idx});
+            }
+        }
+    }
+};
+
+pub const ACAnalysisReport = struct {
+    voltages: []Complex,
+    currents: []?Complex,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        node_count: usize,
+        comp_count: usize,
+    ) !ACAnalysisReport {
+        return ACAnalysisReport{
+            .voltages = try allocator.alloc(
+                Complex,
+                node_count,
+            ),
+            .currents = try allocator.alloc(
+                ?Complex,
+                comp_count,
+            ),
+        };
+    }
+
+    pub fn deinit(
+        self: *ACAnalysisReport,
+        allocator: std.mem.Allocator,
+    ) void {
+        allocator.free(self.voltages);
+        allocator.free(self.currents);
+        self.* = undefined;
+    }
+
+    pub fn dump(self: *ACAnalysisReport) void {
+        for (self.voltages, 0..) |z, idx| {
+            std.debug.print("v{}: ", .{idx});
+            complex_matrix.prettyPrintComplex(Float, z);
+            std.debug.print("\n", .{});
+        }
+
+        for (self.currents, 0..) |current, idx| {
+            if (current) |z| {
+                std.debug.print("i{}: ", .{idx});
+                complex_matrix.prettyPrintComplex(Float, z);
+                std.debug.print("\n", .{});
+            } else {
+                std.debug.print("i{}: ?\n", .{idx});
+            }
         }
     }
 };

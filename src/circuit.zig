@@ -465,6 +465,7 @@ pub const GraphicCircuit = struct {
             start_freq,
             end_freq,
             freq_count,
+            &.{},
         ) catch {
             std.log.err("frequency sweep faied", .{});
             return;
