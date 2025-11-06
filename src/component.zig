@@ -16,6 +16,7 @@ const resistor_graphics_module = @import("components/resistor.zig");
 const voltage_source_graphics_module = @import("components/voltage_source.zig");
 const current_source_graphics_module = @import("components/current_source.zig");
 const capacitor_graphics_module = @import("components/capacitor.zig");
+const inductor_graphics_module = @import("components/inductor.zig");
 const ground_graphics_module = @import("components/ground.zig");
 const ccvs_graphics_module = @import("components/ccvs.zig");
 const cccs_graphics_module = @import("components/cccs.zig");
@@ -26,6 +27,7 @@ fn graphics_module(comptime self: DeviceType) type {
         .voltage_source => voltage_source_graphics_module,
         .current_source => current_source_graphics_module,
         .capacitor => capacitor_graphics_module,
+        .inductor => inductor_graphics_module,
         .ground => ground_graphics_module,
         .ccvs => ccvs_graphics_module,
         .cccs => cccs_graphics_module,

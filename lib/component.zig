@@ -8,6 +8,7 @@ pub const resistor_module = @import("components/resistor.zig");
 pub const voltage_source_module = @import("components/voltage_source.zig");
 pub const current_source_module = @import("components/current_source.zig");
 pub const capacitor_module = @import("components/capacitor.zig");
+pub const inductor_module = @import("components/inductor.zig");
 pub const ground_module = @import("components/ground.zig");
 pub const ccvs_module = @import("components/ccvs.zig");
 pub const cccs_module = @import("components/cccs.zig");
@@ -31,6 +32,7 @@ pub const Component = struct {
         voltage_source,
         current_source,
         capacitor,
+        inductor,
         ccvs,
         cccs,
 
@@ -40,6 +42,7 @@ pub const Component = struct {
                 .voltage_source => voltage_source_module,
                 .current_source => current_source_module,
                 .capacitor => capacitor_module,
+                .inductor => inductor_module,
                 .ground => ground_module,
                 .ccvs => ccvs_module,
                 .cccs => cccs_module,
@@ -59,6 +62,7 @@ pub const Component = struct {
         voltage_source: FloatType,
         current_source: FloatType,
         capacitor: FloatType,
+        inductor: FloatType,
         ccvs: DeviceType.ccvs.module().Inner,
         cccs: DeviceType.cccs.module().Inner,
 

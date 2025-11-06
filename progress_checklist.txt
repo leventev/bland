@@ -8,7 +8,7 @@
 [X] be able to change the resistance of a resistor
 [X] add capacitors
 [X] add MNA
-[ ] add inductors
+[X] add inductors
 [ ] display voltage/current-time graphs
 [ ] be able to save and load circuits
 [ ] be able to delete, move, copy, paste elements of the circuit

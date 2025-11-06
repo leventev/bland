@@ -341,6 +341,12 @@ fn renderToolbox() bool {
             fw.close();
         }
 
+        if (dvui.menuItemLabel(@src(), "Inductor", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .inductor;
+            fw.close();
+        }
+
         if (dvui.menuItemLabel(@src(), "Current controlled voltage source", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .component;
             circuit.held_component = .ccvs;

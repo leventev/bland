@@ -193,49 +193,57 @@ const Group2 = struct {
 fn createGroup2(
     self: *NetList,
     allocator: std.mem.Allocator,
-    currents_watched: []const usize,
+    currents_watched: ?[]const usize,
 ) !Group2 {
     // group edges:
     // - group 1(i1): all elements whose current will be eliminated
     // - group 2(i2): all other elements
 
     var group_2 = Group2.init();
-    try group_2.addComponents(allocator, currents_watched);
 
-    for (0.., self.components.items) |idx, *comp| {
-        switch (comp.device) {
-            .voltage_source => {
-                _ = try group_2.addComponent(allocator, idx);
-            },
-            .ccvs => |*inner| {
-                const controller_comp_idx = self.findComponentByName(
-                    inner.controller_name,
-                ) orelse @panic("TODO");
+    if (currents_watched) |currs| {
+        try group_2.addComponents(allocator, currs);
 
-                // controller's current
-                inner.controller_group_2_idx = try group_2.addComponent(
-                    allocator,
-                    controller_comp_idx,
-                );
+        for (0.., self.components.items) |idx, *comp| {
+            switch (comp.device) {
+                .voltage_source, .inductor => {
+                    _ = try group_2.addComponent(allocator, idx);
+                },
+                .ccvs => |*inner| {
+                    const controller_comp_idx = self.findComponentByName(
+                        inner.controller_name,
+                    ) orelse @panic("TODO");
 
-                // ccvs's current
-                _ = try group_2.addComponent(allocator, idx);
-            },
-            .cccs => |*inner| {
-                const controller_comp_idx = self.findComponentByName(
-                    inner.controller_name,
-                ) orelse @panic("TODO");
+                    // controller's current
+                    inner.controller_group_2_idx = try group_2.addComponent(
+                        allocator,
+                        controller_comp_idx,
+                    );
 
-                // controller's current
-                inner.controller_group_2_idx = try group_2.addComponent(
-                    allocator,
-                    controller_comp_idx,
-                );
+                    // ccvs's current
+                    _ = try group_2.addComponent(allocator, idx);
+                },
+                .cccs => |*inner| {
+                    const controller_comp_idx = self.findComponentByName(
+                        inner.controller_name,
+                    ) orelse @panic("TODO");
 
-                // ccvs's current
-                _ = try group_2.addComponent(allocator, idx);
-            },
-            else => {},
+                    // controller's current
+                    inner.controller_group_2_idx = try group_2.addComponent(
+                        allocator,
+                        controller_comp_idx,
+                    );
+
+                    // ccvs's current
+                    _ = try group_2.addComponent(allocator, idx);
+                },
+                else => {},
+            }
+        }
+    } else {
+        for (0..self.components.items.len) |i| {
+            // TODO: optimize
+            _ = try group_2.addComponent(allocator, i);
         }
     }
 
@@ -245,7 +253,7 @@ fn createGroup2(
 pub fn analyseDC(
     self: *NetList,
     allocator: std.mem.Allocator,
-    currents_watched: []const usize,
+    currents_watched: ?[]const usize,
 ) !MNA.DCAnalysisReport {
     var group_2 = try self.createGroup2(allocator, currents_watched);
     defer group_2.deinit(allocator);
@@ -265,7 +273,7 @@ pub fn analyseDC(
 pub fn analyseAC(
     self: *NetList,
     allocator: std.mem.Allocator,
-    currents_watched: []const usize,
+    currents_watched: ?[]const usize,
     frequency: Float,
 ) !MNA.ACAnalysisReport {
     std.debug.assert(frequency >= 0);
@@ -391,7 +399,7 @@ pub fn analyseFrequencySweep(
     start_freq: Float,
     end_freq: Float,
     freq_count: usize,
-    group_2: []const usize,
+    currents_watched: ?[]const usize,
 ) !FrequencySweepReport {
 
     // TODO: make these into errors
@@ -411,7 +419,7 @@ pub fn analyseFrequencySweep(
     // TODO:
     for (fw_report.frequency_values, 0..) |freq, freq_idx| {
         // TODO
-        var report = try self.analyseAC(allocator, group_2, freq);
+        var report = try self.analyseAC(allocator, currents_watched, freq);
         defer report.deinit(allocator);
 
         for (0..self.nodes.items.len) |node_idx| {

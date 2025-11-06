@@ -435,7 +435,7 @@ pub const GraphicCircuit = struct {
         defer netlist.deinit(self.allocator);
 
         // TODO
-        var report = netlist.analyseDC(self.allocator, &.{}) catch {
+        var report = netlist.analyseDC(self.allocator, null) catch {
             @panic("TODO");
         };
         defer report.deinit(self.allocator);
@@ -465,7 +465,7 @@ pub const GraphicCircuit = struct {
             start_freq,
             end_freq,
             freq_count,
-            &.{},
+            null,
         ) catch {
             std.log.err("frequency sweep faied", .{});
             return;
@@ -479,6 +479,22 @@ pub const GraphicCircuit = struct {
 
             for (voltage_for_freqs) |val| {
                 std.debug.print("{}, ", .{val.magnitude()});
+            }
+
+            std.debug.print("\n", .{});
+        }
+
+        for (0..netlist.components.items.len) |i| {
+            const current_for_freqs = fw_report.getCurrent(i);
+
+            std.debug.print("I{}: ", .{i});
+
+            // TODO: make the entire array an optional and dont store all nulls
+            // for no reason
+            for (current_for_freqs) |val| {
+                if (val) |v| {
+                    std.debug.print("{}, ", .{v.magnitude()});
+                }
             }
 
             std.debug.print("\n", .{});

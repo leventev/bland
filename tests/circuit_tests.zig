@@ -74,17 +74,10 @@ pub fn checkCurrentAC(
     current_id: usize,
     expected: Complex,
 ) !void {
-    // TODO: check polarity???
-    // TODO: check phase too
     try std.testing.expect(current_id < report.currents.len);
     try std.testing.expect(report.currents[current_id] != null);
 
     const actual = report.currents[current_id].?;
-
-    //const expected_re_abs = @abs(expected.re);
-    //const actual_re_abs = @abs(actual.re);
-    //const expected_im_abs = @abs(expected.im);
-    //const actual_im_abs = @abs(actual.im);
     try expectComplex(expected, actual);
 }
 
