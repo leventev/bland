@@ -420,7 +420,61 @@ pub fn render(allocator: std.mem.Allocator) !bool {
     }
 
     if (paned.showSecond()) {
-        try circuit_widget.renderCircuit(allocator);
+        var paned2 = dvui.paned(@src(), .{ .collapsed_size = 200, .direction = .vertical }, .{
+            .expand = .both,
+            .background = true,
+            .color_fill = dvui.themeGet().color(.content, .fill),
+        });
+        defer paned2.deinit();
+
+        if (paned2.showFirst()) {
+            try circuit_widget.renderCircuit(allocator);
+        }
+
+        if (paned2.showSecond()) {
+            var vbox = dvui.box(
+                @src(),
+                .{},
+                .{ .min_size_content = .{ .w = 300, .h = 100 }, .expand = .both },
+            );
+            defer vbox.deinit();
+
+            const Static = struct {
+                var xaxis: dvui.PlotWidget.Axis = .{
+                    .name = "X Axis",
+                    .min = 0.05,
+                    .max = 0.95,
+                };
+
+                var yaxis: dvui.PlotWidget.Axis = .{
+                    .name = "Y Axis",
+                    // let plot figure out min
+                    .max = 0.8,
+                };
+            };
+
+            {
+                var plot = dvui.plot(@src(), .{
+                    .title = "Plot Title",
+                    .x_axis = &Static.xaxis,
+                    .y_axis = &Static.yaxis,
+                    .border_thick = 1.0,
+                    .mouse_hover = true,
+                }, .{ .expand = .both });
+                defer plot.deinit();
+
+                var s1 = plot.line();
+                defer s1.deinit();
+
+                const points: usize = 1000;
+                const freq: f32 = 5;
+                for (0..points + 1) |i| {
+                    const fval: f64 = @sin(2.0 * std.math.pi * @as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(points)) * freq);
+                    s1.point(@as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(points)), fval);
+                }
+                s1.stroke(1, dvui.themeGet().focus);
+            }
+        }
     }
 
     if (paned.showFirst()) {
