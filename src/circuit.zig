@@ -448,57 +448,57 @@ pub const GraphicCircuit = struct {
         start_freq: bland.Float,
         end_freq: bland.Float,
         freq_count: usize,
-    ) void {
+    ) NetList.FrequencySweepReport {
         // TODO: make these into errors
         std.debug.assert(start_freq >= 0);
         std.debug.assert(end_freq > start_freq);
         std.debug.assert(freq_count > 0);
 
         var netlist = self.createNetlist() catch {
-            std.log.err("Failed to build netlist", .{});
-            return;
+            @panic("Failed to build netlist");
         };
         defer netlist.deinit(self.allocator);
 
-        var fw_report = netlist.analyseFrequencySweep(
+        const fw_report = netlist.analyseFrequencySweep(
             self.allocator,
             start_freq,
             end_freq,
             freq_count,
             null,
         ) catch {
-            std.log.err("frequency sweep faied", .{});
-            return;
+            // TODO:
+            @panic("frequency sweep faied");
         };
-        defer fw_report.deinit(self.allocator);
 
-        for (0..netlist.nodes.items.len) |i| {
-            const voltage_for_freqs = fw_report.getVoltage(i);
+        //for (0..netlist.nodes.items.len) |i| {
+        //    const voltage_for_freqs = fw_report.voltage(i);
+        //
+        //    std.debug.print("V{}: ", .{i});
+        //
+        //    for (voltage_for_freqs) |val| {
+        //        std.debug.print("{}, ", .{val.magnitude()});
+        //    }
+        //
+        //    std.debug.print("\n", .{});
+        //}
+        //
+        //for (0..netlist.components.items.len) |i| {
+        //    const current_for_freqs = fw_report.current(i);
+        //
+        //    std.debug.print("I{}: ", .{i});
+        //
+        //    // TODO: make the entire array an optional and dont store all nulls
+        //    // for no reason
+        //    for (current_for_freqs) |val| {
+        //        if (val) |v| {
+        //            std.debug.print("{}, ", .{v.magnitude()});
+        //        }
+        //    }
+        //
+        //    std.debug.print("\n", .{});
+        //}
 
-            std.debug.print("V{}: ", .{i});
-
-            for (voltage_for_freqs) |val| {
-                std.debug.print("{}, ", .{val.magnitude()});
-            }
-
-            std.debug.print("\n", .{});
-        }
-
-        for (0..netlist.components.items.len) |i| {
-            const current_for_freqs = fw_report.getCurrent(i);
-
-            std.debug.print("I{}: ", .{i});
-
-            // TODO: make the entire array an optional and dont store all nulls
-            // for no reason
-            for (current_for_freqs) |val| {
-                if (val) |v| {
-                    std.debug.print("{}, ", .{v.magnitude()});
-                }
-            }
-
-            std.debug.print("\n", .{});
-        }
+        return fw_report;
     }
 };
 
