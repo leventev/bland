@@ -13,8 +13,6 @@ const GridPosition = circuit.GridPosition;
 
 pub var dark_mode: bool = true;
 
-var prev_frequency_reports: std.ArrayList(NetList.FrequencySweepReport) = .{};
-
 pub fn renderCenteredText(pos: dvui.Point.Physical, color: dvui.Color, text: []const u8) void {
     const f = dvui.Font{
         .id = .fromName(global.font_name),
@@ -284,7 +282,7 @@ pub fn renderWire(
     }
 }
 
-fn renderToolbox(gpa: std.mem.Allocator) bool {
+fn renderToolbox() bool {
     var toolbox = dvui.box(@src(), .{
         .dir = .vertical,
     }, .{
@@ -379,8 +377,7 @@ fn renderToolbox(gpa: std.mem.Allocator) bool {
         }
 
         if (dvui.menuItemLabel(@src(), "Frequency Sweep Analysis", .{}, .{ .expand = .horizontal }) != null) {
-            const fw_report = circuit.main_circuit.analyseFrequencySweep(1, 1e7, 700);
-            prev_frequency_reports.append(gpa, fw_report) catch @panic("TODO");
+            circuit.main_circuit.analyseFrequencySweep(1, 1e7, 700);
             fw.close();
         }
     }
@@ -403,7 +400,7 @@ fn renderToolbox(gpa: std.mem.Allocator) bool {
 }
 
 pub fn render(gpa: std.mem.Allocator) !bool {
-    if (!renderToolbox(gpa))
+    if (!renderToolbox())
         return false;
 
     var paned = dvui.paned(
@@ -436,120 +433,8 @@ pub fn render(gpa: std.mem.Allocator) !bool {
             try circuit_widget.renderCircuit(gpa);
         }
 
-        if (paned2.showSecond() and prev_frequency_reports.items.len > 0) {
-            var vbox = dvui.box(
-                @src(),
-                .{},
-                .{ .min_size_content = .{ .w = 300, .h = 100 }, .expand = .both },
-            );
-            defer vbox.deinit();
-
-            // TODO: allocate less or use arena or something else
-            var fw_entries = try gpa.alloc([]u8, prev_frequency_reports.items.len);
-            defer gpa.free(fw_entries);
-            for (0..prev_frequency_reports.items.len) |i| {
-                fw_entries[i] = try std.fmt.allocPrint(gpa, "Frequency report #{}", .{i});
-            }
-            defer {
-                for (fw_entries) |ent| {
-                    gpa.free(ent);
-                }
-            }
-
-            const S = struct {
-                var fw_choice: usize = 0;
-                var prev_fw_choice: usize = 0;
-                var var_choice: usize = 0;
-                var prev_var_choice: usize = 0;
-
-                var xaxis: dvui.PlotWidget.Axis = .{
-                    .name = "Frequency (Hz)",
-                    .scale = .{ .log = .{ .base = 10 } },
-                    .ticks = .{
-                        .format = .{
-                            .custom = formatFrequency,
-                        },
-                        .locations = .{
-                            .auto = .{
-                                .num_ticks = 8,
-                            },
-                        },
-                    },
-                };
-
-                var yaxis: dvui.PlotWidget.Axis = .{
-                    .name = "Amplitude (dB)",
-                };
-            };
-
-            if (fw_entries.len > 0) {
-                const fw_rep_selected = dvui.dropdown(@src(), fw_entries, &S.fw_choice, .{});
-                _ = fw_rep_selected;
-
-                const fw_report = prev_frequency_reports.items[S.fw_choice];
-
-                const node_count = fw_report.nodeCount();
-                const component_count = fw_report.componentCount();
-
-                // TODO: allocate less or use arena or something else
-                var var_entries = try gpa.alloc([]u8, node_count + component_count);
-                defer gpa.free(var_entries);
-                for (0..node_count) |i| {
-                    var_entries[i] = try std.fmt.allocPrint(gpa, "Voltage #{}", .{i});
-                }
-                for (0..component_count) |i| {
-                    var_entries[node_count + i] = try std.fmt.allocPrint(gpa, "Current #{}", .{i});
-                }
-                defer {
-                    for (var_entries) |ent| {
-                        gpa.free(ent);
-                    }
-                }
-
-                _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
-
-                if (S.prev_var_choice != S.var_choice or S.prev_fw_choice != S.fw_choice) {
-                    S.xaxis.min = null;
-                    S.xaxis.max = null;
-                    S.yaxis.min = null;
-                    S.yaxis.max = null;
-                    S.prev_var_choice = S.var_choice;
-                    S.prev_fw_choice = S.fw_choice;
-                }
-
-                var plot = dvui.plot(@src(), .{
-                    .title = var_entries[S.var_choice],
-                    .x_axis = &S.xaxis,
-                    .y_axis = &S.yaxis,
-                    .border_thick = 1.0,
-                    .mouse_hover = true,
-                }, .{ .expand = .both });
-                defer plot.deinit();
-
-                var s1 = plot.line();
-                defer s1.deinit();
-
-                if (S.var_choice >= node_count) {
-                    const comp_idx = S.var_choice - node_count;
-                    const current = fw_report.current(comp_idx);
-                    for (current, 0..) |c, i| {
-                        if (c) |c_val| {
-                            const freq = fw_report.frequency_values[i];
-                            const value = 20 * @log10(c_val.magnitude());
-                            s1.point(freq, value);
-                        }
-                    }
-                } else {
-                    const voltage = fw_report.voltage(S.var_choice);
-                    for (voltage, 0..) |v, i| {
-                        const freq = fw_report.frequency_values[i];
-                        const value = 20 * @log10(v.magnitude());
-                        s1.point(freq, value);
-                    }
-                }
-
-                s1.stroke(2, dvui.themeGet().focus);
-            }
+        if (paned2.showSecond()) {
+            try renderAnalysisResults(gpa);
         }
     }
 
@@ -558,6 +443,272 @@ pub fn render(gpa: std.mem.Allocator) !bool {
     }
 
     return true;
+}
+
+pub fn renderDCReport(gpa: std.mem.Allocator, dc_report: NetList.DCAnalysisReport) !void {
+    const S = struct {
+        var scroll_info: dvui.ScrollInfo = .{ .vertical = .given, .horizontal = .none };
+        var last_col_width: f32 = 0;
+        var resize_cols = false;
+    };
+
+    var grid = dvui.grid(@src(), .numCols(2), .{
+        .scroll_opts = .{
+            .scroll_info = &S.scroll_info,
+        },
+        .resize_cols = S.resize_cols,
+    }, .{
+        .expand = .both,
+        .background = true,
+    });
+    defer grid.deinit();
+    S.resize_cols = false;
+
+    const DCVariable = struct {
+        display_name: []const u8,
+        value: bland.Float,
+    };
+
+    // TODO: less allocation
+    var values = try std.ArrayList(DCVariable).initCapacity(
+        gpa,
+        dc_report.currents.len + dc_report.voltages.len,
+    );
+    defer {
+        for (values.items) |val| {
+            gpa.free(val.display_name);
+        }
+        defer values.deinit(gpa);
+    }
+
+    for (dc_report.voltages, 0..) |voltage, i| {
+        try values.append(gpa, .{
+            .display_name = try std.fmt.allocPrint(gpa, "V(n{})", .{i}),
+            .value = voltage,
+        });
+    }
+
+    for (dc_report.currents, 0..) |current, i| {
+        if (current) |cur| {
+            const graphic_comp = circuit.main_circuit.graphic_components.items[i];
+            if (graphic_comp.comp.device == .ground) continue;
+
+            const comp_name = graphic_comp.comp.name;
+            try values.append(gpa, .{
+                .display_name = try std.fmt.allocPrint(gpa, "I({s})", .{comp_name}),
+                .value = cur,
+            });
+        }
+    }
+
+    const col_width = (grid.data().contentRect().w - dvui.GridWidget.scrollbar_padding_defaults.w) / 2.0;
+    if (col_width < S.last_col_width) {
+        S.resize_cols = true;
+    }
+    S.last_col_width = col_width;
+
+    const scroller = dvui.GridWidget.VirtualScroller.init(grid, .{
+        .total_rows = values.items.len,
+        .scroll_info = &S.scroll_info,
+    });
+
+    const CellStyle = dvui.GridWidget.CellStyle;
+    var highlight_hovered: CellStyle.HoveredRow = .{
+        .cell_opts = .{
+            .background = true,
+            .color_fill_hover = dvui.themeGet().color(.highlight, .fill),
+            .size = .{ .w = col_width },
+        },
+    };
+    highlight_hovered.processEvents(grid);
+
+    const borders: CellStyle.Borders = .initBox(2, values.items.len, 0, 1);
+
+    const cell_style: CellStyle.Combine(CellStyle.HoveredRow, CellStyle.Borders) = .{
+        .style1 = highlight_hovered,
+        .style2 = borders,
+    };
+
+    dvui.gridHeading(@src(), grid, 0, "Variable", .fixed, dvui.GridWidget.CellStyle{
+        .cell_opts = .{
+            .size = .{ .w = col_width },
+        },
+    });
+    dvui.gridHeading(@src(), grid, 1, "Value", .fixed, dvui.GridWidget.CellStyle{
+        .cell_opts = .{
+            .size = .{ .w = col_width },
+        },
+    });
+
+    const first = scroller.startRow();
+    const last = scroller.endRow();
+
+    for (first..last) |n| {
+        const val = values.items[n];
+        var cell_num = dvui.GridWidget.Cell.colRow(0, n);
+
+        {
+            var cell = grid.bodyCell(@src(), cell_num, cell_style.cellOptions(cell_num));
+            defer cell.deinit();
+
+            dvui.label(@src(), "{s}", .{val.display_name}, .{});
+        }
+        cell_num.col_num += 1;
+        {
+            var cell = grid.bodyCell(@src(), cell_num, cell_style.cellOptions(cell_num));
+            defer cell.deinit();
+
+            dvui.label(@src(), "{d:.5}", .{val.value}, .{});
+        }
+    }
+}
+
+pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepReport) !void {
+    // TODO: reset min, max on fw_rep change
+
+    const S = struct {
+        var xaxis: dvui.PlotWidget.Axis = .{
+            .name = "Frequency (Hz)",
+            .scale = .{ .log = .{ .base = 10 } },
+            .ticks = .{
+                .format = .{
+                    .custom = formatFrequency,
+                },
+                .locations = .{
+                    .auto = .{
+                        .num_ticks = 8,
+                    },
+                },
+            },
+        };
+
+        var yaxis: dvui.PlotWidget.Axis = .{
+            .name = "Amplitude (dB)",
+            .ticks = .{
+                .locations = .{
+                    .auto = .{
+                        .num_ticks = 8,
+                    },
+                },
+            },
+        };
+
+        var var_choice: usize = 1;
+        var prev_var_choice: usize = 1;
+    };
+
+    const node_count = fw_report.nodeCount();
+    const component_count = fw_report.componentCount();
+
+    // TODO: allocate less or use arena or something else
+    var var_entries = try gpa.alloc([]u8, node_count + component_count);
+    defer gpa.free(var_entries);
+    for (0..node_count) |i| {
+        var_entries[i] = try std.fmt.allocPrint(gpa, "Voltage #{}", .{i});
+    }
+    for (0..component_count) |i| {
+        var_entries[node_count + i] = try std.fmt.allocPrint(gpa, "Current #{}", .{i});
+    }
+    defer {
+        for (var_entries) |ent| {
+            gpa.free(ent);
+        }
+    }
+
+    _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
+
+    if (S.prev_var_choice != S.var_choice) {
+        S.xaxis.min = null;
+        S.xaxis.max = null;
+        S.yaxis.min = null;
+        S.yaxis.max = null;
+        S.prev_var_choice = S.var_choice;
+    }
+
+    var plot = dvui.plot(@src(), .{
+        .title = var_entries[S.var_choice],
+        .x_axis = &S.xaxis,
+        .y_axis = &S.yaxis,
+        .border_thick = 1.0,
+        .mouse_hover = true,
+    }, .{ .expand = .both });
+    defer plot.deinit();
+
+    var s1 = plot.line();
+    defer s1.deinit();
+
+    if (S.var_choice >= node_count) {
+        const comp_idx = S.var_choice - node_count;
+        const current = fw_report.current(comp_idx);
+        for (current, 0..) |c, i| {
+            if (c) |c_val| {
+                const freq = fw_report.frequency_values[i];
+                const value = 20 * @log10(c_val.magnitude());
+                s1.point(freq, value);
+            }
+        }
+    } else {
+        const voltage = fw_report.voltage(S.var_choice);
+        for (voltage, 0..) |v, i| {
+            const freq = fw_report.frequency_values[i];
+            const value = 20 * @log10(v.magnitude());
+            s1.point(freq, value);
+        }
+    }
+
+    s1.stroke(2, dvui.themeGet().focus);
+}
+
+pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
+    var vbox = dvui.box(
+        @src(),
+        .{},
+        .{
+            .min_size_content = .{ .w = 300, .h = 100 },
+            .expand = .both,
+            .padding = dvui.Rect.all(8),
+            .background = true,
+            .border = dvui.Rect{ .y = 2 },
+        },
+    );
+    defer vbox.deinit();
+
+    if (circuit.analysis_results.items.len == 0) return;
+
+    // TODO: allocate less or use arena or something else
+    var fw_entries = try gpa.alloc([]u8, circuit.analysis_results.items.len);
+    defer gpa.free(fw_entries);
+    for (circuit.analysis_results.items, 0..) |res, i| {
+        fw_entries[i] = switch (res) {
+            .dc => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (DC)", .{i}),
+            .frequency_sweep => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (Freq sweep)", .{i}),
+        };
+    }
+    defer {
+        for (fw_entries) |ent| {
+            gpa.free(ent);
+        }
+    }
+
+    const S = struct {
+        var fw_choice: usize = 0;
+    };
+
+    _ = dvui.dropdown(@src(), fw_entries, &S.fw_choice, .{});
+
+    var report_box = dvui.box(@src(), .{ .dir = .vertical }, .{
+        .border = dvui.Rect{ .y = 2 },
+        .color_border = .gray,
+        .expand = .both,
+        .background = true,
+    });
+    defer report_box.deinit();
+
+    const chosen = circuit.analysis_results.items[S.fw_choice];
+    switch (chosen) {
+        .dc => |dc_rep| try renderDCReport(gpa, dc_rep),
+        .frequency_sweep => |fw_rep| try renderFWReport(gpa, fw_rep),
+    }
 }
 
 fn formatFrequency(gpa: std.mem.Allocator, freq: f64) ![]const u8 {

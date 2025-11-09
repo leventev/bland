@@ -46,6 +46,13 @@ pub const GridPosition = struct {
     }
 };
 
+pub const AnalysisResult = union(enum) {
+    dc: NetList.DCAnalysisReport,
+    frequency_sweep: NetList.FrequencySweepReport,
+};
+
+pub var analysis_results: std.ArrayList(AnalysisResult) = .{};
+
 pub const Wire = struct {
     pos: GridPosition,
     // length can be negative
@@ -435,12 +442,11 @@ pub const GraphicCircuit = struct {
         defer netlist.deinit(self.allocator);
 
         // TODO
-        var report = netlist.analyseDC(self.allocator, null) catch {
+        const report = netlist.analyseDC(self.allocator, null) catch {
             @panic("TODO");
         };
-        defer report.deinit(self.allocator);
 
-        report.dump();
+        analysis_results.append(self.allocator, .{ .dc = report }) catch @panic("TODO");
     }
 
     pub fn analyseFrequencySweep(
@@ -448,7 +454,7 @@ pub const GraphicCircuit = struct {
         start_freq: bland.Float,
         end_freq: bland.Float,
         freq_count: usize,
-    ) NetList.FrequencySweepReport {
+    ) void {
         // TODO: make these into errors
         std.debug.assert(start_freq >= 0);
         std.debug.assert(end_freq > start_freq);
@@ -469,6 +475,11 @@ pub const GraphicCircuit = struct {
             // TODO:
             @panic("frequency sweep faied");
         };
+
+        analysis_results.append(
+            self.allocator,
+            .{ .frequency_sweep = fw_report },
+        ) catch @panic("TODO");
 
         //for (0..netlist.nodes.items.len) |i| {
         //    const voltage_for_freqs = fw_report.voltage(i);
@@ -497,8 +508,6 @@ pub const GraphicCircuit = struct {
         //
         //    std.debug.print("\n", .{});
         //}
-
-        return fw_report;
     }
 };
 
