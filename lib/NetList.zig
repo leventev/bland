@@ -359,18 +359,26 @@ pub const FrequencySweepReport = struct {
         self.* = undefined;
     }
 
-    pub fn getVoltage(self: *const FrequencySweepReport, node_idx: usize) []const Complex {
+    pub fn nodeCount(self: *const FrequencySweepReport) usize {
         // TODO
-        const voltage_count = @divExact(self.all_voltages.len, self.frequency_values.len);
+        return @divExact(self.all_voltages.len, self.frequency_values.len);
+    }
+
+    pub fn componentCount(self: *const FrequencySweepReport) usize {
+        // TODO
+        return @divExact(self.all_currents.len, self.frequency_values.len);
+    }
+
+    pub fn voltage(self: *const FrequencySweepReport, node_idx: usize) []const Complex {
+        const voltage_count = self.nodeCount();
         std.debug.assert(node_idx < voltage_count);
         const start_idx = node_idx * self.frequency_values.len;
         const end_idx = (node_idx + 1) * self.frequency_values.len;
         return self.all_voltages[start_idx..end_idx];
     }
 
-    pub fn getCurrent(self: *const FrequencySweepReport, comp_idx: usize) []const ?Complex {
-        // TODO
-        const component_count = @divExact(self.all_currents.len, self.frequency_values.len);
+    pub fn current(self: *const FrequencySweepReport, comp_idx: usize) []const ?Complex {
+        const component_count = self.componentCount();
         std.debug.assert(comp_idx < component_count);
         const start_idx = comp_idx * self.frequency_values.len;
         const end_idx = (comp_idx + 1) * self.frequency_values.len;
@@ -384,11 +392,11 @@ pub const FrequencySweepReport = struct {
     ) void {
         std.debug.assert(freq_idx < self.frequency_values.len);
         for (0..report_buff.voltages.len) |idx| {
-            report_buff.voltages[idx] = self.getVoltage(idx)[freq_idx];
+            report_buff.voltages[idx] = self.voltage(idx)[freq_idx];
         }
 
         for (0..report_buff.currents.len) |idx| {
-            report_buff.currents[idx] = self.getCurrent(idx)[freq_idx];
+            report_buff.currents[idx] = self.current(idx)[freq_idx];
         }
     }
 };
