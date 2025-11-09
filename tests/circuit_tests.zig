@@ -86,4 +86,6 @@ comptime {
     _ = @import("component/ccvs.zig");
     _ = @import("component/cccs.zig");
     _ = @import("component/capacitor.zig");
+    _ = @import("component/inductor.zig");
+    _ = @import("component/rlc.zig");
 }

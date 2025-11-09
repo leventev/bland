@@ -25,7 +25,7 @@ test "RC series low-pass" {
 
     const v1: Float = 76.4;
     const r1: Float = 2000;
-    const c1 = 34.5e-7;
+    const c1: Float = 34.5e-7;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
@@ -99,7 +99,7 @@ test "RC series high-pass" {
 
     const v1: Float = 358.3333;
     const r1: Float = 17691;
-    const c1 = 640e-6;
+    const c1: Float = 640e-6;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
@@ -175,10 +175,10 @@ test "RC series low-pass complex" {
 
     const v1: Float = 150;
     const r1: Float = 42.111;
-    const c1 = 483e-9;
-    const c2 = 500e-6;
-    const c3 = 300e-9;
-    const c4 = 20e-6;
+    const c1: Float = 483e-9;
+    const c2: Float = 500e-6;
+    const c3: Float = 300e-9;
+    const c4: Float = 20e-6;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
@@ -211,14 +211,14 @@ test "RC series low-pass complex" {
     const c3_comp_idx = try netlist.addComponent(
         gpa,
         Component.Device{ .capacitor = c3 },
-        "C2",
+        "C3",
         &.{ c234_plus_id, gnd_id },
     );
 
     const c4_comp_idx = try netlist.addComponent(
         gpa,
         Component.Device{ .capacitor = c4 },
-        "C2",
+        "C4",
         &.{ c234_plus_id, gnd_id },
     );
 
@@ -298,10 +298,10 @@ test "RC series high-pass complex" {
 
     const v1: Float = 600;
     const r1: Float = 9;
-    const c1 = 555e-9;
-    const c2 = 814e-6;
-    const c3 = 314e-9;
-    const c4 = 900e-6;
+    const c1: Float = 555e-9;
+    const c2: Float = 814e-6;
+    const c3: Float = 314e-9;
+    const c4: Float = 900e-6;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
@@ -334,14 +334,14 @@ test "RC series high-pass complex" {
     const c3_comp_idx = try netlist.addComponent(
         gpa,
         Component.Device{ .capacitor = c3 },
-        "C2",
+        "C3",
         &.{ c234_plus_id, r1_plus_id },
     );
 
     const c4_comp_idx = try netlist.addComponent(
         gpa,
         Component.Device{ .capacitor = c4 },
-        "C2",
+        "C4",
         &.{ c234_plus_id, r1_plus_id },
     );
 
@@ -419,7 +419,7 @@ test "RC parallel" {
 
     const v1: Float = 100;
     const r1: Float = 800;
-    const c1 = 600e-6;
+    const c1: Float = 600e-6;
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
