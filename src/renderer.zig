@@ -466,25 +466,23 @@ pub fn renderDCReport(gpa: std.mem.Allocator, dc_report: NetList.DCAnalysisRepor
 
     const DCVariable = struct {
         display_name: []const u8,
-        value: bland.Float,
+        value: []const u8,
     };
 
-    // TODO: less allocation
+    var arena_alloc = std.heap.ArenaAllocator.init(gpa);
+    const arena = arena_alloc.allocator();
+    defer arena_alloc.deinit();
+
+    // TODO: less allocations?
     var values = try std.ArrayList(DCVariable).initCapacity(
         gpa,
         dc_report.currents.len + dc_report.voltages.len,
     );
-    defer {
-        for (values.items) |val| {
-            gpa.free(val.display_name);
-        }
-        defer values.deinit(gpa);
-    }
 
     for (dc_report.voltages, 0..) |voltage, i| {
         try values.append(gpa, .{
-            .display_name = try std.fmt.allocPrint(gpa, "V(n{})", .{i}),
-            .value = voltage,
+            .display_name = try std.fmt.allocPrint(arena, "V(n{})", .{i}),
+            .value = try bland.units.formatUnitAlloc(arena, .voltage, voltage, 3),
         });
     }
 
@@ -495,8 +493,8 @@ pub fn renderDCReport(gpa: std.mem.Allocator, dc_report: NetList.DCAnalysisRepor
 
             const comp_name = graphic_comp.comp.name;
             try values.append(gpa, .{
-                .display_name = try std.fmt.allocPrint(gpa, "I({s})", .{comp_name}),
-                .value = cur,
+                .display_name = try std.fmt.allocPrint(arena, "I({s})", .{comp_name}),
+                .value = try bland.units.formatUnitAlloc(arena, .current, cur, 3),
             });
         }
     }
@@ -558,7 +556,7 @@ pub fn renderDCReport(gpa: std.mem.Allocator, dc_report: NetList.DCAnalysisRepor
             var cell = grid.bodyCell(@src(), cell_num, cell_style.cellOptions(cell_num));
             defer cell.deinit();
 
-            dvui.label(@src(), "{d:.5}", .{val.value}, .{});
+            dvui.label(@src(), "{s}", .{val.value}, .{});
         }
     }
 }
@@ -712,13 +710,5 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
 }
 
 fn formatFrequency(gpa: std.mem.Allocator, freq: f64) ![]const u8 {
-    if (freq < 1000) {
-        return try std.fmt.allocPrint(gpa, "{d:.2} Hz", .{freq});
-    } else if (freq < 1e6) {
-        return try std.fmt.allocPrint(gpa, "{d:.2} kHz", .{freq / 1e3});
-    } else if (freq < 1e9) {
-        return try std.fmt.allocPrint(gpa, "{d:.2} MHz", .{freq / 1e6});
-    } else if (freq < 1e12) {
-        return try std.fmt.allocPrint(gpa, "{d:.2} GHz", .{freq / 1e9});
-    } else unreachable;
+    return bland.units.formatUnitAlloc(gpa, .frequency, freq, 1);
 }

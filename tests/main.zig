@@ -24,4 +24,5 @@ comptime {
 
     _ = @import("circuit_tests.zig");
     _ = @import("complex_matrix_tests.zig");
+    _ = @import("units.zig");
 }
