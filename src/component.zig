@@ -211,11 +211,12 @@ pub const GraphicComponent = struct {
         );
     }
 
-    pub fn renderPropertyBox(self: *GraphicComponent) void {
+    pub fn renderPropertyBox(self: *GraphicComponent, selected_component_changed: bool) void {
         switch (@as(DeviceType, self.comp.device)) {
             .ground => {},
             inline else => |x| graphics_module(x).renderPropertyBox(
                 &@field(self.comp.device, @tagName(x)),
+                selected_component_changed,
             ),
         }
     }

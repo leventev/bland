@@ -253,7 +253,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(inner: *cccs_module.Inner) void {
+pub fn renderPropertyBox(inner: *cccs_module.Inner, _: bool) void {
     dvui.label(@src(), "multiplier", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,

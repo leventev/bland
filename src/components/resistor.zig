@@ -158,38 +158,123 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(r: *Float) void {
-    dvui.label(@src(), "resistance", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
-
-    var box = dvui.box(
-        @src(),
-        .{ .dir = .horizontal },
-        .{
-            .expand = .horizontal,
-        },
-    );
+fn textEntrySI(
+    location: std.builtin.SourceLocation,
+    unit: bland.units.Unit,
+    val: *bland.Float,
+    change: bool,
+    opts: dvui.Options,
+) bool {
+    var box = dvui.box(location, .{
+        .dir = .horizontal,
+    }, opts.override(.{
+        .expand = .horizontal,
+    }));
     defer box.deinit();
 
-    _ = dvui.textEntryNumber(@src(), Float, .{
-        .value = r,
-        .show_min_max = true,
-        .min = 0.00001,
-    }, .{
-        .color_fill = dvui.themeGet().color(.control, .fill),
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-        .expand = .horizontal,
-        .margin = dvui.Rect.all(4),
-    });
+    const prev_val = val.*;
+    var changed = false;
 
-    dvui.label(@src(), "\u{03A9}", .{}, .{
+    {
+        var te = dvui.TextEntryWidget.init(location, .{
+            .text = .{
+                .internal = .{
+                    .limit = 64,
+                },
+            },
+        }, opts.strip());
+        defer te.deinit();
+
+        if (change) {
+            var tmp: [64]u8 = undefined;
+            const str = bland.units.formatUnitBuf(&tmp, .resistance, val.*, 4) catch @panic("TODO");
+            te.textSet(str, false);
+        }
+
+        te.install();
+        te.processEvents();
+        te.draw();
+
+        const text = te.getText();
+        const parsed = bland.units.parseWithoutUnitSymbol(text);
+
+        if (parsed) |num| {
+            val.* = num;
+            changed = val.* != prev_val;
+        } else |err| {
+            switch (err) {
+                error.InvalidNumber => {},
+                error.InvalidPrefix => {},
+            }
+            const rs = te.data().borderRectScale();
+            rs.r.outsetAll(1).stroke(
+                te.data().options.corner_radiusGet().scale(rs.s, dvui.Rect.Physical),
+                .{
+                    .thickness = 3 * rs.s,
+                    .color = dvui.themeGet().err.fill orelse .red,
+                    .after = true,
+                },
+            );
+        }
+    }
+
+    dvui.label(@src(), "{s}", .{unit.symbol()}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_title,
         .margin = dvui.Rect.all(4),
         .padding = dvui.Rect.all(4),
         .gravity_y = 0.5,
     });
+
+    return false;
+}
+
+pub fn renderPropertyBox(r: *Float, selected_component_changed: bool) void {
+    dvui.label(@src(), "resistance", .{}, .{
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_body,
+    });
+
+    _ = textEntrySI(
+        @src(),
+        .resistance,
+        r,
+        selected_component_changed,
+        .{
+            .color_fill = dvui.themeGet().color(.control, .fill),
+            .color_text = dvui.themeGet().color(.content, .text),
+            .font = dvui.themeGet().font_body,
+            .expand = .horizontal,
+            .margin = dvui.Rect.all(4),
+        },
+    );
+
+    //var box = dvui.box(
+    //    @src(),
+    //    .{ .dir = .horizontal },
+    //    .{
+    //        .expand = .horizontal,
+    //    },
+    //);
+    //defer box.deinit();
+    //
+    //_ = dvui.textEntryNumber(@src(), Float, .{
+    //    .value = r,
+    //    .show_min_max = true,
+    //    .min = 0.00001,
+    //}, .{
+    //    .color_fill = dvui.themeGet().color(.control, .fill),
+    //    .color_text = dvui.themeGet().color(.content, .text),
+    //    .font = dvui.themeGet().font_body,
+    //    .expand = .horizontal,
+    //    .margin = dvui.Rect.all(4),
+    //});
+    //
+    //dvui.label(@src(), "\u{03A9}", .{}, .{
+    //    .color_text = dvui.themeGet().color(.content, .text),
+    //    .font = dvui.themeGet().font_title,
+    //    .margin = dvui.Rect.all(4),
+    //    .padding = dvui.Rect.all(4),
+    //    .gravity_y = 0.5,
+    //});
 }

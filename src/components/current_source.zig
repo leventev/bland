@@ -261,7 +261,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(current: *Float) void {
+pub fn renderPropertyBox(current: *Float, _: bool) void {
     dvui.label(@src(), "current", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,

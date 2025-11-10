@@ -209,7 +209,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(inner: *ccvs_module.Inner) void {
+pub fn renderPropertyBox(inner: *ccvs_module.Inner, _: bool) void {
     dvui.label(@src(), "transresistance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,

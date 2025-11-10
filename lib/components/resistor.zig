@@ -11,9 +11,10 @@ pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
 }
 
 pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
-    // https://juliamono.netlify.app/glyphs/
-    const big_omega = '\u{03A9}';
-    return try std.fmt.bufPrint(buf, "{d}{u}", .{ value, big_omega });
+    return try std.fmt.bufPrint(buf, "{d}{s}", .{
+        value,
+        bland.units.Unit.resistance.symbol(),
+    });
 }
 
 pub fn stampMatrix(

@@ -187,7 +187,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(l: *Float) void {
+pub fn renderPropertyBox(l: *Float, _: bool) void {
     dvui.label(@src(), "inductance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,

@@ -191,7 +191,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(c: *Float) void {
+pub fn renderPropertyBox(c: *Float, _: bool) void {
     dvui.label(@src(), "capacitance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,

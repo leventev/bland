@@ -216,7 +216,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(v: *Float) void {
+pub fn renderPropertyBox(v: *Float, _: bool) void {
     dvui.label(@src(), "voltage", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,

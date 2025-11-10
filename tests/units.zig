@@ -1,6 +1,9 @@
 const std = @import("std");
 const bland = @import("bland");
+const main = @import("main.zig");
+
 const units = bland.units;
+const expectFloat = main.expectFloat;
 
 const TestCase = struct {
     unit: units.Unit,
@@ -53,4 +56,37 @@ test "unit formatting with alloc" {
         try std.testing.expectEqualStrings(test_case.expected, res);
         alloc.free(res);
     }
+}
+
+test "unit parsing" {
+    std.debug.print("a\n", .{});
+
+    var res = try units.parseWithoutUnitSymbol("100.68");
+    try expectFloat(bland.Float, 100.68, res);
+
+    std.debug.print("A\n", .{});
+
+    res = try units.parseWithoutUnitSymbol("849.483G");
+    try expectFloat(bland.Float, 849.483e9, res);
+
+    res = try units.parseWithoutUnitSymbol("0P");
+    try expectFloat(bland.Float, 0, res);
+
+    res = try units.parseWithoutUnitSymbol("0");
+    try expectFloat(bland.Float, 0, res);
+
+    res = try units.parseWithoutUnitSymbol("-137.42u");
+    try expectFloat(bland.Float, -137.42e-6, res);
+
+    res = try units.parseWithoutUnitSymbol("4.1234567n");
+    try expectFloat(bland.Float, 4.1234567e-9, res);
+
+    var failing_res = units.parseWithoutUnitSymbol("6123l");
+    try std.testing.expectError(units.UnitError.InvalidPrefix, failing_res);
+
+    failing_res = units.parseWithoutUnitSymbol("");
+    try std.testing.expectError(units.UnitError.InvalidNumber, failing_res);
+
+    failing_res = units.parseWithoutUnitSymbol("k");
+    try std.testing.expectError(units.UnitError.InvalidNumber, failing_res);
 }
