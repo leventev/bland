@@ -6,6 +6,7 @@ const common = @import("common.zig");
 const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const dvui = @import("dvui");
+const GraphicComponent = @import("../component.zig").GraphicComponent;
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
@@ -160,38 +161,49 @@ pub fn render(
 
 fn textEntrySI(
     location: std.builtin.SourceLocation,
+    buff: []u8,
+    buff_actual: []u8,
     unit: bland.units.Unit,
     val: *bland.Float,
     change: bool,
     opts: dvui.Options,
 ) bool {
+    _ = opts;
     var box = dvui.box(location, .{
         .dir = .horizontal,
-    }, opts.override(.{
+    }, .{
         .expand = .horizontal,
-    }));
+    });
     defer box.deinit();
 
     const prev_val = val.*;
     var changed = false;
 
     {
-        var te = dvui.TextEntryWidget.init(location, .{
-            .text = .{
-                .internal = .{
-                    .limit = 64,
+        var te = dvui.TextEntryWidget.init(
+            location,
+            .{
+                .text = .{
+                    .buffer = buff,
                 },
             },
-        }, opts.strip());
+            .{
+                .color_fill = dvui.themeGet().color(.control, .fill),
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+                .expand = .horizontal,
+                .margin = dvui.Rect.all(4),
+            },
+        );
         defer te.deinit();
 
+        te.install();
+
         if (change) {
-            var tmp: [64]u8 = undefined;
-            const str = bland.units.formatUnitBuf(&tmp, .resistance, val.*, 4) catch @panic("TODO");
-            te.textSet(str, false);
+            std.log.debug("{s}", .{buff_actual});
+            te.textSet(buff_actual, false);
         }
 
-        te.install();
         te.processEvents();
         te.draw();
 
@@ -229,7 +241,7 @@ fn textEntrySI(
     return false;
 }
 
-pub fn renderPropertyBox(r: *Float, selected_component_changed: bool) void {
+pub fn renderPropertyBox(r: *Float, value_buffer: *GraphicComponent.ValueBuffer, selected_component_changed: bool) void {
     dvui.label(@src(), "resistance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
@@ -237,16 +249,12 @@ pub fn renderPropertyBox(r: *Float, selected_component_changed: bool) void {
 
     _ = textEntrySI(
         @src(),
+        value_buffer.resistor.buff,
+        value_buffer.resistor.actual,
         .resistance,
         r,
         selected_component_changed,
-        .{
-            .color_fill = dvui.themeGet().color(.control, .fill),
-            .color_text = dvui.themeGet().color(.content, .text),
-            .font = dvui.themeGet().font_body,
-            .expand = .horizontal,
-            .margin = dvui.Rect.all(4),
-        },
+        .{},
     );
 
     //var box = dvui.box(

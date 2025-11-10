@@ -117,17 +117,12 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                                 grid_pos,
                                 circuit.placement_rotation,
                             )) {
-                                var graphic_comp = component.GraphicComponent{
-                                    .pos = grid_pos,
-                                    .rotation = circuit.placement_rotation,
-                                    .name_buffer = try allocator.alloc(u8, bland.component.max_component_name_length),
-                                    .comp = bland.Component{
-                                        .name = &.{},
-                                        .device = try circuit.held_component.defaultValue(allocator),
-                                        .terminal_node_ids = try allocator.alloc(usize, 2),
-                                    },
-                                };
-                                try graphic_comp.setNewComponentName();
+                                const graphic_comp = try component.GraphicComponent.init(
+                                    allocator,
+                                    grid_pos,
+                                    circuit.placement_rotation,
+                                    circuit.held_component,
+                                );
                                 try circuit.main_circuit.graphic_components.append(
                                     circuit.main_circuit.allocator,
                                     graphic_comp,

@@ -151,6 +151,9 @@ pub fn gridPositionFromScreenPos(
     return deviceCenterForMouse(dev_type, grid_pos, rotation);
 }
 
+// TODO:
+const MaxFloatValueLength = 64;
+
 pub const GraphicComponent = struct {
     pos: GridPosition,
     rotation: Rotation,
@@ -161,10 +164,95 @@ pub const GraphicComponent = struct {
     // comp.name is a slice into name_buffer
     name_buffer: []u8,
 
+    value_buffer: ValueBuffer,
+
+    pub const ValueBuffer = union(Component.DeviceType) {
+        ground,
+        resistor: struct {
+            buff: []u8,
+            actual: []u8,
+        },
+        voltage_source: struct {
+            buff: []u8,
+            actual: []u8,
+        },
+        current_source: struct {
+            buff: []u8,
+            actual: []u8,
+        },
+        capacitor: struct {
+            buff: []u8,
+            actual: []u8,
+        },
+        inductor: struct {
+            buff: []u8,
+            actual: []u8,
+        },
+        ccvs: void,
+        cccs: void,
+
+        pub fn init(gpa: std.mem.Allocator, device_type: Component.DeviceType) !@This() {
+            return switch (device_type) {
+                .ground => .{ .ground = {} },
+                .resistor => .{ .resistor = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
+                .capacitor => .{ .capacitor = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
+                .inductor => .{ .inductor = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
+                .ccvs => .{ .ccvs = {} },
+                .cccs => .{ .cccs = {} },
+                .voltage_source => .{ .voltage_source = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
+                .current_source => .{ .current_source = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
+            };
+        }
+
+        // TODO:
+        pub fn setValue(self: *@This(), precision: usize, dev: Device) !void {
+            switch (self.*) {
+                .ground => {},
+                .resistor => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .resistance, dev.resistor, precision),
+                .capacitor => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .capacitance, dev.capacitor, precision),
+                .inductor => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .inductance, dev.inductor, precision),
+                .ccvs => |_| @panic("TODO"),
+                .cccs => |_| @panic("TODO"),
+                .voltage_source => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .voltage, dev.voltage_source, precision),
+                .current_source => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .current, dev.current_source, precision),
+            }
+        }
+
+        pub fn deinit(self: @This(), gpa: std.mem.Allocator) void {
+            _ = self;
+            _ = gpa;
+            @panic("TODO");
+        }
+    };
+
+    pub fn init(
+        gpa: std.mem.Allocator,
+        grid_pos: circuit.GridPosition,
+        rotation: circuit.Rotation,
+        device_type: DeviceType,
+    ) !GraphicComponent {
+        var graphic_comp = GraphicComponent{
+            .pos = grid_pos,
+            .rotation = rotation,
+            .name_buffer = try gpa.alloc(u8, bland.component.max_component_name_length),
+            .comp = bland.Component{
+                .name = &.{},
+                .device = try device_type.defaultValue(gpa),
+                .terminal_node_ids = try gpa.alloc(usize, 2),
+            },
+            .value_buffer = try .init(gpa, circuit.held_component),
+        };
+        try graphic_comp.setNewComponentName();
+        try graphic_comp.value_buffer.setValue(0, graphic_comp.comp.device);
+
+        return graphic_comp;
+    }
+
     pub fn deinit(self: *Component, allocator: std.mem.Allocator) void {
         allocator.free(self.name_buffer);
         self.name = &.{};
         allocator.free(self.terminal_node_ids);
+        self.value_buffer.deinit();
         self.inner.deinit(allocator);
     }
 
@@ -216,6 +304,7 @@ pub const GraphicComponent = struct {
             .ground => {},
             inline else => |x| graphics_module(x).renderPropertyBox(
                 &@field(self.comp.device, @tagName(x)),
+                &self.value_buffer,
                 selected_component_changed,
             ),
         }

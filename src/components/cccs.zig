@@ -7,6 +7,7 @@ const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const sidebar = @import("../sidebar.zig");
 const dvui = @import("dvui");
+const GraphicComponent = @import("../component.zig").GraphicComponent;
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
@@ -253,7 +254,7 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(inner: *cccs_module.Inner, _: bool) void {
+pub fn renderPropertyBox(inner: *cccs_module.Inner, _: *GraphicComponent.ValueBuffer, _: bool) void {
     dvui.label(@src(), "multiplier", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
