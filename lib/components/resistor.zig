@@ -11,10 +11,7 @@ pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
 }
 
 pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
-    return try std.fmt.bufPrint(buf, "{d}{s}", .{
-        value,
-        bland.units.Unit.resistance.symbol(),
-    });
+    return try bland.units.formatUnitBuf(buf, .resistance, value, 3);
 }
 
 pub fn stampMatrix(

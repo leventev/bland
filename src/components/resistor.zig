@@ -47,7 +47,7 @@ pub fn render(
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?Float,
+    value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ComponentRenderType,
 ) void {
     const wire_pixel_len = 25;
@@ -59,11 +59,7 @@ pub fn render(
     const resistor_color = render_type.colors().component_color;
     const thickness = render_type.thickness();
 
-    var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| resistor_module.formatValue(
-        val,
-        buff[0..],
-    ) catch unreachable else null;
+    const value_str = if (value) |val| val.resistor.actual else null;
 
     switch (rot) {
         .left, .right => {
@@ -159,130 +155,18 @@ pub fn render(
     }
 }
 
-fn textEntrySI(
-    location: std.builtin.SourceLocation,
-    buff: []u8,
-    buff_actual: []u8,
-    unit: bland.units.Unit,
-    val: *bland.Float,
-    change: bool,
-    opts: dvui.Options,
-) bool {
-    _ = opts;
-    var box = dvui.box(location, .{
-        .dir = .horizontal,
-    }, .{
-        .expand = .horizontal,
-    });
-    defer box.deinit();
-
-    const prev_val = val.*;
-    var changed = false;
-
-    {
-        var te = dvui.TextEntryWidget.init(
-            location,
-            .{
-                .text = .{
-                    .buffer = buff,
-                },
-            },
-            .{
-                .color_fill = dvui.themeGet().color(.control, .fill),
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-                .expand = .horizontal,
-                .margin = dvui.Rect.all(4),
-            },
-        );
-        defer te.deinit();
-
-        te.install();
-
-        if (change) {
-            std.log.debug("{s}", .{buff_actual});
-            te.textSet(buff_actual, false);
-        }
-
-        te.processEvents();
-        te.draw();
-
-        const text = te.getText();
-        const parsed = bland.units.parseWithoutUnitSymbol(text);
-
-        if (parsed) |num| {
-            val.* = num;
-            changed = val.* != prev_val;
-        } else |err| {
-            switch (err) {
-                error.InvalidNumber => {},
-                error.InvalidPrefix => {},
-            }
-            const rs = te.data().borderRectScale();
-            rs.r.outsetAll(1).stroke(
-                te.data().options.corner_radiusGet().scale(rs.s, dvui.Rect.Physical),
-                .{
-                    .thickness = 3 * rs.s,
-                    .color = dvui.themeGet().err.fill orelse .red,
-                    .after = true,
-                },
-            );
-        }
-    }
-
-    dvui.label(@src(), "{s}", .{unit.symbol()}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_title,
-        .margin = dvui.Rect.all(4),
-        .padding = dvui.Rect.all(4),
-        .gravity_y = 0.5,
-    });
-
-    return false;
-}
-
 pub fn renderPropertyBox(r: *Float, value_buffer: *GraphicComponent.ValueBuffer, selected_component_changed: bool) void {
     dvui.label(@src(), "resistance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    _ = textEntrySI(
+    _ = renderer.textEntrySI(
         @src(),
-        value_buffer.resistor.buff,
-        value_buffer.resistor.actual,
+        &value_buffer.resistor.actual,
         .resistance,
         r,
         selected_component_changed,
         .{},
     );
-
-    //var box = dvui.box(
-    //    @src(),
-    //    .{ .dir = .horizontal },
-    //    .{
-    //        .expand = .horizontal,
-    //    },
-    //);
-    //defer box.deinit();
-    //
-    //_ = dvui.textEntryNumber(@src(), Float, .{
-    //    .value = r,
-    //    .show_min_max = true,
-    //    .min = 0.00001,
-    //}, .{
-    //    .color_fill = dvui.themeGet().color(.control, .fill),
-    //    .color_text = dvui.themeGet().color(.content, .text),
-    //    .font = dvui.themeGet().font_body,
-    //    .expand = .horizontal,
-    //    .margin = dvui.Rect.all(4),
-    //});
-    //
-    //dvui.label(@src(), "\u{03A9}", .{}, .{
-    //    .color_text = dvui.themeGet().color(.content, .text),
-    //    .font = dvui.themeGet().font_title,
-    //    .margin = dvui.Rect.all(4),
-    //    .padding = dvui.Rect.all(4),
-    //    .gravity_y = 0.5,
-    //});
 }

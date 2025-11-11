@@ -45,7 +45,7 @@ pub fn render(
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?Float,
+    value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ComponentRenderType,
 ) void {
     const wire_pixel_len = 55;
@@ -56,11 +56,7 @@ pub fn render(
     const capacitor_color = render_type.colors().component_color;
     const thickness = render_type.thickness();
 
-    var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| bland.component.capacitor_module.formatValue(
-        val,
-        buff[0..],
-    ) catch unreachable else null;
+    const value_str = if (value) |val| val.capacitor.actual else null;
 
     switch (rot) {
         .left, .right => {
@@ -192,38 +188,22 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(c: *Float, _: *GraphicComponent.ValueBuffer, _: bool) void {
+pub fn renderPropertyBox(
+    c: *Float,
+    value_buffer: *GraphicComponent.ValueBuffer,
+    selected_component_changed: bool,
+) void {
     dvui.label(@src(), "capacitance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    var box = dvui.box(
+    _ = renderer.textEntrySI(
         @src(),
-        .{ .dir = .horizontal },
-        .{
-            .expand = .horizontal,
-        },
+        &value_buffer.capacitor.actual,
+        .capacitance,
+        c,
+        selected_component_changed,
+        .{},
     );
-    defer box.deinit();
-
-    _ = dvui.textEntryNumber(@src(), Float, .{
-        .value = c,
-        .show_min_max = true,
-        .min = std.math.floatMin(Float),
-    }, .{
-        .color_fill = dvui.themeGet().color(.control, .fill),
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-        .expand = .horizontal,
-        .margin = dvui.Rect.all(4),
-    });
-
-    dvui.label(@src(), "F", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_title,
-        .margin = dvui.Rect.all(4),
-        .padding = dvui.Rect.all(4),
-        .gravity_y = 0.5,
-    });
 }

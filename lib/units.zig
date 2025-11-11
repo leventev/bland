@@ -122,6 +122,56 @@ pub fn formatUnitAlloc(
     });
 }
 
+pub fn formatPrefixBuf(
+    buff: []u8,
+    val: bland.Float,
+    precision: usize,
+) std.fmt.BufPrintError![]u8 {
+    if (val == 0)
+        return std.fmt.bufPrint(buff, "0", .{});
+
+    inline for (si_prefixes) |prefix| {
+        if (@abs(val) >= prefix.decimal) {
+            return std.fmt.bufPrint(buff, "{d:.[2]}{s}", .{
+                val / prefix.decimal,
+                prefix.symbol,
+                precision,
+            });
+        }
+    }
+
+    // if the value is lower than the last threshold then print it in scientific notation
+    return std.fmt.bufPrint(buff, "{e:.[1]}", .{
+        val,
+        precision,
+    });
+}
+
+pub fn formatPrefixAlloc(
+    gpa: std.mem.Allocator,
+    val: bland.Float,
+    precision: usize,
+) std.mem.Allocator.Error![]u8 {
+    if (val == 0)
+        return std.fmt.allocPrint(gpa, "0", .{});
+
+    inline for (si_prefixes) |prefix| {
+        if (@abs(val) >= prefix.decimal) {
+            return std.fmt.allocPrint(gpa, "{d:.[2]}{s}", .{
+                val / prefix.decimal,
+                prefix.symbol,
+                precision,
+            });
+        }
+    }
+
+    // if the value is lower than the last threshold then print it in scientific notation
+    return std.fmt.allocPrint(gpa, "{e:.[1]}", .{
+        val,
+        precision,
+    });
+}
+
 pub const UnitError = error{ InvalidNumber, InvalidPrefix };
 
 fn isNumber(c: u8) bool {

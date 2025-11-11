@@ -48,7 +48,7 @@ pub fn render(
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?Float,
+    value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
@@ -62,11 +62,7 @@ pub fn render(
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
 
-    var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| current_source_module.formatValue(
-        val,
-        buff[0..],
-    ) catch unreachable else null;
+    const value_str = if (value) |val| val.current_source.actual else null;
 
     switch (rot) {
         .left, .right => {
@@ -262,37 +258,22 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(current: *Float, _: *GraphicComponent.ValueBuffer, _: bool) void {
+pub fn renderPropertyBox(
+    current: *Float,
+    value_buffer: *GraphicComponent.ValueBuffer,
+    selected_component_changed: bool,
+) void {
     dvui.label(@src(), "current", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    var box = dvui.box(
+    _ = renderer.textEntrySI(
         @src(),
-        .{ .dir = .horizontal },
-        .{
-            .expand = .horizontal,
-        },
+        &value_buffer.current_source.actual,
+        .current,
+        current,
+        selected_component_changed,
+        .{},
     );
-    defer box.deinit();
-
-    _ = dvui.textEntryNumber(@src(), Float, .{
-        .value = current,
-        .show_min_max = true,
-    }, .{
-        .color_fill = dvui.themeGet().color(.control, .fill),
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-        .expand = .horizontal,
-        .margin = dvui.Rect.all(4),
-    });
-
-    dvui.label(@src(), "A", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_title,
-        .margin = dvui.Rect.all(4),
-        .padding = dvui.Rect.all(4),
-        .gravity_y = 0.5,
-    });
 }

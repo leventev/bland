@@ -712,3 +712,89 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
 fn formatFrequency(gpa: std.mem.Allocator, freq: f64) ![]const u8 {
     return bland.units.formatUnitAlloc(gpa, .frequency, freq, 1);
 }
+
+pub fn textEntrySI(
+    location: std.builtin.SourceLocation,
+    buff_actual: *[]u8,
+    unit: bland.units.Unit,
+    val: *bland.Float,
+    change: bool,
+    opts: dvui.Options,
+) bool {
+    _ = opts;
+    var box = dvui.box(location, .{
+        .dir = .horizontal,
+    }, .{
+        .expand = .horizontal,
+    });
+    defer box.deinit();
+
+    const prev_val = val.*;
+    var changed = false;
+
+    {
+        var te = dvui.TextEntryWidget.init(
+            location,
+            .{
+                .text = .{
+                    .internal = .{
+                        .limit = 64,
+                    },
+                },
+            },
+            .{
+                .color_fill = dvui.themeGet().color(.control, .fill),
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+                .expand = .horizontal,
+                .margin = dvui.Rect.all(4),
+            },
+        );
+        defer te.deinit();
+
+        te.install();
+
+        if (change) {
+            te.textSet(buff_actual.*, false);
+        }
+
+        te.processEvents();
+        te.draw();
+
+        const text = te.getText();
+        const parsed = bland.units.parseWithoutUnitSymbol(text);
+
+        if (parsed) |num| {
+            // TODO: DO THIS NOT LIKE THIS
+            const txt = te.getText();
+            buff_actual.len = txt.len;
+            @memcpy(buff_actual.*, txt);
+            val.* = num;
+            changed = val.* != prev_val;
+        } else |err| {
+            switch (err) {
+                error.InvalidNumber => {},
+                error.InvalidPrefix => {},
+            }
+            const rs = te.data().borderRectScale();
+            rs.r.outsetAll(1).stroke(
+                te.data().options.corner_radiusGet().scale(rs.s, dvui.Rect.Physical),
+                .{
+                    .thickness = 3 * rs.s,
+                    .color = dvui.themeGet().err.fill orelse .red,
+                    .after = true,
+                },
+            );
+        }
+    }
+
+    dvui.label(@src(), "{s}", .{unit.symbol()}, .{
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_title,
+        .margin = dvui.Rect.all(4),
+        .padding = dvui.Rect.all(4),
+        .gravity_y = 0.5,
+    });
+
+    return false;
+}

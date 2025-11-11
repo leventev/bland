@@ -48,7 +48,7 @@ pub fn render(
     grid_pos: GridPosition,
     rot: Rotation,
     name: ?[]const u8,
-    value: ?ccvs_module.Inner,
+    value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ComponentRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
@@ -62,11 +62,10 @@ pub fn render(
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
 
-    var buff: [256]u8 = undefined;
-    const value_str = if (value) |val| ccvs_module.formatValue(
-        val,
-        buff[0..],
-    ) catch unreachable else null;
+    // TODO
+    //var buff: [256]u8 = undefined;
+    _ = value;
+    const value_str = null;
 
     switch (rot) {
         .left, .right => {

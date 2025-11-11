@@ -51,32 +51,6 @@ pub fn occupiedPointsIntersect(
     return false;
 }
 
-pub fn renderComponent(
-    device: *const Device,
-    circuit_rect: dvui.Rect.Physical,
-    pos: GridPosition,
-    rot: Rotation,
-    name: []const u8,
-    render_type: renderer.ComponentRenderType,
-) void {
-    switch (@as(DeviceType, device.*)) {
-        .ground => graphics_module(DeviceType.ground).render(
-            circuit_rect,
-            pos,
-            rot,
-            render_type,
-        ),
-        inline else => |x| graphics_module(x).render(
-            circuit_rect,
-            pos,
-            rot,
-            name,
-            @field(device, @tagName(x)),
-            render_type,
-        ),
-    }
-}
-
 pub fn renderComponentHolding(
     dev_type: DeviceType,
     circuit_rect: dvui.Rect.Physical,
@@ -208,13 +182,13 @@ pub const GraphicComponent = struct {
         pub fn setValue(self: *@This(), precision: usize, dev: Device) !void {
             switch (self.*) {
                 .ground => {},
-                .resistor => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .resistance, dev.resistor, precision),
-                .capacitor => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .capacitance, dev.capacitor, precision),
-                .inductor => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .inductance, dev.inductor, precision),
+                .resistor => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.resistor, precision),
+                .capacitor => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.capacitor, precision),
+                .inductor => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.inductor, precision),
                 .ccvs => |_| @panic("TODO"),
                 .cccs => |_| @panic("TODO"),
-                .voltage_source => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .voltage, dev.voltage_source, precision),
-                .current_source => |*buf| buf.actual = try bland.units.formatUnitBuf(buf.buff, .current, dev.current_source, precision),
+                .voltage_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.voltage_source, precision),
+                .current_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.current_source, precision),
             }
         }
 
@@ -270,14 +244,22 @@ pub const GraphicComponent = struct {
         circuit_rect: dvui.Rect.Physical,
         render_type: renderer.ComponentRenderType,
     ) void {
-        renderComponent(
-            &self.comp.device,
-            circuit_rect,
-            self.pos,
-            self.rotation,
-            self.comp.name,
-            render_type,
-        );
+        switch (@as(DeviceType, self.comp.device)) {
+            .ground => graphics_module(DeviceType.ground).render(
+                circuit_rect,
+                self.pos,
+                self.rotation,
+                render_type,
+            ),
+            inline else => |x| graphics_module(x).render(
+                circuit_rect,
+                self.pos,
+                self.rotation,
+                self.comp.name,
+                self.value_buffer,
+                render_type,
+            ),
+        }
     }
 
     pub fn intersects(self: *const GraphicComponent, positions: []OccupiedGridPosition) bool {
