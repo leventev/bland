@@ -59,7 +59,14 @@ pub fn render(
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
 
-    const value_str = if (value) |val| val.voltage_source.actual else null;
+    var buff: [256]u8 = undefined;
+    const value_str = if (value) |val|
+        std.fmt.bufPrint(&buff, "{s}{s}", .{
+            val.voltage_source.actual,
+            bland.units.Unit.voltage.symbol(),
+        }) catch unreachable
+    else
+        null;
 
     switch (rot) {
         .left, .right => {

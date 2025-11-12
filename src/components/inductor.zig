@@ -58,7 +58,14 @@ pub fn render(
     const inductor_color = render_type.colors().component_color;
     const thickness = render_type.thickness();
 
-    const value_str = if (value) |val| val.inductor.actual else null;
+    var buff: [256]u8 = undefined;
+    const value_str = if (value) |val|
+        std.fmt.bufPrint(&buff, "{s}{s}", .{
+            val.inductor.actual,
+            bland.units.Unit.inductance.symbol(),
+        }) catch unreachable
+    else
+        null;
 
     switch (rot) {
         .left, .right => {

@@ -56,7 +56,14 @@ pub fn render(
     const capacitor_color = render_type.colors().component_color;
     const thickness = render_type.thickness();
 
-    const value_str = if (value) |val| val.capacitor.actual else null;
+    var buff: [256]u8 = undefined;
+    const value_str = if (value) |val|
+        std.fmt.bufPrint(&buff, "{s}{s}", .{
+            val.capacitor.actual,
+            bland.units.Unit.capacitance.symbol(),
+        }) catch unreachable
+    else
+        null;
 
     switch (rot) {
         .left, .right => {

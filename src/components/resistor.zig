@@ -59,7 +59,14 @@ pub fn render(
     const resistor_color = render_type.colors().component_color;
     const thickness = render_type.thickness();
 
-    const value_str = if (value) |val| val.resistor.actual else null;
+    var buff: [256]u8 = undefined;
+    const value_str = if (value) |val|
+        std.fmt.bufPrint(&buff, "{s}{s}", .{
+            val.resistor.actual,
+            bland.units.Unit.resistance.symbol(),
+        }) catch unreachable
+    else
+        null;
 
     switch (rot) {
         .left, .right => {
