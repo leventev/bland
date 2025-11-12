@@ -10,6 +10,7 @@ pub const Unit = enum {
     capacitance,
     inductance,
     frequency,
+    time,
 
     pub fn symbol(self: Unit) []const u8 {
         return switch (self) {
@@ -21,6 +22,7 @@ pub const Unit = enum {
             .capacitance => "F",
             .inductance => "H",
             .frequency => "Hz",
+            .time => "s",
         };
     }
 };
