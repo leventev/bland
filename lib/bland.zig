@@ -1,6 +1,8 @@
 const std = @import("std");
 const complex_matrix = @import("complex_matrix.zig");
 
+pub const log = std.log.scoped(.bland_lib);
+
 pub const units = @import("units.zig");
 pub const component = @import("component.zig");
 pub const NetList = @import("NetList.zig");

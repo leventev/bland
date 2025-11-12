@@ -243,6 +243,8 @@ pub fn analyseDC(
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
 ) !MNA.DCAnalysisReport {
+    const start_time: i64 = std.time.microTimestamp();
+
     var group_2 = try self.createGroup2(allocator, currents_watched);
     defer group_2.deinit(allocator);
 
@@ -255,6 +257,21 @@ pub fn analyseDC(
 
     // solve the matrix with Gauss elimination
     const res = try mna.solveDC(allocator);
+
+    const end_time: i64 = std.time.microTimestamp();
+    const elapsed_us: f64 = @as(f64, @floatFromInt(end_time - start_time));
+    const elapsed_s = elapsed_us / 1e6;
+
+    var time_buff: [32]u8 = undefined;
+    const time_str = bland.units.formatUnitBuf(
+        &time_buff,
+        .time,
+        elapsed_s,
+        3,
+    ) catch unreachable;
+
+    bland.log.info("DC analysis took {s}", .{time_str});
+
     return res;
 }
 
@@ -397,6 +414,7 @@ pub fn analyseFrequencySweep(
     freq_count: usize,
     currents_watched: ?[]const usize,
 ) !FrequencySweepReport {
+    const start_time: i64 = std.time.microTimestamp();
 
     // TODO: make these into errors
     std.debug.assert(start_freq >= 0);
@@ -428,6 +446,40 @@ pub fn analyseFrequencySweep(
             fw_report.all_currents[idx] = report.currents[comp_idx];
         }
     }
+
+    const end_time: i64 = std.time.microTimestamp();
+    const elapsed_us: f64 = @as(f64, @floatFromInt(end_time - start_time));
+    const elapsed_s = elapsed_us / 1e6;
+
+    var time_buff: [32]u8 = undefined;
+    const time_str = bland.units.formatUnitBuf(
+        &time_buff,
+        .time,
+        elapsed_s,
+        3,
+    ) catch unreachable;
+
+    var freq1_buff: [32]u8 = undefined;
+    const freq1_str = bland.units.formatUnitBuf(
+        &freq1_buff,
+        .frequency,
+        start_freq,
+        1,
+    ) catch unreachable;
+    var freq2_buff: [32]u8 = undefined;
+    const freq2_str = bland.units.formatUnitBuf(
+        &freq2_buff,
+        .frequency,
+        end_freq,
+        1,
+    ) catch unreachable;
+
+    bland.log.info("Sinusoidal steady-state frequency sweep({s}-{s}, {} points) took {s}", .{
+        freq1_str,
+        freq2_str,
+        freq_count,
+        time_str,
+    });
 
     return fw_report;
 }
