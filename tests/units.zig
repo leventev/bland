@@ -58,6 +58,43 @@ test "unit formatting with alloc" {
     }
 }
 
+test "prefix formatting with prealloced buffer" {
+    var buff: [256]u8 = undefined;
+
+    inline for (test_cases) |test_case| {
+        const res = try units.formatPrefixBuf(
+            &buff,
+            test_case.val,
+            test_case.precision,
+        );
+
+        const unit_length = test_case.unit.symbol().len;
+        const without_unit_length = test_case.expected.len - unit_length;
+        const expected_without_unit = test_case.expected[0..without_unit_length];
+
+        try std.testing.expectEqualStrings(expected_without_unit, res);
+    }
+}
+
+test "prefix formatting with alloc" {
+    const alloc = std.testing.allocator;
+
+    inline for (test_cases) |test_case| {
+        const res = try units.formatPrefixAlloc(
+            alloc,
+            test_case.val,
+            test_case.precision,
+        );
+
+        const unit_length = test_case.unit.symbol().len;
+        const without_unit_length = test_case.expected.len - unit_length;
+        const expected_without_unit = test_case.expected[0..without_unit_length];
+
+        try std.testing.expectEqualStrings(expected_without_unit, res);
+        alloc.free(res);
+    }
+}
+
 test "unit parsing" {
     var res = try units.parseWithoutUnitSymbol("100.68");
     try expectFloat(bland.Float, 100.68, res);
