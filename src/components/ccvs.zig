@@ -62,10 +62,12 @@ pub fn render(
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
 
-    // TODO
-    //var buff: [256]u8 = undefined;
-    _ = value;
-    const value_str = null;
+    var buff: [256]u8 = undefined;
+    const value_str = if (value) |val| std.fmt.bufPrint(&buff, "{s}{s}*I({s})", .{
+        val.ccvs.transresistance_actual,
+        bland.units.Unit.resistance.symbol(),
+        val.ccvs.controller_name_actual,
+    }) catch unreachable else null;
 
     switch (rot) {
         .left, .right => {
@@ -209,40 +211,24 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(inner: *ccvs_module.Inner, _: *GraphicComponent.ValueBuffer, _: bool) void {
+pub fn renderPropertyBox(
+    inner: *ccvs_module.Inner,
+    value_buffer: *GraphicComponent.ValueBuffer,
+    selected_component_changed: bool,
+) void {
     dvui.label(@src(), "transresistance", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    {
-        var box = dvui.box(
-            @src(),
-            .{ .dir = .horizontal },
-            .{
-                .expand = .horizontal,
-            },
-        );
-        defer box.deinit();
-
-        _ = dvui.textEntryNumber(@src(), Float, .{
-            .value = &inner.transresistance,
-        }, .{
-            .color_fill = dvui.themeGet().color(.control, .fill),
-            .color_text = dvui.themeGet().color(.content, .text),
-            .font = dvui.themeGet().font_body,
-            .expand = .horizontal,
-            .margin = dvui.Rect.all(4),
-        });
-
-        dvui.label(@src(), "\u{03A9}", .{}, .{
-            .color_text = dvui.themeGet().color(.content, .text),
-            .font = dvui.themeGet().font_title,
-            .margin = dvui.Rect.all(4),
-            .padding = dvui.Rect.all(4),
-            .gravity_y = 0.5,
-        });
-    }
+    _ = renderer.textEntrySI(
+        @src(),
+        &value_buffer.ccvs.transresistance_actual,
+        .resistance,
+        &inner.transresistance,
+        selected_component_changed,
+        .{},
+    );
 
     dvui.label(@src(), "controller name", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
@@ -251,7 +237,7 @@ pub fn renderPropertyBox(inner: *ccvs_module.Inner, _: *GraphicComponent.ValueBu
 
     var te = dvui.textEntry(@src(), .{
         .text = .{
-            .buffer = inner.controller_name_buff,
+            .buffer = value_buffer.ccvs.controller_name_buff,
         },
     }, .{
         .color_fill = dvui.themeGet().color(.control, .fill),
@@ -261,11 +247,11 @@ pub fn renderPropertyBox(inner: *ccvs_module.Inner, _: *GraphicComponent.ValueBu
         .margin = dvui.Rect.all(4),
     });
 
-    if (dvui.firstFrame(te.data().id) or sidebar.selected_component_changed) {
-        te.textSet(inner.controller_name, false);
+    if (selected_component_changed) {
+        te.textSet(value_buffer.ccvs.controller_name_actual, false);
     }
 
-    inner.controller_name = te.getText();
+    value_buffer.ccvs.controller_name_actual = te.getText();
 
     te.deinit();
 }

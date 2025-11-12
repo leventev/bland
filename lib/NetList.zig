@@ -206,10 +206,6 @@ fn createGroup2(
                     _ = try group_2.addComponent(allocator, idx);
                 },
                 .ccvs => |*inner| {
-                    //const controller_comp_idx = self.findComponentByName(
-                    //    inner.controller_name,
-                    //) orelse @panic("TODO");
-
                     // controller's current
                     inner.controller_comp_id = try group_2.addComponent(
                         allocator,
@@ -220,10 +216,6 @@ fn createGroup2(
                     _ = try group_2.addComponent(allocator, idx);
                 },
                 .cccs => |*inner| {
-                    //const controller_comp_idx = self.findComponentByName(
-                    //    inner.controller_name,
-                    //) orelse @panic("TODO");
-
                     // controller's current
                     inner.controller_comp_id = try group_2.addComponent(
                         allocator,
@@ -438,12 +430,4 @@ pub fn analyseFrequencySweep(
     }
 
     return fw_report;
-}
-
-pub fn findComponentByName(self: *const NetList, name: []const u8) ?usize {
-    for (self.components.items, 0..) |comp, i| {
-        if (std.mem.eql(u8, comp.name, name)) return i;
-    }
-
-    return null;
 }

@@ -12,6 +12,8 @@ const Component = bland.Component;
 const Device = Component.Device;
 const DeviceType = Component.DeviceType;
 
+const max_component_name_length = bland.component.max_component_name_length;
+
 const resistor_graphics_module = @import("components/resistor.zig");
 const voltage_source_graphics_module = @import("components/voltage_source.zig");
 const current_source_graphics_module = @import("components/current_source.zig");
@@ -126,7 +128,7 @@ pub fn gridPositionFromScreenPos(
 }
 
 // TODO:
-const MaxFloatValueLength = 64;
+const max_float_length = 64;
 
 pub const GraphicComponent = struct {
     pos: GridPosition,
@@ -162,19 +164,72 @@ pub const GraphicComponent = struct {
             buff: []u8,
             actual: []u8,
         },
-        ccvs: void,
-        cccs: void,
+        ccvs: struct {
+            transresistance_buff: []u8,
+            transresistance_actual: []u8,
+
+            controller_name_buff: []u8,
+            controller_name_actual: []u8,
+        },
+        cccs: struct {
+            multiplier_buff: []u8,
+            multiplier_actual: []u8,
+
+            controller_name_buff: []u8,
+            controller_name_actual: []u8,
+        },
 
         pub fn init(gpa: std.mem.Allocator, device_type: Component.DeviceType) !@This() {
             return switch (device_type) {
                 .ground => .{ .ground = {} },
-                .resistor => .{ .resistor = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
-                .capacitor => .{ .capacitor = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
-                .inductor => .{ .inductor = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
-                .ccvs => .{ .ccvs = {} },
-                .cccs => .{ .cccs = {} },
-                .voltage_source => .{ .voltage_source = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
-                .current_source => .{ .current_source = .{ .buff = try gpa.alloc(u8, MaxFloatValueLength), .actual = &.{} } },
+                .resistor => .{
+                    .resistor = .{
+                        .buff = try gpa.alloc(u8, max_float_length),
+                        .actual = &.{},
+                    },
+                },
+                .capacitor => .{
+                    .capacitor = .{
+                        .buff = try gpa.alloc(u8, max_float_length),
+                        .actual = &.{},
+                    },
+                },
+                .inductor => .{
+                    .inductor = .{
+                        .buff = try gpa.alloc(u8, max_float_length),
+                        .actual = &.{},
+                    },
+                },
+                .ccvs => .{
+                    .ccvs = .{
+                        .transresistance_buff = try gpa.alloc(u8, max_float_length),
+                        .transresistance_actual = &.{},
+
+                        .controller_name_buff = try gpa.alloc(u8, max_component_name_length),
+                        .controller_name_actual = &.{},
+                    },
+                },
+                .cccs => .{
+                    .cccs = .{
+                        .multiplier_buff = try gpa.alloc(u8, max_float_length),
+                        .multiplier_actual = &.{},
+
+                        .controller_name_buff = try gpa.alloc(u8, max_component_name_length),
+                        .controller_name_actual = &.{},
+                    },
+                },
+                .voltage_source => .{
+                    .voltage_source = .{
+                        .buff = try gpa.alloc(u8, max_float_length),
+                        .actual = &.{},
+                    },
+                },
+                .current_source => .{
+                    .current_source = .{
+                        .buff = try gpa.alloc(u8, max_float_length),
+                        .actual = &.{},
+                    },
+                },
             };
         }
 
@@ -182,13 +237,45 @@ pub const GraphicComponent = struct {
         pub fn setValue(self: *@This(), precision: usize, dev: Device) !void {
             switch (self.*) {
                 .ground => {},
-                .resistor => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.resistor, precision),
-                .capacitor => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.capacitor, precision),
-                .inductor => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.inductor, precision),
-                .ccvs => |_| @panic("TODO"),
-                .cccs => |_| @panic("TODO"),
-                .voltage_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.voltage_source, precision),
-                .current_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(buf.buff, dev.current_source, precision),
+                .resistor => |*buf| buf.actual = try bland.units.formatPrefixBuf(
+                    buf.buff,
+                    dev.resistor,
+                    precision,
+                ),
+                .capacitor => |*buf| buf.actual = try bland.units.formatPrefixBuf(
+                    buf.buff,
+                    dev.capacitor,
+                    precision,
+                ),
+                .inductor => |*buf| buf.actual = try bland.units.formatPrefixBuf(
+                    buf.buff,
+                    dev.inductor,
+                    precision,
+                ),
+                .ccvs => |*buf| {
+                    buf.transresistance_actual = try bland.units.formatPrefixBuf(
+                        buf.transresistance_buff,
+                        dev.ccvs.transresistance,
+                        precision,
+                    );
+                },
+                .cccs => |*buf| {
+                    buf.multiplier_actual = try bland.units.formatPrefixBuf(
+                        buf.multiplier_buff,
+                        dev.cccs.multiplier,
+                        precision,
+                    );
+                },
+                .voltage_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(
+                    buf.buff,
+                    dev.voltage_source,
+                    precision,
+                ),
+                .current_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(
+                    buf.buff,
+                    dev.current_source,
+                    precision,
+                ),
             }
         }
 
@@ -227,7 +314,6 @@ pub const GraphicComponent = struct {
         self.name = &.{};
         allocator.free(self.terminal_node_ids);
         self.value_buffer.deinit();
-        self.inner.deinit(allocator);
     }
 
     pub fn terminals(self: *const GraphicComponent, buffer: []GridPosition) []GridPosition {

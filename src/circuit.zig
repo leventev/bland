@@ -418,10 +418,27 @@ pub const GraphicCircuit = struct {
             self.graphic_components.items.len,
         );
 
-        // TODO: graphic_comp.comp is not deep copied here and that might cause
-        // some kind of issue later, we should either do a deep copy
-        // or be 100% sure the memory stays valid until we are done
-        for (self.graphic_components.items) |graphic_comp| {
+        // TODO: validate values, errors
+        for (self.graphic_components.items) |*graphic_comp| {
+            switch (graphic_comp.comp.device) {
+                .resistor, .capacitor, .inductor => |val| {
+                    std.debug.assert(val > 0);
+                },
+                .ccvs => |*inner| {
+                    const comp_id = self.findComponentByName(
+                        graphic_comp.value_buffer.ccvs.controller_name_actual,
+                    ) orelse @panic("TODO");
+                    inner.controller_comp_id = comp_id;
+                },
+                .cccs => |*inner| {
+                    const comp_id = self.findComponentByName(
+                        graphic_comp.value_buffer.cccs.controller_name_actual,
+                    ) orelse @panic("TODO");
+                    inner.controller_comp_id = comp_id;
+                },
+                else => {},
+            }
+
             try netlist_comps.append(
                 self.allocator,
                 graphic_comp.comp,
@@ -432,6 +449,14 @@ pub const GraphicCircuit = struct {
             .nodes = nodes,
             .components = netlist_comps,
         };
+    }
+
+    fn findComponentByName(self: *const GraphicCircuit, name: []const u8) ?usize {
+        for (self.graphic_components.items, 0..) |graphic_comp, i| {
+            if (std.mem.eql(u8, graphic_comp.comp.name, name)) return i;
+        }
+
+        return null;
     }
 
     pub fn analyseDC(self: *const GraphicCircuit) void {

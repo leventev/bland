@@ -64,10 +64,11 @@ pub fn render(
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
 
-    // TODO
-    //var buff: [256]u8 = undefined;
-    _ = value;
-    const value_str = null;
+    var buff: [256]u8 = undefined;
+    const value_str = if (value) |val| std.fmt.bufPrint(&buff, "{s}*I({s})", .{
+        val.cccs.multiplier_actual,
+        val.cccs.controller_name_actual,
+    }) catch unreachable else null;
 
     switch (rot) {
         .left, .right => {
@@ -253,21 +254,24 @@ pub fn render(
     }
 }
 
-pub fn renderPropertyBox(inner: *cccs_module.Inner, _: *GraphicComponent.ValueBuffer, _: bool) void {
+pub fn renderPropertyBox(
+    inner: *cccs_module.Inner,
+    value_buffer: *GraphicComponent.ValueBuffer,
+    selected_component_changed: bool,
+) void {
     dvui.label(@src(), "multiplier", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
         .font = dvui.themeGet().font_body,
     });
 
-    _ = dvui.textEntryNumber(@src(), Float, .{
-        .value = &inner.multiplier,
-    }, .{
-        .color_fill = dvui.themeGet().color(.control, .fill),
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-        .expand = .horizontal,
-        .margin = dvui.Rect.all(4),
-    });
+    _ = renderer.textEntrySI(
+        @src(),
+        &value_buffer.cccs.multiplier_actual,
+        .dimensionless,
+        &inner.multiplier,
+        selected_component_changed,
+        .{},
+    );
 
     dvui.label(@src(), "controller name", .{}, .{
         .color_text = dvui.themeGet().color(.content, .text),
@@ -276,7 +280,7 @@ pub fn renderPropertyBox(inner: *cccs_module.Inner, _: *GraphicComponent.ValueBu
 
     var te = dvui.textEntry(@src(), .{
         .text = .{
-            .buffer = inner.controller_name_buff,
+            .buffer = value_buffer.cccs.controller_name_buff,
         },
     }, .{
         .color_fill = dvui.themeGet().color(.control, .fill),
@@ -286,11 +290,10 @@ pub fn renderPropertyBox(inner: *cccs_module.Inner, _: *GraphicComponent.ValueBu
         .margin = dvui.Rect.all(4),
     });
 
-    if (dvui.firstFrame(te.data().id) or sidebar.selected_component_changed) {
-        te.textSet(inner.controller_name, false);
+    if (selected_component_changed) {
+        te.textSet(value_buffer.cccs.controller_name_actual, false);
     }
 
-    inner.controller_name = te.getText();
-
+    value_buffer.cccs.controller_name_actual = te.getText();
     te.deinit();
 }
