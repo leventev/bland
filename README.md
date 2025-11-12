@@ -28,5 +28,5 @@ Features:
 - [ ]  Time domain analysis
 - [ ]  Saving and loading circuits
 - [ ]  Parse expressions for inputs and plotting
-- [ ]  Console
+- [X]  Console
 - [ ]  Non-linear circuits
