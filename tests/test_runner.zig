@@ -74,3 +74,19 @@ pub fn main() !void {
 
     try stdout.flush();
 }
+
+pub const std_options: std.Options = .{
+    .logFn = testLog,
+};
+
+pub fn testLog(
+    comptime message_level: std.log.Level,
+    comptime scope: @Type(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = message_level;
+    _ = scope;
+    _ = format;
+    _ = args;
+}
