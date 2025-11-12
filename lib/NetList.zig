@@ -104,10 +104,6 @@ pub fn deinit(self: *NetList, allocator: std.mem.Allocator) void {
         node.connected_terminals.deinit(allocator);
     }
 
-    for (self.components.items) |*comp| {
-        comp.deinit(allocator);
-    }
-
     self.nodes.deinit(allocator);
     self.components.deinit(allocator);
     self.* = undefined;
@@ -210,28 +206,28 @@ fn createGroup2(
                     _ = try group_2.addComponent(allocator, idx);
                 },
                 .ccvs => |*inner| {
-                    const controller_comp_idx = self.findComponentByName(
-                        inner.controller_name,
-                    ) orelse @panic("TODO");
+                    //const controller_comp_idx = self.findComponentByName(
+                    //    inner.controller_name,
+                    //) orelse @panic("TODO");
 
                     // controller's current
-                    inner.controller_group_2_idx = try group_2.addComponent(
+                    inner.controller_comp_id = try group_2.addComponent(
                         allocator,
-                        controller_comp_idx,
+                        inner.controller_comp_id,
                     );
 
                     // ccvs's current
                     _ = try group_2.addComponent(allocator, idx);
                 },
                 .cccs => |*inner| {
-                    const controller_comp_idx = self.findComponentByName(
-                        inner.controller_name,
-                    ) orelse @panic("TODO");
+                    //const controller_comp_idx = self.findComponentByName(
+                    //    inner.controller_name,
+                    //) orelse @panic("TODO");
 
                     // controller's current
-                    inner.controller_group_2_idx = try group_2.addComponent(
+                    inner.controller_comp_id = try group_2.addComponent(
                         allocator,
-                        controller_comp_idx,
+                        inner.controller_comp_id,
                     );
 
                     // ccvs's current

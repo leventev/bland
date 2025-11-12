@@ -49,14 +49,11 @@ test "isolated current controlled voltage source" {
         &.{ vs2_plus_id, gnd_id },
     );
 
-    const controller_name = try gpa.dupe(u8, "R1");
     const ccvs_comp_idx = try netlist.addComponent(
         gpa,
         Component.Device{ .ccvs = .{
-            .controller_name_buff = controller_name,
-            .controller_name = controller_name,
             .transresistance = ccvs_transresistance,
-            .controller_group_2_idx = null,
+            .controller_comp_id = r1_comp_idx,
         } },
         "CCVS1",
         &.{ ccvs_plus_id, vs2_plus_id },
@@ -127,14 +124,11 @@ test "coupled current controlled voltage source" {
         &.{ vs_plus_id, ccvs_plus_id },
     );
 
-    const controller_name = try gpa.dupe(u8, "R1");
     const ccvs_comp_idx = try netlist.addComponent(
         gpa,
         Component.Device{ .ccvs = .{
-            .controller_name_buff = controller_name,
-            .controller_name = controller_name,
             .transresistance = ccvs_transresistance,
-            .controller_group_2_idx = null,
+            .controller_comp_id = r1_comp_idx,
         } },
         "CCVS1",
         &.{ ccvs_plus_id, gnd_id },

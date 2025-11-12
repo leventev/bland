@@ -21,11 +21,6 @@ pub const Component = struct {
 
     name: []const u8,
 
-    pub fn deinit(self: *Component, allocator: std.mem.Allocator) void {
-        self.device.deinit(allocator);
-        self.* = undefined;
-    }
-
     pub const DeviceType = enum {
         ground,
         resistor,
@@ -82,14 +77,6 @@ pub const Component = struct {
                     current_group_2_idx,
                     angular_frequency,
                 ),
-            }
-        }
-
-        pub fn deinit(self: *Device, allocator: std.mem.Allocator) void {
-            switch (@as(DeviceType, self.*)) {
-                inline else => {},
-                .ccvs => @field(self, @tagName(DeviceType.ccvs)).deinit(allocator),
-                .cccs => @field(self, @tagName(DeviceType.cccs)).deinit(allocator),
             }
         }
     };

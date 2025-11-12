@@ -59,12 +59,8 @@ test "unit formatting with alloc" {
 }
 
 test "unit parsing" {
-    std.debug.print("a\n", .{});
-
     var res = try units.parseWithoutUnitSymbol("100.68");
     try expectFloat(bland.Float, 100.68, res);
-
-    std.debug.print("A\n", .{});
 
     res = try units.parseWithoutUnitSymbol("849.483G");
     try expectFloat(bland.Float, 849.483e9, res);
