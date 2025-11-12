@@ -1,14 +1,15 @@
 const std = @import("std");
 const bland = @import("bland");
+const dvui = @import("dvui");
 
 const global = @import("global.zig");
 const component = @import("component.zig");
 const circuit = @import("circuit.zig");
 const sidebar = @import("sidebar.zig");
 const circuit_widget = @import("circuit_widget.zig");
-const NetList = bland.NetList;
+const console = @import("console.zig");
 
-const dvui = @import("dvui");
+const NetList = bland.NetList;
 const GridPosition = circuit.GridPosition;
 
 pub var dark_mode: bool = true;
@@ -434,7 +435,23 @@ pub fn render(gpa: std.mem.Allocator) !bool {
         }
 
         if (paned2.showSecond()) {
-            try renderAnalysisResults(gpa);
+            var res_console_paned = dvui.paned(@src(), .{
+                .collapsed_size = 200,
+                .direction = .vertical,
+            }, .{
+                .expand = .both,
+                .background = true,
+                .color_fill = dvui.themeGet().color(.content, .fill),
+            });
+            defer res_console_paned.deinit();
+
+            if (res_console_paned.showFirst()) {
+                try renderAnalysisResults(gpa);
+            }
+
+            if (res_console_paned.showSecond()) {
+                console.renderConsole();
+            }
         }
     }
 
