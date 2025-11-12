@@ -58,10 +58,20 @@ pub fn renderConsole() void {
 
     var scroller = dvui.scrollArea(@src(), .{}, .{
         .expand = .both,
+        .background = true,
+        .color_fill = dvui.themeGet().color(.content, .fill),
     });
     defer scroller.deinit();
 
-    var tl = dvui.TextLayoutWidget.init(@src(), .{}, .{ .expand = .horizontal });
+    var tl = dvui.TextLayoutWidget.init(
+        @src(),
+        .{},
+        .{
+            .expand = .horizontal,
+            .background = true,
+            .color_fill = dvui.themeGet().color(.content, .fill),
+        },
+    );
     defer tl.deinit();
     tl.install(.{});
     tl.processEvents();
