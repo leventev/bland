@@ -78,7 +78,7 @@ test "RLC series" {
     defer ac_report.deinit(gpa);
 
     for (0.., res.frequency_values) |freq_idx, freq| {
-        res.analysisReportForFreq(freq_idx, &ac_report);
+        try res.analysisReportForFreq(freq_idx, &ac_report);
 
         const angular_freq = 2 * std.math.pi * freq;
 
@@ -174,7 +174,7 @@ test "RLC parallel" {
     defer ac_report.deinit(gpa);
 
     for (0.., res.frequency_values) |freq_idx, freq| {
-        res.analysisReportForFreq(freq_idx, &ac_report);
+        try res.analysisReportForFreq(freq_idx, &ac_report);
 
         const angular_freq = 2 * std.math.pi * freq;
 

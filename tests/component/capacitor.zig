@@ -69,7 +69,7 @@ test "RC series low-pass" {
     defer ac_report.deinit(gpa);
 
     for (0.., res.frequency_values) |freq_idx, freq| {
-        res.analysisReportForFreq(freq_idx, &ac_report);
+        try res.analysisReportForFreq(freq_idx, &ac_report);
 
         const cap_voltage = Complex.init(v1, 0).mul(Complex.reciprocal(
             Complex.init(1, 2 * std.math.pi * freq * r1 * c1),
@@ -143,7 +143,7 @@ test "RC series high-pass" {
     defer ac_report.deinit(gpa);
 
     for (0.., res.frequency_values) |freq_idx, freq| {
-        res.analysisReportForFreq(freq_idx, &ac_report);
+        try res.analysisReportForFreq(freq_idx, &ac_report);
 
         const resistor_voltage = Complex.init(v1, 0).mul(Complex.div(
             Complex.init(0, 2 * std.math.pi * freq * r1 * c1),
@@ -251,7 +251,7 @@ test "RC series low-pass complex" {
 
     for (0.., res.frequency_values) |freq_idx, freq| {
         const ang_freq = 2 * std.math.pi * freq;
-        res.analysisReportForFreq(freq_idx, &ac_report);
+        try res.analysisReportForFreq(freq_idx, &ac_report);
 
         const c1_impedance = Complex.init(0, -1 / (ang_freq * c1));
         const c234_impedance = Complex.init(0, -1 / (ang_freq * c2)).reciprocal().add(
@@ -374,7 +374,7 @@ test "RC series high-pass complex" {
 
     for (0.., res.frequency_values) |freq_idx, freq| {
         const ang_freq = 2 * std.math.pi * freq;
-        res.analysisReportForFreq(freq_idx, &ac_report);
+        try res.analysisReportForFreq(freq_idx, &ac_report);
 
         const c1_impedance = Complex.init(0, -1 / (ang_freq * c1));
         const c234_impedance = Complex.init(0, -1 / (ang_freq * c2)).reciprocal().add(
@@ -463,7 +463,7 @@ test "RC parallel" {
     defer ac_report.deinit(gpa);
 
     for (0.., res.frequency_values) |freq_idx, freq| {
-        res.analysisReportForFreq(freq_idx, &ac_report);
+        try res.analysisReportForFreq(freq_idx, &ac_report);
 
         // voltages
         try checkVoltageAC(&ac_report, gnd_id, Complex.init(0, 0));

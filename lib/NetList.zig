@@ -401,11 +401,13 @@ pub const FrequencySweepReport = struct {
     ) FrequencySweepReport.Error!void {
         if (freq_idx >= self.frequency_values.len) return error.InvalidFequencyIdx;
         for (0..report_buff.voltages.len) |idx| {
-            report_buff.voltages[idx] = self.voltage(idx)[freq_idx];
+            const voltage_for_freqs = self.voltage(idx) catch unreachable;
+            report_buff.voltages[idx] = voltage_for_freqs[freq_idx];
         }
 
         for (0..report_buff.currents.len) |idx| {
-            report_buff.currents[idx] = self.current(idx)[freq_idx];
+            const current_for_freqs = self.current(idx) catch unreachable;
+            report_buff.currents[idx] = current_for_freqs[freq_idx];
         }
     }
 };
