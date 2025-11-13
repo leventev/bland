@@ -125,13 +125,18 @@ fn createMNAMatrix(
         return error.InvalidFrequency;
     }
 
-    var mna = try MNA.init(
+    var mna = MNA.init(
         allocator,
         self.nodes.items,
         group_2,
         self.components.items.len,
         ac_analysis,
-    );
+    ) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => |e| {
+            @panic(@errorName(e));
+        },
+    };
 
     mna.zero();
 
