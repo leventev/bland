@@ -28,9 +28,7 @@ pub fn stampMatrix(
     const y = Complex.init(0, angular_frequency * c);
     const z = y.reciprocal();
 
-    if (angular_frequency == 0) {
-        // TODO
-    } else {
+    if (angular_frequency != 0) {
         // TODO: explain how stamping works
         if (current_group_2_idx) |curr_idx| {
             mna.stampVoltageCurrent(v_plus, curr_idx, 1);
@@ -44,5 +42,10 @@ pub fn stampMatrix(
             mna.stampVoltageVoltageComplex(v_minus, v_plus, y.neg());
             mna.stampVoltageVoltageComplex(v_minus, v_minus, y);
         }
+    } else {
+        // if angular frequency is 0 then we are doing DC analysis
+        // and in DC analysis a capacitor acts as an open circuit.
+        // to achieve this we dont have to do anything
+        // by default the two nodes at each terminal are not connected to eachother
     }
 }
