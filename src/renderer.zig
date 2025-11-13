@@ -612,17 +612,14 @@ pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepR
         var prev_var_choice: usize = 1;
     };
 
-    const node_count = fw_report.nodeCount();
-    const component_count = fw_report.componentCount();
-
     // TODO: allocate less or use arena or something else
-    var var_entries = try gpa.alloc([]u8, node_count + component_count);
+    var var_entries = try gpa.alloc([]u8, fw_report.node_count + fw_report.component_count);
     defer gpa.free(var_entries);
-    for (0..node_count) |i| {
+    for (0..fw_report.node_count) |i| {
         var_entries[i] = try std.fmt.allocPrint(gpa, "Voltage #{}", .{i});
     }
-    for (0..component_count) |i| {
-        var_entries[node_count + i] = try std.fmt.allocPrint(gpa, "Current #{}", .{i});
+    for (0..fw_report.component_count) |i| {
+        var_entries[fw_report.node_count + i] = try std.fmt.allocPrint(gpa, "Current #{}", .{i});
     }
     defer {
         for (var_entries) |ent| {
@@ -652,9 +649,9 @@ pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepR
     var s1 = plot.line();
     defer s1.deinit();
 
-    if (S.var_choice >= node_count) {
-        const comp_idx = S.var_choice - node_count;
-        const current = fw_report.current(comp_idx);
+    if (S.var_choice >= fw_report.node_count) {
+        const comp_idx = S.var_choice - fw_report.node_count;
+        const current = fw_report.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
             if (c) |c_val| {
                 const freq = fw_report.frequency_values[i];
@@ -663,7 +660,7 @@ pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepR
             }
         }
     } else {
-        const voltage = fw_report.voltage(S.var_choice);
+        const voltage = fw_report.voltage(S.var_choice) catch @panic("TODO");
         for (voltage, 0..) |v, i| {
             const freq = fw_report.frequency_values[i];
             const value = 20 * @log10(v.magnitude());

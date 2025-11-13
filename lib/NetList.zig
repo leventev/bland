@@ -29,7 +29,14 @@ pub const Node = struct {
     voltage: ?Float,
 };
 
-pub fn init(allocator: std.mem.Allocator) !NetList {
+pub const Error = error{
+    InvalidComponentID,
+    InvalidNodeID,
+    InvalidFrequency,
+    InvalidFrequencyRange,
+} || std.mem.Allocator.Error;
+
+pub fn init(allocator: std.mem.Allocator) Error!NetList {
     var nodes = std.ArrayListUnmanaged(Node){};
     try nodes.append(allocator, .{
         .id = ground_node_id,
@@ -43,7 +50,7 @@ pub fn init(allocator: std.mem.Allocator) !NetList {
     };
 }
 
-pub fn allocateNode(self: *NetList, allocator: std.mem.Allocator) !usize {
+pub fn allocateNode(self: *NetList, allocator: std.mem.Allocator) Error!usize {
     const next_id = self.nodes.items.len;
     try self.nodes.append(allocator, .{
         .id = next_id,
@@ -54,19 +61,13 @@ pub fn allocateNode(self: *NetList, allocator: std.mem.Allocator) !usize {
     return next_id;
 }
 
-//pub fn addComponentNoConnection(self: *NetList, inner: component.Component.Inner) !usize {
-//    const id = self.components.items.len;
-//    try self.components.append(self.allocator, comp);
-//    return id;
-//}
-
 pub fn addComponent(
     self: *NetList,
     allocator: std.mem.Allocator,
     device: Component.Device,
     name: []const u8,
     node_ids: []const usize,
-) !usize {
+) Error!usize {
     const id = self.components.items.len;
     try self.components.append(allocator, Component{
         .device = device,
@@ -85,10 +86,9 @@ pub fn addComponentConnection(
     node_id: usize,
     comp_id: usize,
     term_id: usize,
-) !void {
-    // TODO: error instead of assert
-    std.debug.assert(node_id < self.nodes.items.len);
-    std.debug.assert(comp_id < self.components.items.len);
+) Error!void {
+    if (node_id >= self.nodes.items.len) return error.InvalidNodeID;
+    if (comp_id >= self.components.items.len) return error.InvalidComponentID;
 
     try self.nodes.items[node_id].connected_terminals.append(
         allocator,
@@ -115,14 +115,14 @@ fn createMNAMatrix(
     group_2: []const usize,
     angular_frequency: Float,
     ac_analysis: bool,
-) !MNA {
+) Error!MNA {
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // where v is all nodes except ground
     // the last column is the RHS of the equation Ax=b
     // basically (A|b) where b is an (|v| + |i2| X 1) matrix
 
-    if (!ac_analysis) {
-        std.debug.assert(angular_frequency == 0);
+    if (ac_analysis and angular_frequency <= 0) {
+        return error.InvalidFrequency;
     }
 
     var mna = try MNA.init(
@@ -242,7 +242,7 @@ pub fn analyseDC(
     self: *NetList,
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
-) !MNA.DCAnalysisReport {
+) Error!MNA.DCAnalysisReport {
     const start_time: i64 = std.time.microTimestamp();
 
     var group_2 = try self.createGroup2(allocator, currents_watched);
@@ -250,9 +250,7 @@ pub fn analyseDC(
 
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // iterate over all elements and stamp them onto the matrix
-    var mna = self.createMNAMatrix(allocator, group_2.arr.items, 0, false) catch {
-        @panic("Failed to build netlist");
-    };
+    var mna = try self.createMNAMatrix(allocator, group_2.arr.items, 0, false);
     defer mna.deinit(allocator);
 
     // solve the matrix with Gauss elimination
@@ -280,7 +278,7 @@ pub fn analyseAC(
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
     frequency: Float,
-) !MNA.ACAnalysisReport {
+) Error!MNA.ACAnalysisReport {
     std.debug.assert(frequency >= 0);
     const angular_frequency = 2 * std.math.pi * frequency;
 
@@ -289,9 +287,7 @@ pub fn analyseAC(
 
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // iterate over all elements and stamp them onto the matrix
-    var mna = self.createMNAMatrix(allocator, group_2.arr.items, angular_frequency, true) catch {
-        @panic("Failed to build netlist");
-    };
+    var mna = try self.createMNAMatrix(allocator, group_2.arr.items, angular_frequency, true);
     defer mna.deinit(allocator);
 
     // solve the matrix with Gauss elimination
@@ -303,11 +299,18 @@ pub const FrequencySweepReport = struct {
     /// frequency values
     frequency_values: []Float,
 
+    node_count: usize,
+    component_count: usize,
+
     /// all voltage values for every frequency are allocated together
     all_voltages: []Complex,
 
     /// all currents values for every frequency are allocated at the same time
     all_currents: []?Complex,
+
+    pub const Error = error{
+        InvalidFequencyIdx,
+    } || NetList.Error;
 
     fn init(
         allocator: std.mem.Allocator,
@@ -316,12 +319,12 @@ pub const FrequencySweepReport = struct {
         start_freq: Float,
         end_freq: Float,
         frequency_count: usize,
-    ) !FrequencySweepReport {
-        // TODO: errors instead of assert
-        std.debug.assert(frequency_count > 0);
-        std.debug.assert(start_freq > 0);
-        std.debug.assert(end_freq > start_freq);
+    ) FrequencySweepReport.Error!FrequencySweepReport {
+        if (frequency_count < 2) return error.InvalidFrequencyRange;
+        if (start_freq <= 0) return error.InvalidFrequencyRange;
+        if (start_freq >= end_freq) return error.InvalidFrequencyRange;
 
+        // TODO: figure out whats the best way to go about handling this error
         std.debug.assert(node_count > 0);
         std.debug.assert(component_count > 0);
 
@@ -339,10 +342,10 @@ pub const FrequencySweepReport = struct {
 
         const frequency_values = try allocator.alloc(Float, frequency_count);
 
-        // TODO: allow 0Hz
         const start_freq_exponent: Float = std.math.log10(start_freq);
         const end_freq_exponent: Float = std.math.log10(end_freq);
-        const step: Float = (end_freq_exponent - start_freq_exponent) / @as(Float, @floatFromInt(frequency_count));
+        const f_exp_diff = end_freq_exponent - start_freq_exponent;
+        const step: Float = f_exp_diff / @as(Float, @floatFromInt(frequency_count));
         for (0..frequency_count) |i| {
             const exp_off = @as(Float, @floatFromInt(i)) * step;
             const exponent: Float = start_freq_exponent + exp_off;
@@ -353,6 +356,8 @@ pub const FrequencySweepReport = struct {
         return FrequencySweepReport{
             .all_voltages = all_voltages,
             .all_currents = all_currents,
+            .node_count = node_count,
+            .component_count = component_count,
             .frequency_values = frequency_values,
         };
     }
@@ -364,27 +369,21 @@ pub const FrequencySweepReport = struct {
         self.* = undefined;
     }
 
-    pub fn nodeCount(self: *const FrequencySweepReport) usize {
-        // TODO
-        return @divExact(self.all_voltages.len, self.frequency_values.len);
-    }
-
-    pub fn componentCount(self: *const FrequencySweepReport) usize {
-        // TODO
-        return @divExact(self.all_currents.len, self.frequency_values.len);
-    }
-
-    pub fn voltage(self: *const FrequencySweepReport, node_idx: usize) []const Complex {
-        const voltage_count = self.nodeCount();
-        std.debug.assert(node_idx < voltage_count);
+    pub fn voltage(
+        self: *const FrequencySweepReport,
+        node_idx: usize,
+    ) FrequencySweepReport.Error![]const Complex {
+        if (node_idx >= self.node_count) return error.InvalidNodeID;
         const start_idx = node_idx * self.frequency_values.len;
         const end_idx = (node_idx + 1) * self.frequency_values.len;
         return self.all_voltages[start_idx..end_idx];
     }
 
-    pub fn current(self: *const FrequencySweepReport, comp_idx: usize) []const ?Complex {
-        const component_count = self.componentCount();
-        std.debug.assert(comp_idx < component_count);
+    pub fn current(
+        self: *const FrequencySweepReport,
+        comp_idx: usize,
+    ) FrequencySweepReport.Error![]const ?Complex {
+        if (comp_idx >= self.component_count) return error.InvalidComponentID;
         const start_idx = comp_idx * self.frequency_values.len;
         const end_idx = (comp_idx + 1) * self.frequency_values.len;
         return self.all_currents[start_idx..end_idx];
@@ -394,8 +393,8 @@ pub const FrequencySweepReport = struct {
         self: *const FrequencySweepReport,
         freq_idx: usize,
         report_buff: *ACAnalysisReport,
-    ) void {
-        std.debug.assert(freq_idx < self.frequency_values.len);
+    ) FrequencySweepReport.Error!void {
+        if (freq_idx >= self.frequency_values.len) return error.InvalidFequencyIdx;
         for (0..report_buff.voltages.len) |idx| {
             report_buff.voltages[idx] = self.voltage(idx)[freq_idx];
         }
@@ -413,13 +412,8 @@ pub fn analyseFrequencySweep(
     end_freq: Float,
     freq_count: usize,
     currents_watched: ?[]const usize,
-) !FrequencySweepReport {
+) FrequencySweepReport.Error!FrequencySweepReport {
     const start_time: i64 = std.time.microTimestamp();
-
-    // TODO: make these into errors
-    std.debug.assert(start_freq >= 0);
-    std.debug.assert(end_freq > start_freq);
-    std.debug.assert(freq_count > 0);
 
     var fw_report = try FrequencySweepReport.init(
         allocator,
