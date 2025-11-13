@@ -99,18 +99,14 @@ pub fn Matrix(comptime T: type) type {
                     // the pivot for the Nth column should be in the Nth row
                     // if the pivot we chose isnt in the correct row we swap it
                     if (p_row != row) {
-                        self.swapRows(p_row, row) catch |err| {
-                            @panic(@errorName(err));
-                        };
+                        self.swapRows(p_row, row) catch unreachable;
                     }
 
                     // now `row` contains the index of the row that contains the pivot
 
                     // scale the row so the leading coefficient is 1
                     if (self.data[row][col] != 1) {
-                        self.scaleRow(row, 1 / self.data[row][col]) catch |err| {
-                            @panic(@errorName(err));
-                        };
+                        self.scaleRow(row, 1 / self.data[row][col]) catch unreachable;
                     }
                     // set all the other row leading coefficients to 0
                     for (0..self.row_count) |other_row| {
@@ -120,9 +116,7 @@ pub fn Matrix(comptime T: type) type {
                                 row,
                                 other_row,
                                 -self.data[other_row][col],
-                            ) catch |err| {
-                                @panic(@errorName(err));
-                            };
+                            ) catch unreachable;
                         }
                     }
 

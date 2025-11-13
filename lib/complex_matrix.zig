@@ -2,12 +2,7 @@ const std = @import("std");
 
 const Complex = std.math.Complex;
 
-fn complex_div(comptime T: type, a: Complex(T), b: Complex(T)) Complex(T) {
-    // multiplying by 1/z is the same as multiplying by conj(z)/(|z|^2)
-    // so a/b -> a*conj(b)/(|b|^2)
-    return a.mul(b.reciprocal());
-}
-
+// TODO: replace this to be used by std.fmt.format
 pub fn prettyPrintComplex(comptime T: type, z: Complex(T)) void {
     if (z.im == 0) {
         std.debug.print("({}) ", .{z.re});
@@ -17,6 +12,12 @@ pub fn prettyPrintComplex(comptime T: type, z: Complex(T)) void {
         std.debug.print("({} + j{}) ", .{ z.re, z.im });
     }
 }
+
+pub const Error = error{
+    InvalidRow,
+    InvalidColumn,
+    InvalidDimension,
+} || std.mem.Allocator.Error;
 
 pub fn ComplexMatrix(comptime T: type) type {
     return struct {
@@ -29,7 +30,9 @@ pub fn ComplexMatrix(comptime T: type) type {
             allocator: std.mem.Allocator,
             row_count: usize,
             col_count: usize,
-        ) !ComplexMatrix(T) {
+        ) Error!ComplexMatrix(T) {
+            if (row_count < 1) return error.InvalidDimension;
+            if (col_count < 1) return error.InvalidDimension;
             var data: [][]Complex(T) = try allocator.alloc([]Complex(T), row_count);
             // maybe do a single allocation for all rows and then just slice them?
             for (0..row_count) |i| {
@@ -65,25 +68,29 @@ pub fn ComplexMatrix(comptime T: type) type {
             }
         }
 
-        pub fn swapRows(self: *ComplexMatrix(T), row1: usize, row2: usize) void {
-            std.debug.assert(row1 < self.row_count);
-            std.debug.assert(row2 < self.row_count);
+        pub fn swapRows(self: *ComplexMatrix(T), row1: usize, row2: usize) Error!void {
+            if (row1 >= self.row_count or row2 >= self.row_count)
+                return error.InvalidRow;
+
             const temp = self.data[row1];
             self.data[row1] = self.data[row2];
             self.data[row2] = temp;
         }
 
-        pub fn scaleRow(self: *ComplexMatrix(T), row: usize, scale: Complex(T)) void {
-            std.debug.assert(row < self.row_count);
+        pub fn scaleRow(self: *ComplexMatrix(T), row: usize, scale: Complex(T)) Error!void {
+            if (row >= self.row_count)
+                return error.InvalidRow;
+
             for (0..self.col_count) |col| {
                 self.data[row][col] = self.data[row][col].mul(scale);
             }
         }
 
         // row2 = row2 + scale * row1
-        pub fn addRows(self: *ComplexMatrix(T), row1: usize, row2: usize, scale: Complex(T)) void {
-            std.debug.assert(row1 < self.row_count);
-            std.debug.assert(row2 < self.row_count);
+        pub fn addRows(self: *ComplexMatrix(T), row1: usize, row2: usize, scale: Complex(T)) Error!void {
+            if (row1 >= self.row_count or row2 >= self.row_count)
+                return error.InvalidRow;
+
             for (0..self.col_count) |col| {
                 self.data[row2][col] = self.data[row2][col].add(
                     self.data[row1][col].mul(scale),
@@ -91,7 +98,7 @@ pub fn ComplexMatrix(comptime T: type) type {
             }
         }
 
-        pub fn gaussJordanElimination(self: *ComplexMatrix(T)) void {
+        pub fn toRowReducedEchelon(self: *ComplexMatrix(T)) void {
             var row: usize = 0;
             var col: usize = 0;
 
@@ -109,7 +116,7 @@ pub fn ComplexMatrix(comptime T: type) type {
                     // the pivot for the Nth column should be in the Nth row
                     // if the pivot we chose isnt in the correct row we swap it
                     if (p_row != row) {
-                        self.swapRows(p_row, row);
+                        self.swapRows(p_row, row) catch unreachable;
                     }
 
                     // now `row` contains the index of the row that contains the pivot
@@ -121,10 +128,10 @@ pub fn ComplexMatrix(comptime T: type) type {
                         const pivot_z = self.data[row][col];
                         const other_z = self.data[other_row][col];
 
-                        const scale = complex_div(T, other_z, pivot_z).neg();
+                        const scale = other_z.div(pivot_z).neg();
 
                         if (self.data[other_row][col].magnitude() != 0) {
-                            self.addRows(row, other_row, scale);
+                            self.addRows(row, other_row, scale) catch unreachable;
                         }
                     }
 
@@ -132,7 +139,7 @@ pub fn ComplexMatrix(comptime T: type) type {
                     const pivot_value = self.data[row][col];
                     if (pivot_value.re != 1 or pivot_value.im != 0) {
                         const reciprocal = pivot_value.reciprocal();
-                        self.scaleRow(row, reciprocal);
+                        self.scaleRow(row, reciprocal) catch unreachable;
                     }
 
                     row += 1;

@@ -336,7 +336,7 @@ pub fn solveDC(self: *MNA, allocator: std.mem.Allocator) !DCAnalysisReport {
 pub fn solveAC(self: *MNA, allocator: std.mem.Allocator) !ACAnalysisReport {
     var mat = self.mat.ac;
 
-    mat.gaussJordanElimination();
+    mat.toRowReducedEchelon();
 
     var ac_results = try ACAnalysisReport.init(
         allocator,

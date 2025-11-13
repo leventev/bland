@@ -29,7 +29,7 @@ fn testMatrix(input: []const []const Complex, output: []const []const Complex) !
         }
     }
 
-    mat.gaussJordanElimination();
+    mat.toRowReducedEchelon();
 
     for (output, 0..) |row, row_idx| {
         for (row, 0..) |expected, col_idx| {
