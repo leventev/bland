@@ -30,7 +30,10 @@ pub fn stampMatrix(
     const curr_idx = current_group_2_idx.?;
 
     if (angular_frequency == 0) {
-        // TODO
+        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+        mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+        mna.stampCurrentVoltage(curr_idx, v_minus, -1);
     } else {
         // TODO: explain how stamping works
         mna.stampVoltageCurrent(v_plus, curr_idx, 1);
