@@ -132,10 +132,11 @@ fn getOccupiedGridPositions(
     occupied: []component.OccupiedGridPosition,
 ) []component.OccupiedGridPosition {
     const abs_len = @abs(wire.length);
-    std.debug.assert(abs_len < occupied.len);
+    const point_count = abs_len + 1;
+    std.debug.assert(point_count < occupied.len);
     const negative = wire.length < 0;
 
-    for (0..@intCast(abs_len)) |i| {
+    for (0..point_count) |i| {
         const idx: i32 = if (negative) -@as(i32, @intCast(i)) else @intCast(i);
         const pos: GridPosition = if (wire.direction == .horizontal) .{
             .x = wire.pos.x + idx,
@@ -150,7 +151,7 @@ fn getOccupiedGridPositions(
         };
     }
 
-    return occupied[0..abs_len];
+    return occupied[0..point_count];
 }
 
 pub fn gridPositionFromPos(
