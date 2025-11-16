@@ -386,6 +386,17 @@ pub fn analyseTransient(
                     const current_prev = currents[time_idx - 1].?;
                     break :blk (2 * c) / time_step * (voltage_now - voltage_prev) - current_prev;
                 },
+                .inductor => |l| blk: {
+                    const node_plus_id = comp.terminal_node_ids[0];
+                    const node_minus_id = comp.terminal_node_ids[1];
+                    const voltages_plus = transient_report.voltage(node_plus_id) catch unreachable;
+                    const voltages_minus = transient_report.voltage(node_minus_id) catch unreachable;
+                    const currents = transient_report.current(comp_idx) catch unreachable;
+                    const voltage_now = voltages_plus[time_idx] - voltages_minus[time_idx];
+                    const voltage_prev = voltages_plus[time_idx - 1] - voltages_minus[time_idx - 1];
+                    const current_prev = currents[time_idx - 1].?;
+                    break :blk time_step / (2 * l) * (voltage_now + voltage_prev) + current_prev;
+                },
                 else => step_res.currents[comp_idx],
             };
 

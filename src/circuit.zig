@@ -495,6 +495,11 @@ pub const GraphicCircuit = struct {
             std.debug.print("{}: {any}\n", .{ i, voltage });
         }
 
+        for (0..report.component_count) |i| {
+            const current = report.current(i) catch @panic("TODO");
+            std.debug.print("I{}: {any}\n", .{ i, current });
+        }
+
         //analysis_results.append(self.allocator, .{ .dc = report }) catch @panic("TODO");
     }
 

@@ -44,8 +44,20 @@ pub fn stampMatrix(
             mna.stampCurrentVoltage(curr_idx, v_minus, -1);
             mna.stampCurrentCurrentComplex(curr_idx, curr_idx, z.neg());
         },
-        .transient => |_| {
-            @panic("TODO");
+        .transient => |trans| {
+            const g = trans.time_step / (2 * inductance);
+            const ieq = trans.prev_current.? + g * trans.prev_voltage;
+
+            if (current_group_2_idx) |_| {
+                mna.stampVoltageVoltage(v_plus, v_plus, g);
+                mna.stampVoltageVoltage(v_plus, v_minus, -g);
+                mna.stampVoltageVoltage(v_minus, v_plus, -g);
+                mna.stampVoltageVoltage(v_minus, v_minus, g);
+                mna.stampVoltageRHS(v_plus, -ieq);
+                mna.stampVoltageRHS(v_minus, ieq);
+            } else {
+                @panic("TODO");
+            }
         },
     }
 }
