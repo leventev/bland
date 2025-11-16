@@ -284,7 +284,7 @@ pub fn analyseTransient(
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
 ) TransientReport.Error!TransientReport {
-    //const start_time: i64 = std.time.microTimestamp();
+    const start_time: i64 = std.time.microTimestamp();
 
     var group_2 = try self.createGroup2(allocator, currents_watched);
     defer group_2.deinit(allocator);
@@ -305,7 +305,7 @@ pub fn analyseTransient(
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // iterate over all elements and stamp them onto the matrix
     // get values at t=0
-    var dc_res = try self.analyseDC(allocator, currents_watched);
+    //var dc_res = try self.analyseDC(allocator, currents_watched);
 
     for (0..self.nodes.items.len) |node_idx| {
         const idx = node_idx * time_point_count;
@@ -320,7 +320,7 @@ pub fn analyseTransient(
         transient_report.all_currents[idx] = 0;
     }
 
-    dc_res.deinit(allocator);
+    //dc_res.deinit(allocator);
 
     // t0 = 0
     transient_report.time_values[0] = 0;
@@ -372,7 +372,6 @@ pub fn analyseTransient(
 
         for (0.., self.components.items) |comp_idx, comp| {
             const idx = comp_idx * time_point_count + time_idx;
-            std.debug.print("comp {}: {}\n", .{ comp_idx, step_res.currents[comp_idx].? });
 
             const current_now = switch (comp.device) {
                 .capacitor => |c| blk: {
@@ -404,19 +403,19 @@ pub fn analyseTransient(
         }
     }
 
-    //const end_time: i64 = std.time.microTimestamp();
-    //const elapsed_us: f64 = @as(f64, @floatFromInt(end_time - start_time));
-    //const elapsed_s = elapsed_us / 1e6;
-    //
-    //var time_buff: [32]u8 = undefined;
-    //const time_str = bland.units.formatUnitBuf(
-    //    &time_buff,
-    //    .time,
-    //    elapsed_s,
-    //    3,
-    //) catch unreachable;
+    const end_time: i64 = std.time.microTimestamp();
+    const elapsed_us: f64 = @as(f64, @floatFromInt(end_time - start_time));
+    const elapsed_s = elapsed_us / 1e6;
 
-    //bland.log.info("DC analysis took {s}", .{time_str});
+    var time_buff: [32]u8 = undefined;
+    const time_str = bland.units.formatUnitBuf(
+        &time_buff,
+        .time,
+        elapsed_s,
+        3,
+    ) catch unreachable;
+
+    bland.log.info("Transient analysis took {s}", .{time_str});
 
     return transient_report;
 }

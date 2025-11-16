@@ -53,7 +53,6 @@ pub fn stampMatrix(
             // TODO: no current_group_2
             const g = 2 * c / trans.time_step;
             const ieq = trans.prev_current.? + g * trans.prev_voltage;
-            std.log.debug("cond: {} current: {} prev_current: {} prev_voltage: {}", .{ g, ieq, trans.prev_current.?, trans.prev_voltage });
 
             if (current_group_2_idx) |_| {
                 mna.stampVoltageVoltage(v_plus, v_plus, g);

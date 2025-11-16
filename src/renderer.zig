@@ -676,6 +676,98 @@ pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepR
     s1.stroke(2, dvui.themeGet().focus);
 }
 
+pub fn renderTransientReport(gpa: std.mem.Allocator, report: NetList.TransientReport) !void {
+    const S = struct {
+        var xaxis: dvui.PlotWidget.Axis = .{
+            .name = "Time (s)",
+            .ticks = .{
+                .locations = .{
+                    .auto = .{
+                        .num_ticks = 8,
+                    },
+                },
+            },
+        };
+
+        var yaxis: dvui.PlotWidget.Axis = .{
+            .name = "Value",
+            .ticks = .{
+                .locations = .{
+                    .auto = .{
+                        .num_ticks = 8,
+                    },
+                },
+            },
+        };
+
+        var var_choice: usize = 1;
+        var prev_var_choice: usize = 1;
+    };
+
+    // TODO: allocate less or use arena or something else
+    // FIXME TODO: dont allocate memory for ground nodes
+    var var_entries = try gpa.alloc([]u8, report.node_count + report.component_count);
+    defer {
+        for (var_entries) |ent| {
+            gpa.free(ent);
+        }
+        gpa.free(var_entries);
+    }
+
+    for (0..report.node_count) |i| {
+        var_entries[i] = try std.fmt.allocPrint(gpa, "V(n{})", .{i});
+    }
+
+    for (0..report.component_count) |i| {
+        const graphic_comp = circuit.main_circuit.graphic_components.items[i];
+        //if (graphic_comp.comp.device == .ground) continue;
+        const comp_name = graphic_comp.comp.name;
+
+        var_entries[report.node_count + i] = try std.fmt.allocPrint(gpa, "I({s})", .{comp_name});
+    }
+
+    _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
+
+    if (S.prev_var_choice != S.var_choice) {
+        S.xaxis.min = null;
+        S.xaxis.max = null;
+        S.yaxis.min = null;
+        S.yaxis.max = null;
+        S.prev_var_choice = S.var_choice;
+    }
+
+    var plot = dvui.plot(@src(), .{
+        .title = var_entries[S.var_choice],
+        .x_axis = &S.xaxis,
+        .y_axis = &S.yaxis,
+        .border_thick = 1.0,
+        .mouse_hover = true,
+    }, .{ .expand = .both });
+    defer plot.deinit();
+
+    var s1 = plot.line();
+    defer s1.deinit();
+
+    if (S.var_choice >= report.node_count) {
+        const comp_idx = S.var_choice - report.node_count;
+        const current = report.current(comp_idx) catch @panic("TODO");
+        for (current, 0..) |c, i| {
+            if (c) |c_val| {
+                const time = report.time_values[i];
+                s1.point(time, c_val);
+            }
+        }
+    } else {
+        const voltage = report.voltage(S.var_choice) catch @panic("TODO");
+        for (voltage, 0..) |v, i| {
+            const time = report.time_values[i];
+            s1.point(time, v);
+        }
+    }
+
+    s1.stroke(2, dvui.themeGet().focus);
+}
+
 pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     var vbox = dvui.box(
         @src(),
@@ -697,8 +789,9 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     defer gpa.free(fw_entries);
     for (circuit.analysis_results.items, 0..) |res, i| {
         fw_entries[i] = switch (res) {
-            .dc => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (DC)", .{i}),
-            .frequency_sweep => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (Freq sweep)", .{i}),
+            .dc => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (dc)", .{i}),
+            .frequency_sweep => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (freq. sweep)", .{i}),
+            .transient => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (transient)", .{i}),
         };
     }
     defer {
@@ -725,6 +818,7 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     switch (chosen) {
         .dc => |dc_rep| try renderDCReport(gpa, dc_rep),
         .frequency_sweep => |fw_rep| try renderFWReport(gpa, fw_rep),
+        .transient => |trans_rep| try renderTransientReport(gpa, trans_rep),
     }
 }
 

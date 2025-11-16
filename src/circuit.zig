@@ -49,6 +49,7 @@ pub const GridPosition = struct {
 pub const AnalysisResult = union(enum) {
     dc: NetList.DCAnalysisReport,
     frequency_sweep: NetList.FrequencySweepReport,
+    transient: NetList.TransientReport,
 };
 
 pub var analysis_results: std.ArrayList(AnalysisResult) = .{};
@@ -483,24 +484,11 @@ pub const GraphicCircuit = struct {
         defer netlist.deinit(self.allocator);
 
         // TODO
-        var report = netlist.analyseTransient(self.allocator, null) catch {
+        const report = netlist.analyseTransient(self.allocator, null) catch {
             @panic("TODO");
         };
-        defer report.deinit(self.allocator);
 
-        std.debug.print("{any}\n", .{report.time_values});
-
-        for (0..report.node_count) |i| {
-            const voltage = report.voltage(i) catch @panic("TODO");
-            std.debug.print("{}: {any}\n", .{ i, voltage });
-        }
-
-        for (0..report.component_count) |i| {
-            const current = report.current(i) catch @panic("TODO");
-            std.debug.print("I{}: {any}\n", .{ i, current });
-        }
-
-        //analysis_results.append(self.allocator, .{ .dc = report }) catch @panic("TODO");
+        analysis_results.append(self.allocator, .{ .transient = report }) catch @panic("TODO");
     }
 
     pub fn analyseFrequencySweep(
