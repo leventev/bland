@@ -475,6 +475,29 @@ pub const GraphicCircuit = struct {
         analysis_results.append(self.allocator, .{ .dc = report }) catch @panic("TODO");
     }
 
+    pub fn analyseTransient(self: *const GraphicCircuit) void {
+        var netlist = self.createNetlist() catch {
+            std.log.err("Failed to build netlist", .{});
+            return;
+        };
+        defer netlist.deinit(self.allocator);
+
+        // TODO
+        var report = netlist.analyseTransient(self.allocator, null) catch {
+            @panic("TODO");
+        };
+        defer report.deinit(self.allocator);
+
+        std.debug.print("{any}\n", .{report.time_values});
+
+        for (0..report.node_count) |i| {
+            const voltage = report.voltage(i) catch @panic("TODO");
+            std.debug.print("{}: {any}\n", .{ i, voltage });
+        }
+
+        //analysis_results.append(self.allocator, .{ .dc = report }) catch @panic("TODO");
+    }
+
     pub fn analyseFrequencySweep(
         self: *const GraphicCircuit,
         start_freq: bland.Float,

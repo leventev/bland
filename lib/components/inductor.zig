@@ -6,6 +6,7 @@ const MNA = @import("../MNA.zig");
 const Component = component.Component;
 const Float = bland.Float;
 const Complex = bland.Complex;
+const StampOptions = Component.Device.StampOptions;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .inductor = 0.001 };
@@ -20,26 +21,31 @@ pub fn stampMatrix(
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
-    angular_frequency: Float,
+    stamp_opts: StampOptions,
 ) void {
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
-
-    const z = Complex.init(0, angular_frequency * inductance);
-
     const curr_idx = current_group_2_idx.?;
 
-    if (angular_frequency == 0) {
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentVoltage(curr_idx, v_plus, 1);
-        mna.stampCurrentVoltage(curr_idx, v_minus, -1);
-    } else {
-        // TODO: explain how stamping works
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentVoltage(curr_idx, v_plus, 1);
-        mna.stampCurrentVoltage(curr_idx, v_minus, -1);
-        mna.stampCurrentCurrentComplex(curr_idx, curr_idx, z.neg());
+    // TODO: explain how stamping works
+    switch (stamp_opts) {
+        .dc => {
+            // short circuit
+            mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+            mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+            mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+            mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+        },
+        .sin_steady_state => |angular_frequency| {
+            const z = Complex.init(0, angular_frequency * inductance);
+            mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+            mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+            mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+            mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+            mna.stampCurrentCurrentComplex(curr_idx, curr_idx, z.neg());
+        },
+        .transient => |_| {
+            @panic("TODO");
+        },
     }
 }

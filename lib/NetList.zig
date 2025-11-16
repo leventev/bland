@@ -13,8 +13,8 @@ nodes: std.ArrayListUnmanaged(Node),
 components: std.ArrayListUnmanaged(Component),
 
 pub const ground_node_id = 0;
-pub const DCAnalysisReport = MNA.DCAnalysisReport;
-pub const ACAnalysisReport = MNA.ACAnalysisReport;
+pub const DCAnalysisReport = MNA.RealAnalysisReport;
+pub const ACAnalysisReport = MNA.ComplexAnalysisReport;
 
 const NetList = @This();
 
@@ -109,6 +109,7 @@ pub fn deinit(self: *NetList, allocator: std.mem.Allocator) void {
     self.* = undefined;
 }
 
+// TODO: get rid of angular_frequency and ac_analysis
 fn createMNAMatrix(
     self: *NetList,
     allocator: std.mem.Allocator,
@@ -139,16 +140,6 @@ fn createMNAMatrix(
     };
 
     mna.zero();
-
-    for (0.., self.components.items) |idx, comp| {
-        const current_group_2_idx = std.mem.indexOf(usize, group_2, &.{idx});
-        comp.device.stampMatrix(
-            comp.terminal_node_ids,
-            &mna,
-            current_group_2_idx,
-            angular_frequency,
-        );
-    }
 
     return mna;
 }
@@ -247,7 +238,7 @@ pub fn analyseDC(
     self: *NetList,
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
-) Error!MNA.DCAnalysisReport {
+) Error!MNA.RealAnalysisReport {
     const start_time: i64 = std.time.microTimestamp();
 
     var group_2 = try self.createGroup2(allocator, currents_watched);
@@ -258,8 +249,18 @@ pub fn analyseDC(
     var mna = try self.createMNAMatrix(allocator, group_2.arr.items, 0, false);
     defer mna.deinit(allocator);
 
+    for (0.., self.components.items) |idx, comp| {
+        const current_group_2_idx = std.mem.indexOf(usize, group_2.arr.items, &.{idx});
+        comp.device.stampMatrix(
+            comp.terminal_node_ids,
+            &mna,
+            current_group_2_idx,
+            .dc,
+        );
+    }
+
     // solve the matrix with Gauss elimination
-    const res = try mna.solveDC(allocator);
+    const res = try mna.solveReal(allocator);
 
     const end_time: i64 = std.time.microTimestamp();
     const elapsed_us: f64 = @as(f64, @floatFromInt(end_time - start_time));
@@ -278,12 +279,143 @@ pub fn analyseDC(
     return res;
 }
 
-pub fn analyseAC(
+pub fn analyseTransient(
+    self: *NetList,
+    allocator: std.mem.Allocator,
+    currents_watched: ?[]const usize,
+) TransientReport.Error!TransientReport {
+    //const start_time: i64 = std.time.microTimestamp();
+
+    var group_2 = try self.createGroup2(allocator, currents_watched);
+    defer group_2.deinit(allocator);
+
+    const time_step: Float = 1e-5;
+    const until: Float = 0.01;
+
+    const time_point_count: usize = @as(usize, @intFromFloat(until / time_step)) + 1;
+
+    // TODO: adaptive time steps
+    var transient_report = try TransientReport.init(
+        allocator,
+        self.nodes.items.len,
+        self.components.items.len,
+        time_point_count,
+    );
+
+    // create matrix (|v| + |i2| X |v| + |i2| + 1)
+    // iterate over all elements and stamp them onto the matrix
+    // get values at t=0
+    var dc_res = try self.analyseDC(allocator, currents_watched);
+
+    for (0..self.nodes.items.len) |node_idx| {
+        const idx = node_idx * time_point_count;
+        transient_report.all_voltages[idx] = 0;
+        //transient_report.all_voltages[idx] = dc_res.voltages[node_idx];
+        //std.debug.print("dc_res: {} = {}", .{ node_idx, dc_res.voltages[node_idx] });
+    }
+
+    for (0..self.components.items.len) |comp_idx| {
+        const idx = comp_idx * time_point_count;
+        //transient_report.all_currents[idx] = dc_res.currents[comp_idx];
+        transient_report.all_currents[idx] = 0;
+    }
+
+    dc_res.deinit(allocator);
+
+    // t0 = 0
+    transient_report.time_values[0] = 0;
+    var mna = try self.createMNAMatrix(allocator, group_2.arr.items, 0, false);
+    defer mna.deinit(allocator);
+
+    for (1..time_point_count) |time_idx| {
+        const time = @as(Float, @floatFromInt(time_idx)) * time_step;
+        //std.debug.print("{}/{}: {}\n", .{ time_idx, time_point_count, time });
+        transient_report.time_values[time_idx] = time;
+
+        mna.zero();
+
+        for (0.., self.components.items) |comp_id, comp| {
+            const current_group_2_idx = std.mem.indexOf(usize, group_2.arr.items, &.{comp_id});
+            // TODO:
+            if (comp.device == .ground) {
+                comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
+                    .transient = .{
+                        .time_step = time_step,
+                        .prev_voltage = 0,
+                        .prev_current = 0,
+                    },
+                });
+            } else {
+                const voltage_pos = (try transient_report.voltage(comp.terminal_node_ids[0]))[time_idx - 1];
+                const voltage_neg = (try transient_report.voltage(comp.terminal_node_ids[1]))[time_idx - 1];
+                const voltage_prev = voltage_pos - voltage_neg;
+                const current_prev = (try transient_report.current(comp_id))[time_idx - 1];
+
+                comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
+                    .transient = .{
+                        .time_step = time_step,
+                        .prev_voltage = voltage_prev,
+                        .prev_current = current_prev,
+                    },
+                });
+            }
+        }
+
+        // TODO: no allocation
+        var step_res = try mna.solveReal(allocator);
+        defer step_res.deinit(allocator);
+
+        for (0..self.nodes.items.len) |node_idx| {
+            const idx = node_idx * time_point_count + time_idx;
+            transient_report.all_voltages[idx] = step_res.voltages[node_idx];
+        }
+
+        for (0.., self.components.items) |comp_idx, comp| {
+            const idx = comp_idx * time_point_count + time_idx;
+            std.debug.print("comp {}: {}\n", .{ comp_idx, step_res.currents[comp_idx].? });
+
+            const current_now = switch (comp.device) {
+                .capacitor => |c| blk: {
+                    const node_plus_id = comp.terminal_node_ids[0];
+                    const node_minus_id = comp.terminal_node_ids[1];
+                    const voltages_plus = transient_report.voltage(node_plus_id) catch unreachable;
+                    const voltages_minus = transient_report.voltage(node_minus_id) catch unreachable;
+                    const currents = transient_report.current(comp_idx) catch unreachable;
+                    const voltage_now = voltages_plus[time_idx] - voltages_minus[time_idx];
+                    const voltage_prev = voltages_plus[time_idx - 1] - voltages_minus[time_idx - 1];
+                    const current_prev = currents[time_idx - 1].?;
+                    break :blk (2 * c) / time_step * (voltage_now - voltage_prev) - current_prev;
+                },
+                else => step_res.currents[comp_idx],
+            };
+
+            transient_report.all_currents[idx] = current_now;
+        }
+    }
+
+    //const end_time: i64 = std.time.microTimestamp();
+    //const elapsed_us: f64 = @as(f64, @floatFromInt(end_time - start_time));
+    //const elapsed_s = elapsed_us / 1e6;
+    //
+    //var time_buff: [32]u8 = undefined;
+    //const time_str = bland.units.formatUnitBuf(
+    //    &time_buff,
+    //    .time,
+    //    elapsed_s,
+    //    3,
+    //) catch unreachable;
+
+    //bland.log.info("DC analysis took {s}", .{time_str});
+
+    return transient_report;
+}
+
+pub fn analyseSinusoidalSteadyState(
     self: *NetList,
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
     frequency: Float,
-) Error!MNA.ACAnalysisReport {
+) Error!MNA.ComplexAnalysisReport {
     std.debug.assert(frequency >= 0);
     const angular_frequency = 2 * std.math.pi * frequency;
 
@@ -295,8 +427,20 @@ pub fn analyseAC(
     var mna = try self.createMNAMatrix(allocator, group_2.arr.items, angular_frequency, true);
     defer mna.deinit(allocator);
 
+    for (0.., self.components.items) |idx, comp| {
+        const current_group_2_idx = std.mem.indexOf(usize, group_2.arr.items, &.{idx});
+        comp.device.stampMatrix(
+            comp.terminal_node_ids,
+            &mna,
+            current_group_2_idx,
+            .{
+                .sin_steady_state = angular_frequency,
+            },
+        );
+    }
+
     // solve the matrix with Gauss elimination
-    const res = try mna.solveAC(allocator);
+    const res = try mna.solveComplex(allocator);
     return res;
 }
 
@@ -412,6 +556,103 @@ pub const FrequencySweepReport = struct {
     }
 };
 
+pub const TransientReport = struct {
+    /// time values
+    time_values: []Float,
+
+    node_count: usize,
+    component_count: usize,
+
+    /// all voltage values for every time point are allocated together
+    all_voltages: []Float,
+
+    /// all currents values for every time point are allocated at the same time
+    all_currents: []?Float,
+
+    pub const Error = error{
+        InvalidTimeIdx,
+    } || NetList.Error;
+
+    fn init(
+        allocator: std.mem.Allocator,
+        node_count: usize,
+        component_count: usize,
+        time_count: usize,
+    ) TransientReport.Error!TransientReport {
+        if (time_count < 1) return error.InvalidFrequencyRange;
+
+        // TODO: figure out whats the best way to go about handling this error
+        std.debug.assert(node_count > 0);
+        std.debug.assert(component_count > 0);
+
+        const all_voltages = try allocator.alloc(
+            Float,
+            node_count * time_count,
+        );
+        errdefer allocator.free(all_voltages);
+
+        const all_currents = try allocator.alloc(
+            ?Float,
+            component_count * time_count,
+        );
+        errdefer allocator.free(all_currents);
+
+        const time_values = try allocator.alloc(Float, time_count);
+
+        return TransientReport{
+            .all_voltages = all_voltages,
+            .all_currents = all_currents,
+            .node_count = node_count,
+            .component_count = component_count,
+            .time_values = time_values,
+        };
+    }
+
+    pub fn deinit(self: *TransientReport, allocator: std.mem.Allocator) void {
+        allocator.free(self.time_values);
+        allocator.free(self.all_voltages);
+        allocator.free(self.all_currents);
+        self.* = undefined;
+    }
+
+    pub fn voltage(
+        self: *const TransientReport,
+        node_idx: usize,
+    ) TransientReport.Error![]const Float {
+        if (node_idx >= self.node_count) return error.InvalidNodeID;
+        const start_idx = node_idx * self.time_values.len;
+        const end_idx = (node_idx + 1) * self.time_values.len;
+        return self.all_voltages[start_idx..end_idx];
+    }
+
+    pub fn current(
+        self: *const TransientReport,
+        comp_idx: usize,
+    ) TransientReport.Error![]const ?Float {
+        if (comp_idx >= self.component_count) return error.InvalidComponentID;
+        const start_idx = comp_idx * self.time_values.len;
+        const end_idx = (comp_idx + 1) * self.time_values.len;
+        return self.all_currents[start_idx..end_idx];
+    }
+
+    //pub fn analysisReportForTime(
+    //    self: *const TransientReport,
+    //    freq_idx: usize,
+    //    report_buff: *ACAnalysisReport,
+    //) FrequencySweepReport.Error!void {
+    //    if (freq_idx >= self.frequency_values.len) return error.InvalidFequencyIdx;
+    //    for (0..report_buff.voltages.len) |idx| {
+    //        const voltage_for_freqs = self.voltage(idx) catch unreachable;
+    //        report_buff.voltages[idx] = voltage_for_freqs[freq_idx];
+    //    }
+    //
+    //    for (0..report_buff.currents.len) |idx| {
+    //        const current_for_freqs = self.current(idx) catch unreachable;
+    //        report_buff.currents[idx] = current_for_freqs[freq_idx];
+    //    }
+    //}
+};
+
 pub fn analyseFrequencySweep(
     self: *NetList,
     allocator: std.mem.Allocator,
@@ -434,7 +675,7 @@ pub fn analyseFrequencySweep(
     // TODO:
     for (fw_report.frequency_values, 0..) |freq, freq_idx| {
         // TODO
-        var report = try self.analyseAC(allocator, currents_watched, freq);
+        var report = try self.analyseSinusoidalSteadyState(allocator, currents_watched, freq);
         defer report.deinit(allocator);
 
         for (0..self.nodes.items.len) |node_idx| {

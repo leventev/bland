@@ -5,6 +5,7 @@ const MNA = @import("../MNA.zig");
 
 const Component = component.Component;
 const Float = bland.Float;
+const StampOptions = Component.Device.StampOptions;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .current_source = 1 };
@@ -19,20 +20,26 @@ pub fn stampMatrix(
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
-    angular_frequency: Float,
+    stamp_opts: StampOptions,
 ) void {
-    _ = angular_frequency;
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 
-    // TODO: explain how stamping works
-    if (current_group_2_idx) |curr_idx| {
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
-        mna.stampCurrentRHS(curr_idx, i);
-    } else {
-        mna.stampVoltageRHS(v_plus, -i);
-        mna.stampVoltageRHS(v_minus, i);
+    switch (stamp_opts) {
+        .dc, .sin_steady_state => {
+            // TODO: explain how stamping works
+            if (current_group_2_idx) |curr_idx| {
+                mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+                mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+                mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
+                mna.stampCurrentRHS(curr_idx, i);
+            } else {
+                mna.stampVoltageRHS(v_plus, -i);
+                mna.stampVoltageRHS(v_minus, i);
+            }
+        },
+        .transient => {
+            @panic("TODO");
+        },
     }
 }

@@ -305,12 +305,12 @@ fn print(
     }
 }
 
-pub fn solveDC(self: *MNA, allocator: std.mem.Allocator) !DCAnalysisReport {
+pub fn solveReal(self: *MNA, allocator: std.mem.Allocator) !RealAnalysisReport {
     var mat = self.mat.dc;
 
     mat.toRowReducedEchelon();
 
-    var dc_results = try DCAnalysisReport.init(
+    var dc_results = try RealAnalysisReport.init(
         allocator,
         self.nodes.len,
         self.component_count,
@@ -333,12 +333,12 @@ pub fn solveDC(self: *MNA, allocator: std.mem.Allocator) !DCAnalysisReport {
     return dc_results;
 }
 
-pub fn solveAC(self: *MNA, allocator: std.mem.Allocator) !ACAnalysisReport {
+pub fn solveComplex(self: *MNA, allocator: std.mem.Allocator) !ComplexAnalysisReport {
     var mat = self.mat.ac;
 
     mat.toRowReducedEchelon();
 
-    var ac_results = try ACAnalysisReport.init(
+    var ac_results = try ComplexAnalysisReport.init(
         allocator,
         self.nodes.len,
         self.component_count,
@@ -361,7 +361,7 @@ pub fn solveAC(self: *MNA, allocator: std.mem.Allocator) !ACAnalysisReport {
     return ac_results;
 }
 
-pub const DCAnalysisReport = struct {
+pub const RealAnalysisReport = struct {
     voltages: []Float,
     currents: []?Float,
 
@@ -369,8 +369,8 @@ pub const DCAnalysisReport = struct {
         allocator: std.mem.Allocator,
         node_count: usize,
         comp_count: usize,
-    ) !DCAnalysisReport {
-        return DCAnalysisReport{
+    ) !RealAnalysisReport {
+        return RealAnalysisReport{
             .voltages = try allocator.alloc(
                 Float,
                 node_count,
@@ -383,7 +383,7 @@ pub const DCAnalysisReport = struct {
     }
 
     pub fn deinit(
-        self: *DCAnalysisReport,
+        self: *RealAnalysisReport,
         allocator: std.mem.Allocator,
     ) void {
         allocator.free(self.voltages);
@@ -391,7 +391,7 @@ pub const DCAnalysisReport = struct {
         self.* = undefined;
     }
 
-    pub fn dump(self: *DCAnalysisReport) void {
+    pub fn dump(self: *RealAnalysisReport) void {
         for (self.voltages, 0..) |v, idx| {
             std.debug.print("v{}: {d}\n", .{ idx, v });
         }
@@ -406,7 +406,7 @@ pub const DCAnalysisReport = struct {
     }
 };
 
-pub const ACAnalysisReport = struct {
+pub const ComplexAnalysisReport = struct {
     voltages: []Complex,
     currents: []?Complex,
 
@@ -414,8 +414,8 @@ pub const ACAnalysisReport = struct {
         allocator: std.mem.Allocator,
         node_count: usize,
         comp_count: usize,
-    ) !ACAnalysisReport {
-        return ACAnalysisReport{
+    ) !ComplexAnalysisReport {
+        return ComplexAnalysisReport{
             .voltages = try allocator.alloc(
                 Complex,
                 node_count,
@@ -428,7 +428,7 @@ pub const ACAnalysisReport = struct {
     }
 
     pub fn deinit(
-        self: *ACAnalysisReport,
+        self: *ComplexAnalysisReport,
         allocator: std.mem.Allocator,
     ) void {
         allocator.free(self.voltages);
@@ -436,7 +436,7 @@ pub const ACAnalysisReport = struct {
         self.* = undefined;
     }
 
-    pub fn dump(self: *ACAnalysisReport) void {
+    pub fn dump(self: *ComplexAnalysisReport) void {
         for (self.voltages, 0..) |z, idx| {
             std.debug.print("v{}: ", .{idx});
             complex_matrix.prettyPrintComplex(Float, z);

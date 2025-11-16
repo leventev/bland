@@ -5,6 +5,7 @@ const MNA = @import("../MNA.zig");
 
 const Component = component.Component;
 const Float = bland.Float;
+const StampOptions = Component.Device.StampOptions;
 
 pub const Inner = struct {
     transresistance: Float,
@@ -23,9 +24,11 @@ pub fn stampMatrix(
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
-    angular_frequency: Float,
+    stamp_opts: StampOptions,
 ) void {
-    _ = angular_frequency;
+    // stamping is the same for every kind of analysis
+    _ = stamp_opts;
+
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 

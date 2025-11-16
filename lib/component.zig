@@ -2,7 +2,7 @@ const std = @import("std");
 const bland = @import("bland.zig");
 const MNA = @import("MNA.zig");
 
-const FloatType = bland.Float;
+const Float = bland.Float;
 
 pub const resistor_module = @import("components/resistor.zig");
 pub const voltage_source_module = @import("components/voltage_source.zig");
@@ -53,20 +53,30 @@ pub const Component = struct {
 
     pub const Device = union(DeviceType) {
         ground,
-        resistor: FloatType,
-        voltage_source: FloatType,
-        current_source: FloatType,
-        capacitor: FloatType,
-        inductor: FloatType,
+        resistor: Float,
+        voltage_source: Float,
+        current_source: Float,
+        capacitor: Float,
+        inductor: Float,
         ccvs: DeviceType.ccvs.module().Inner,
         cccs: DeviceType.cccs.module().Inner,
+
+        pub const StampOptions = union(enum) {
+            dc: void,
+            sin_steady_state: Float,
+            transient: struct {
+                time_step: Float,
+                prev_voltage: Float,
+                prev_current: ?Float,
+            },
+        };
 
         pub fn stampMatrix(
             self: *const Device,
             terminal_node_ids: []const usize,
             mna: *MNA,
             current_group_2_idx: ?usize,
-            angular_frequency: FloatType,
+            stamp_opts: StampOptions,
         ) void {
             switch (@as(DeviceType, self.*)) {
                 .ground => {},
@@ -75,7 +85,7 @@ pub const Component = struct {
                     terminal_node_ids,
                     mna,
                     current_group_2_idx,
-                    angular_frequency,
+                    stamp_opts,
                 ),
             }
         }
