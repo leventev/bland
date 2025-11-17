@@ -24,7 +24,7 @@ Features:
 - [X]  Capacitor and inductor
 - [X]  DC analysis
 - [X]  Sinusoidal steady state frequency sweep
-- [ ]  Bode plots
+- [X]  Bode plots
 - [X]  Time domain analysis
 - [ ]  Saving and loading circuits
 - [ ]  Parse expressions for inputs and plotting
