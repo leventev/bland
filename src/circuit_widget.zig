@@ -183,6 +183,7 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
                 try checkForKeybinds(key_ev);
             },
             .text => {},
+            else => {},
         }
     }
 }
