@@ -25,7 +25,7 @@ Features:
 - [X]  DC analysis
 - [X]  Sinusoidal steady state frequency sweep
 - [ ]  Bode plots
-- [ ]  Time domain analysis
+- [X]  Time domain analysis
 - [ ]  Saving and loading circuits
 - [ ]  Parse expressions for inputs and plotting
 - [X]  Console
