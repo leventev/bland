@@ -65,6 +65,7 @@ pub const Component = struct {
             dc: void,
             sin_steady_state: Float,
             transient: struct {
+                time: Float,
                 time_step: Float,
                 prev_voltage: Float,
                 prev_current: ?Float,

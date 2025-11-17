@@ -290,7 +290,7 @@ pub fn analyseTransient(
     defer group_2.deinit(allocator);
 
     const time_step: Float = 1e-5;
-    const until: Float = 0.01;
+    const until: Float = 0.1;
 
     const time_point_count: usize = @as(usize, @intFromFloat(until / time_step)) + 1;
 
@@ -340,6 +340,7 @@ pub fn analyseTransient(
             if (comp.device == .ground) {
                 comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
                     .transient = .{
+                        .time = time,
                         .time_step = time_step,
                         .prev_voltage = 0,
                         .prev_current = 0,
@@ -353,6 +354,7 @@ pub fn analyseTransient(
 
                 comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
                     .transient = .{
+                        .time = time,
                         .time_step = time_step,
                         .prev_voltage = voltage_prev,
                         .prev_current = current_prev,

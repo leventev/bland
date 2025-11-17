@@ -28,13 +28,24 @@ pub fn stampMatrix(
 
     // TODO: explain stamping
     switch (stamp_opts) {
-        .dc, .sin_steady_state, .transient => {
+        .dc, .sin_steady_state => {
             mna.stampVoltageCurrent(v_plus, curr_idx, 1);
             mna.stampVoltageCurrent(v_minus, curr_idx, -1);
 
             mna.stampCurrentVoltage(curr_idx, v_plus, 1);
             mna.stampCurrentVoltage(curr_idx, v_minus, -1);
             mna.stampCurrentRHS(curr_idx, v);
+        },
+        .transient => |trans| {
+            const freq = 50;
+            const voltage = v * @sin(2 * std.math.pi * freq * trans.time);
+
+            mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+            mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+
+            mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+            mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+            mna.stampCurrentRHS(curr_idx, voltage);
         },
     }
 }
