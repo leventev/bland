@@ -54,12 +54,12 @@ pub const Component = struct {
     pub const Device = union(DeviceType) {
         ground,
         resistor: Float,
-        voltage_source: Float,
+        voltage_source: voltage_source_module.VoltageOutput,
         current_source: Float,
         capacitor: Float,
         inductor: Float,
-        ccvs: DeviceType.ccvs.module().Inner,
-        cccs: DeviceType.cccs.module().Inner,
+        ccvs: ccvs_module.Inner,
+        cccs: cccs_module.Inner,
 
         pub const StampOptions = union(enum) {
             dc: void,

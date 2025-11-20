@@ -22,7 +22,7 @@ test "ohm's law" {
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = .{ .dc = v1 } },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
@@ -62,7 +62,7 @@ test "voltage divider" {
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = .{ .dc = v1 } },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
@@ -147,7 +147,7 @@ test "voltage divider many" {
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = .{ .dc = v1 } },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
@@ -195,7 +195,7 @@ test "current divider" {
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = .{ .dc = v1 } },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
@@ -242,7 +242,7 @@ test "current divider many" {
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = .{ .dc = v1 } },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );

@@ -5,10 +5,31 @@ const MNA = @import("../MNA.zig");
 
 const Component = component.Component;
 const Float = bland.Float;
+const Complex = bland.Complex;
 const StampOptions = Component.Device.StampOptions;
 
+/// Value of the output voltage
+pub const VoltageOutput = union(enum) {
+    /// Constant DC value
+    dc: Float,
+
+    // TODO: maybe replace with complex
+    /// Phasor, for sinusoidal steady state
+    phasor: struct {
+        amplitude: Float,
+        phase: Float,
+    },
+
+    /// Sinusoidal output: `amplitude`*sin(2*pi*`frequency` * time + `phase`)
+    sin: struct {
+        amplitude: Float,
+        frequency: Float,
+        phase: Float,
+    },
+};
+
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
-    return Component.Device{ .voltage_source = 5 };
+    return Component.Device{ .voltage_source = .{ .dc = 5 } };
 }
 
 pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
@@ -16,7 +37,7 @@ pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
 }
 
 pub fn stampMatrix(
-    v: Float,
+    voltage_output: VoltageOutput,
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
@@ -26,26 +47,53 @@ pub fn stampMatrix(
     const v_minus = terminal_node_ids[1];
     const curr_idx = current_group_2_idx orelse @panic("Invalid voltage stamp");
 
+    const RealOrComplex = union(enum) {
+        real: Float,
+        complex: Complex,
+    };
+
     // TODO: explain stamping
-    switch (stamp_opts) {
-        .dc, .sin_steady_state => {
-            mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-            mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-
-            mna.stampCurrentVoltage(curr_idx, v_plus, 1);
-            mna.stampCurrentVoltage(curr_idx, v_minus, -1);
-            mna.stampCurrentRHS(curr_idx, v);
+    const voltage: RealOrComplex = switch (stamp_opts) {
+        .dc => blk: {
+            switch (voltage_output) {
+                .dc => |dc_val| break :blk RealOrComplex{ .real = dc_val },
+                else => @panic("TODO: invalid voltage output"),
+            }
         },
-        .transient => |trans| {
-            const freq = 50;
-            const voltage = v * @sin(2 * std.math.pi * freq * trans.time);
-
-            mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-            mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-
-            mna.stampCurrentVoltage(curr_idx, v_plus, 1);
-            mna.stampCurrentVoltage(curr_idx, v_minus, -1);
-            mna.stampCurrentRHS(curr_idx, voltage);
+        .transient => |trans| blk: {
+            // TODO: validate sin params(frequency)
+            switch (voltage_output) {
+                .dc => |dc_val| break :blk RealOrComplex{ .real = dc_val },
+                .sin => |params| {
+                    const ang_freq = 2 * std.math.pi * params.frequency;
+                    const arg = ang_freq * trans.time + params.phase;
+                    break :blk RealOrComplex{ .real = params.amplitude * @sin(arg) };
+                },
+                .phasor => @panic("TODO: invalid voltage output"),
+            }
         },
+        .sin_steady_state => blk: {
+            switch (voltage_output) {
+                .phasor => |params| {
+                    const re = params.amplitude * @cos(params.phase);
+                    const im = params.amplitude * @sin(params.phase);
+                    break :blk RealOrComplex{
+                        .complex = Complex.init(re, im),
+                    };
+                },
+                else => @panic("TODO: invalid voltage output"),
+            }
+        },
+    };
+
+    mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+    mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+
+    mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+    mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+
+    switch (voltage) {
+        .real => |v| mna.stampCurrentRHS(curr_idx, v),
+        .complex => |v| mna.stampCurrentRHSComplex(curr_idx, v),
     }
 }

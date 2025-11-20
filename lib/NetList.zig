@@ -283,6 +283,7 @@ pub fn analyseTransient(
     self: *NetList,
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
+    until: Float,
 ) TransientReport.Error!TransientReport {
     const start_time: i64 = std.time.microTimestamp();
 
@@ -290,7 +291,6 @@ pub fn analyseTransient(
     defer group_2.deinit(allocator);
 
     const time_step: Float = 1e-5;
-    const until: Float = 0.1;
 
     const time_point_count: usize = @as(usize, @intFromFloat(until / time_step)) + 1;
 
@@ -319,8 +319,6 @@ pub fn analyseTransient(
         //transient_report.all_currents[idx] = dc_res.currents[comp_idx];
         transient_report.all_currents[idx] = 0;
     }
-
-    //dc_res.deinit(allocator);
 
     // t0 = 0
     transient_report.time_values[0] = 0;

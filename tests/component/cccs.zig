@@ -24,7 +24,7 @@ test "isolated current controlled current source" {
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = .{ .dc = v1 } },
         "V1",
         &.{ vs1_plus_id, gnd_id },
     );
@@ -114,7 +114,7 @@ test "coupled current controlled current source" {
 
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{ .voltage_source = .{ .dc = v1 } },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );

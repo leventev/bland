@@ -23,13 +23,26 @@ test "RL series" {
     const vs_plus_id = try netlist.allocateNode(gpa);
     const l_plus_id = try netlist.allocateNode(gpa);
 
-    const v1: Float = 560;
+    const v1_amplitude: Float = 560;
+    const v1_phase: Float = 362.4 / 180.0 * std.math.pi;
     const r1: Float = 440.5;
     const l1: Float = 888.888e-6;
 
+    const v1 = Complex.init(
+        v1_amplitude * @cos(v1_phase),
+        v1_amplitude * @sin(v1_phase),
+    );
+
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{
+            .voltage_source = .{
+                .phasor = .{
+                    .amplitude = v1_amplitude,
+                    .phase = v1_phase,
+                },
+            },
+        },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
@@ -73,18 +86,18 @@ test "RL series" {
 
         const angular_freq = 2 * std.math.pi * freq;
 
-        const inductor_voltage = Complex.init(v1, 0).mul(Complex.div(
+        const inductor_voltage = v1.mul(Complex.div(
             Complex.init(0, angular_freq * l1),
             Complex.init(r1, angular_freq * l1),
         ));
 
         // voltages
         try checkVoltageAC(&ac_report, gnd_id, Complex.init(0, 0));
-        try checkVoltageAC(&ac_report, vs_plus_id, Complex.init(v1, 0));
+        try checkVoltageAC(&ac_report, vs_plus_id, v1);
         try checkVoltageAC(&ac_report, l_plus_id, inductor_voltage);
 
         // currents
-        const current = Complex.init(v1, 0).sub(inductor_voltage).div(Complex.init(r1, 0));
+        const current = v1.sub(inductor_voltage).div(Complex.init(r1, 0));
         try checkCurrentAC(&ac_report, v1_comp_idx, current.neg());
         try checkCurrentAC(&ac_report, r1_comp_idx, current);
         try checkCurrentAC(&ac_report, l1_comp_idx, current);
@@ -99,13 +112,26 @@ test "RL parallel" {
     const gnd_id: usize = NetList.ground_node_id;
     const vs_plus_id = try netlist.allocateNode(gpa);
 
-    const v1: Float = 3.3;
+    const v1_amplitude: Float = 3.3;
+    const v1_phase: Float = 44 / 180 * std.math.pi;
     const r1: Float = 600;
     const l1: Float = 2.7e-3;
 
+    const v1 = Complex.init(
+        v1_amplitude * @cos(v1_phase),
+        v1_amplitude * @sin(v1_phase),
+    );
+
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{
+            .voltage_source = .{
+                .phasor = .{
+                    .amplitude = v1_amplitude,
+                    .phase = v1_phase,
+                },
+            },
+        },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
@@ -151,7 +177,7 @@ test "RL parallel" {
 
         // voltages
         try checkVoltageAC(&ac_report, gnd_id, Complex.init(0, 0));
-        try checkVoltageAC(&ac_report, vs_plus_id, Complex.init(v1, 0));
+        try checkVoltageAC(&ac_report, vs_plus_id, v1);
 
         // currents
         const r1_impedance = Complex.init(r1, 0);
@@ -161,7 +187,7 @@ test "RL parallel" {
             r1_impedance.add(l1_impedance),
         );
 
-        const total_current = Complex.init(v1, 0).div(total_impedance);
+        const total_current = v1.div(total_impedance);
         const resistor_current = total_current.mul(total_impedance.div(r1_impedance));
         const capacitor_current = total_current.mul(total_impedance.div(l1_impedance));
 
@@ -181,16 +207,29 @@ test "RL complex" {
     const l1_plus_id = try netlist.allocateNode(gpa);
     const l234_plus_id = try netlist.allocateNode(gpa);
 
-    const v1: Float = 990;
+    const v1_amplitude: Float = 990;
+    const v1_phase: Float = 777 / 180 * std.math.pi;
     const r1: Float = 60;
     const l1: Float = 983e-6;
     const l2: Float = 200e-3;
     const l3: Float = 440e-6;
     const l4: Float = 20e-3;
 
+    const v1 = Complex.init(
+        v1_amplitude * @cos(v1_phase),
+        v1_amplitude * @sin(v1_phase),
+    );
+
     const v1_comp_idx = try netlist.addComponent(
         gpa,
-        Component.Device{ .voltage_source = v1 },
+        Component.Device{
+            .voltage_source = .{
+                .phasor = .{
+                    .amplitude = v1_amplitude,
+                    .phase = v1_phase,
+                },
+            },
+        },
         "V1",
         &.{ vs_plus_id, gnd_id },
     );
@@ -270,24 +309,24 @@ test "RL complex" {
 
         const total_impedance = Complex.init(r1, 0).add(l1_impedance).add(l234_impedance);
 
-        const l1_voltage = Complex.init(v1, 0).mul(Complex.div(
+        const l1_voltage = v1.mul(Complex.div(
             l1_impedance,
             total_impedance,
         ));
 
-        const l234_voltage = Complex.init(v1, 0).mul(Complex.div(
+        const l234_voltage = v1.mul(Complex.div(
             l234_impedance,
             total_impedance,
         ));
 
         // voltages
         try checkVoltageAC(&ac_report, gnd_id, Complex.init(0, 0));
-        try checkVoltageAC(&ac_report, vs_plus_id, Complex.init(v1, 0));
+        try checkVoltageAC(&ac_report, vs_plus_id, v1);
         try checkVoltage2AC(&ac_report, l1_plus_id, l234_plus_id, l1_voltage);
         try checkVoltageAC(&ac_report, l234_plus_id, l234_voltage);
 
         // currents
-        const current = Complex.init(v1, 0).div(total_impedance);
+        const current = v1.div(total_impedance);
         try checkCurrentAC(&ac_report, v1_comp_idx, current.neg());
         try checkCurrentAC(&ac_report, r1_comp_idx, current);
         try checkCurrentAC(&ac_report, l1_comp_idx, current);
