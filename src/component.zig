@@ -170,6 +170,12 @@ pub const GraphicComponent = struct {
             sin_frequency_actual: []u8,
             sin_phase_buff: []u8,
             sin_phase_actual: []u8,
+
+            // OutputFunction.square
+            square_amplitude_buff: []u8,
+            square_amplitude_actual: []u8,
+            square_frequency_buff: []u8,
+            square_frequency_actual: []u8,
         },
         current_source: struct {
             // TODO: store this smarter
@@ -193,6 +199,12 @@ pub const GraphicComponent = struct {
             sin_frequency_actual: []u8,
             sin_phase_buff: []u8,
             sin_phase_actual: []u8,
+
+            // OutputFunction.square
+            square_amplitude_buff: []u8,
+            square_amplitude_actual: []u8,
+            square_frequency_buff: []u8,
+            square_frequency_actual: []u8,
         },
         capacitor: struct {
             buff: []u8,
@@ -274,6 +286,11 @@ pub const GraphicComponent = struct {
                         .sin_frequency_actual = &.{},
                         .sin_phase_buff = try gpa.alloc(u8, max_float_length),
                         .sin_phase_actual = &.{},
+
+                        .square_amplitude_buff = try gpa.alloc(u8, max_float_length),
+                        .square_amplitude_actual = &.{},
+                        .square_frequency_buff = try gpa.alloc(u8, max_float_length),
+                        .square_frequency_actual = &.{},
                     },
                 },
                 .current_source => .{
@@ -294,6 +311,11 @@ pub const GraphicComponent = struct {
                         .sin_frequency_actual = &.{},
                         .sin_phase_buff = try gpa.alloc(u8, max_float_length),
                         .sin_phase_actual = &.{},
+
+                        .square_amplitude_buff = try gpa.alloc(u8, max_float_length),
+                        .square_amplitude_actual = &.{},
+                        .square_frequency_buff = try gpa.alloc(u8, max_float_length),
+                        .square_frequency_actual = &.{},
                     },
                 },
             };
@@ -369,6 +391,18 @@ pub const GraphicComponent = struct {
                         0,
                         precision,
                     );
+
+                    buf.square_amplitude_actual = try bland.units.formatPrefixBuf(
+                        buf.square_amplitude_buff,
+                        5,
+                        precision,
+                    );
+
+                    buf.square_frequency_actual = try bland.units.formatPrefixBuf(
+                        buf.square_frequency_buff,
+                        10,
+                        precision,
+                    );
                 },
                 .current_source => |*buf| {
                     // TODO TODO TODO
@@ -405,6 +439,18 @@ pub const GraphicComponent = struct {
                     buf.sin_phase_actual = try bland.units.formatPrefixBuf(
                         buf.sin_phase_buff,
                         0,
+                        precision,
+                    );
+
+                    buf.square_amplitude_actual = try bland.units.formatPrefixBuf(
+                        buf.square_amplitude_buff,
+                        5,
+                        precision,
+                    );
+
+                    buf.square_frequency_actual = try bland.units.formatPrefixBuf(
+                        buf.square_frequency_buff,
+                        10,
                         precision,
                     );
                 },

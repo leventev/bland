@@ -270,7 +270,7 @@ pub fn renderPropertyBox(
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    const entries = [_][]const u8{ "DC", "Phasor", "Sine" };
+    const entries = [_][]const u8{ "DC", "Phasor", "Sine", "Square" };
     const radio_group = dvui.radioGroup(@src(), .{}, .{ .label = .{ .text = "Function" } });
     defer radio_group.deinit();
 
@@ -389,6 +389,43 @@ pub fn renderPropertyBox(
                 &value_buffer.current_source.sin_phase_actual,
                 .radian,
                 &current_output.sin.phase,
+                changed,
+                .{},
+            );
+        },
+        .square => {
+            if (function_changed) {
+                const amplitude = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.square_amplitude_actual,
+                ) catch 5;
+                const frequency = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.square_frequency_actual,
+                ) catch 10;
+
+                current_output.* = .{
+                    .square = .{
+                        .amplitude = amplitude,
+                        .frequency = frequency,
+                    },
+                };
+            }
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "amplitude",
+                &value_buffer.current_source.square_amplitude_actual,
+                .voltage,
+                &current_output.square.amplitude,
+                changed,
+                .{},
+            );
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "frequency",
+                &value_buffer.current_source.square_frequency_actual,
+                .frequency,
+                &current_output.square.frequency,
                 changed,
                 .{},
             );

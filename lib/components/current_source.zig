@@ -51,6 +51,16 @@ pub fn stampMatrix(
                     const arg = ang_freq * trans.time + params.phase;
                     break :blk RealOrComplex{ .real = params.amplitude * @sin(arg) };
                 },
+                .square => |params| {
+                    // TODO: only accept good values
+                    const period = 1 / params.frequency;
+                    const rem = @rem(trans.time, period);
+                    if (rem <= period * 0.5) {
+                        break :blk RealOrComplex{ .real = params.amplitude };
+                    } else {
+                        break :blk RealOrComplex{ .real = -params.amplitude };
+                    }
+                },
                 .phasor => return error.InvalidOutputFunctionForAnalysisMode,
             }
         },

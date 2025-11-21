@@ -298,7 +298,7 @@ pub fn analyseTransient(
     var group_2 = try self.createGroup2(allocator, currents_watched);
     defer group_2.deinit(allocator);
 
-    const time_step: Float = 1e-5;
+    const time_step: Float = 5e-5;
 
     const time_point_count: usize = @as(usize, @intFromFloat(until / time_step)) + 1;
 

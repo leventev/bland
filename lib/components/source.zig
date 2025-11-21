@@ -6,6 +6,7 @@ pub const OutputFunctionType = enum {
     dc,
     phasor,
     sin,
+    square,
 };
 
 /// Output function of a source
@@ -25,5 +26,11 @@ pub const OutputFunction = union(OutputFunctionType) {
         amplitude: Float,
         frequency: Float,
         phase: Float,
+    },
+
+    ///
+    square: struct {
+        amplitude: Float,
+        frequency: Float,
     },
 };
