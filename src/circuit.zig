@@ -484,7 +484,11 @@ pub const GraphicCircuit = struct {
         defer netlist.deinit(self.allocator);
 
         // TODO
-        const report = netlist.analyseTransient(self.allocator, null) catch {
+        const report = netlist.analyseTransient(
+            self.allocator,
+            null,
+            0.1,
+        ) catch {
             @panic("TODO");
         };
 

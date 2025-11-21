@@ -8,8 +8,14 @@ const Float = bland.Float;
 const Complex = bland.Complex;
 const StampOptions = Component.Device.StampOptions;
 
+pub const VoltageOutputType = enum {
+    dc,
+    phasor,
+    sin,
+};
+
 /// Value of the output voltage
-pub const VoltageOutput = union(enum) {
+pub const VoltageOutput = union(VoltageOutputType) {
     /// Constant DC value
     dc: Float,
 

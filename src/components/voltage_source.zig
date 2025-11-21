@@ -13,7 +13,7 @@ const GridPosition = circuit.GridPosition;
 const Rotation = circuit.Rotation;
 const Float = bland.Float;
 
-const voltage_source_module = bland.component.voltage_source_module;
+const vs_module = bland.component.voltage_source_module;
 
 var voltage_source_counter: usize = 0;
 
@@ -60,9 +60,9 @@ pub fn render(
     const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
-    const value_str = if (value) |val|
+    const value_str = if (value) |_|
         std.fmt.bufPrint(&buff, "{s}{s}", .{
-            val.voltage_source.actual,
+            "5",
             bland.units.Unit.voltage.symbol(),
         }) catch unreachable
     else
@@ -221,21 +221,150 @@ pub fn render(
 }
 
 pub fn renderPropertyBox(
-    v: *Float,
+    voltage_output: *vs_module.VoltageOutput,
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    dvui.label(@src(), "voltage", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
+    const entries = [_][]const u8{ "DC", "Phasor", "Sine" };
+    const radio_group = dvui.radioGroup(@src(), .{}, .{ .label = .{ .text = "Function" } });
+    defer radio_group.deinit();
 
-    _ = renderer.textEntrySI(
-        @src(),
-        &value_buffer.voltage_source.actual,
-        .voltage,
-        v,
-        selected_component_changed,
-        .{},
-    );
+    var function_changed: bool = false;
+
+    for (0..entries.len) |i| {
+        const active = i == @intFromEnum(value_buffer.voltage_source.selected_function);
+
+        if (dvui.radio(@src(), active, entries[i], .{ .id_extra = i })) {
+            value_buffer.voltage_source.selected_function = @enumFromInt(i);
+            function_changed = true;
+        }
+    }
+
+    const changed = function_changed or selected_component_changed;
+
+    switch (value_buffer.voltage_source.selected_function) {
+        .dc => {
+            if (function_changed) {
+                const val = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.voltage_source.dc_actual,
+                ) catch 5;
+                voltage_output.* = .{ .dc = val };
+            }
+
+            dvui.label(@src(), "offset", .{}, .{
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+            });
+            _ = renderer.textEntrySI(
+                @src(),
+                &value_buffer.voltage_source.dc_actual,
+                .voltage,
+                &voltage_output.dc,
+                changed,
+                .{},
+            );
+        },
+        .phasor => {
+            if (function_changed) {
+                const amplitude = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.voltage_source.phasor_amplitude_actual,
+                ) catch 5;
+                const phase = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.voltage_source.phasor_phase_actual,
+                ) catch 0;
+                voltage_output.* = .{
+                    .phasor = .{
+                        .amplitude = amplitude,
+                        .phase = phase,
+                    },
+                };
+            }
+
+            dvui.label(@src(), "amplitude", .{}, .{
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+            });
+            _ = renderer.textEntrySI(
+                @src(),
+                &value_buffer.voltage_source.phasor_amplitude_actual,
+                .voltage,
+                &voltage_output.phasor.amplitude,
+                changed,
+                .{},
+            );
+
+            dvui.label(@src(), "phase", .{}, .{
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+            });
+            _ = renderer.textEntrySI(
+                @src(),
+                &value_buffer.voltage_source.phasor_phase_actual,
+                .dimensionless,
+                &voltage_output.phasor.phase,
+                changed,
+                .{},
+            );
+        },
+        .sin => {
+            if (function_changed) {
+                const amplitude = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.voltage_source.sin_amplitude_actual,
+                ) catch 5;
+                const frequency = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.voltage_source.sin_frequency_actual,
+                ) catch 10;
+                const phase = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.voltage_source.sin_phase_actual,
+                ) catch 0;
+
+                voltage_output.* = .{
+                    .sin = .{
+                        .amplitude = amplitude,
+                        .phase = phase,
+                        .frequency = frequency,
+                    },
+                };
+            }
+
+            dvui.label(@src(), "amplitude", .{}, .{
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+            });
+            _ = renderer.textEntrySI(
+                @src(),
+                &value_buffer.voltage_source.sin_amplitude_actual,
+                .voltage,
+                &voltage_output.sin.amplitude,
+                changed,
+                .{},
+            );
+
+            dvui.label(@src(), "frequency", .{}, .{
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+            });
+            _ = renderer.textEntrySI(
+                @src(),
+                &value_buffer.voltage_source.sin_frequency_actual,
+                .frequency,
+                &voltage_output.sin.frequency,
+                changed,
+                .{},
+            );
+
+            dvui.label(@src(), "phase", .{}, .{
+                .color_text = dvui.themeGet().color(.content, .text),
+                .font = dvui.themeGet().font_body,
+            });
+            _ = renderer.textEntrySI(
+                @src(),
+                &value_buffer.voltage_source.sin_phase_actual,
+                .dimensionless,
+                &voltage_output.sin.phase,
+                changed,
+                .{},
+            );
+        },
+    }
 }

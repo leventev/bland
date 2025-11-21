@@ -149,8 +149,27 @@ pub const GraphicComponent = struct {
             actual: []u8,
         },
         voltage_source: struct {
-            buff: []u8,
-            actual: []u8,
+            // TODO: store this smarter
+
+            selected_function: bland.component.voltage_source_module.VoltageOutputType,
+
+            // VoltageOutput.dc
+            dc_buff: []u8,
+            dc_actual: []u8,
+
+            // VoltageOutput.phasor
+            phasor_amplitude_buff: []u8,
+            phasor_amplitude_actual: []u8,
+            phasor_phase_buff: []u8,
+            phasor_phase_actual: []u8,
+
+            // VoltageOutput.sin
+            sin_amplitude_buff: []u8,
+            sin_amplitude_actual: []u8,
+            sin_frequency_buff: []u8,
+            sin_frequency_actual: []u8,
+            sin_phase_buff: []u8,
+            sin_phase_actual: []u8,
         },
         current_source: struct {
             buff: []u8,
@@ -220,8 +239,22 @@ pub const GraphicComponent = struct {
                 },
                 .voltage_source => .{
                     .voltage_source = .{
-                        .buff = try gpa.alloc(u8, max_float_length),
-                        .actual = &.{},
+                        .selected_function = .dc,
+
+                        .dc_buff = try gpa.alloc(u8, max_float_length),
+                        .dc_actual = &.{},
+
+                        .phasor_amplitude_buff = try gpa.alloc(u8, max_float_length),
+                        .phasor_amplitude_actual = &.{},
+                        .phasor_phase_buff = try gpa.alloc(u8, max_float_length),
+                        .phasor_phase_actual = &.{},
+
+                        .sin_amplitude_buff = try gpa.alloc(u8, max_float_length),
+                        .sin_amplitude_actual = &.{},
+                        .sin_frequency_buff = try gpa.alloc(u8, max_float_length),
+                        .sin_frequency_actual = &.{},
+                        .sin_phase_buff = try gpa.alloc(u8, max_float_length),
+                        .sin_phase_actual = &.{},
                     },
                 },
                 .current_source => .{
@@ -234,7 +267,7 @@ pub const GraphicComponent = struct {
         }
 
         // TODO:
-        pub fn setValue(self: *@This(), precision: usize, dev: Device) !void {
+        pub fn setDeefaultValue(self: *@This(), precision: usize, dev: Device) !void {
             switch (self.*) {
                 .ground => {},
                 .resistor => |*buf| buf.actual = try bland.units.formatPrefixBuf(
@@ -266,11 +299,44 @@ pub const GraphicComponent = struct {
                         precision,
                     );
                 },
-                .voltage_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(
-                    buf.buff,
-                    dev.voltage_source,
-                    precision,
-                ),
+                .voltage_source => |*buf| {
+                    // TODO
+                    buf.dc_actual = try bland.units.formatPrefixBuf(
+                        buf.dc_buff,
+                        dev.voltage_source.dc,
+                        precision,
+                    );
+
+                    buf.phasor_amplitude_actual = try bland.units.formatPrefixBuf(
+                        buf.phasor_amplitude_buff,
+                        5,
+                        precision,
+                    );
+
+                    buf.phasor_phase_actual = try bland.units.formatPrefixBuf(
+                        buf.phasor_phase_buff,
+                        0,
+                        precision,
+                    );
+
+                    buf.sin_amplitude_actual = try bland.units.formatPrefixBuf(
+                        buf.sin_amplitude_buff,
+                        5,
+                        precision,
+                    );
+
+                    buf.sin_frequency_actual = try bland.units.formatPrefixBuf(
+                        buf.sin_frequency_buff,
+                        10,
+                        precision,
+                    );
+
+                    buf.sin_phase_actual = try bland.units.formatPrefixBuf(
+                        buf.sin_phase_buff,
+                        0,
+                        precision,
+                    );
+                },
                 .current_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(
                     buf.buff,
                     dev.current_source,
@@ -304,7 +370,7 @@ pub const GraphicComponent = struct {
             .value_buffer = try .init(gpa, circuit.held_component),
         };
         try graphic_comp.setNewComponentName();
-        try graphic_comp.value_buffer.setValue(0, graphic_comp.comp.device);
+        try graphic_comp.value_buffer.setDeefaultValue(0, graphic_comp.comp.device);
 
         return graphic_comp;
     }
