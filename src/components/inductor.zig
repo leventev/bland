@@ -196,13 +196,9 @@ pub fn renderPropertyBox(
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    dvui.label(@src(), "inductance", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
-
     _ = renderer.textEntrySI(
         @src(),
+        "inductance",
         &value_buffer.inductor.actual,
         .inductance,
         l,

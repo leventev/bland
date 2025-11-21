@@ -163,13 +163,9 @@ pub fn render(
 }
 
 pub fn renderPropertyBox(r: *Float, value_buffer: *GraphicComponent.ValueBuffer, selected_component_changed: bool) void {
-    dvui.label(@src(), "resistance", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
-
     _ = renderer.textEntrySI(
         @src(),
+        "resistance",
         &value_buffer.resistor.actual,
         .resistance,
         r,

@@ -216,13 +216,9 @@ pub fn renderPropertyBox(
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    dvui.label(@src(), "transresistance", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
-
     _ = renderer.textEntrySI(
         @src(),
+        "transresistance",
         &value_buffer.ccvs.transresistance_actual,
         .resistance,
         &inner.transresistance,

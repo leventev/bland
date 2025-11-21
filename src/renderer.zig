@@ -828,6 +828,7 @@ fn formatFrequency(gpa: std.mem.Allocator, freq: f64) ![]const u8 {
 
 pub fn textEntrySI(
     location: std.builtin.SourceLocation,
+    comptime label_str: []const u8,
     buff_actual: *[]u8,
     unit: bland.units.Unit,
     val: *bland.Float,
@@ -836,11 +837,24 @@ pub fn textEntrySI(
 ) bool {
     _ = opts;
     var box = dvui.box(location, .{
-        .dir = .horizontal,
+        .dir = .vertical,
     }, .{
         .expand = .horizontal,
     });
     defer box.deinit();
+
+    // TODO: styling
+    dvui.label(@src(), label_str, .{}, .{
+        .color_text = dvui.themeGet().color(.content, .text),
+        .font = dvui.themeGet().font_body,
+    });
+
+    var box2 = dvui.box(@src(), .{
+        .dir = .horizontal,
+    }, .{
+        .expand = .horizontal,
+    });
+    defer box2.deinit();
 
     const prev_val = val.*;
     var changed = false;

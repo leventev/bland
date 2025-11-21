@@ -251,12 +251,9 @@ pub fn renderPropertyBox(
                 voltage_output.* = .{ .dc = val };
             }
 
-            dvui.label(@src(), "offset", .{}, .{
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-            });
             _ = renderer.textEntrySI(
                 @src(),
+                "offset",
                 &value_buffer.voltage_source.dc_actual,
                 .voltage,
                 &voltage_output.dc,
@@ -280,12 +277,9 @@ pub fn renderPropertyBox(
                 };
             }
 
-            dvui.label(@src(), "amplitude", .{}, .{
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-            });
             _ = renderer.textEntrySI(
                 @src(),
+                "amplitude",
                 &value_buffer.voltage_source.phasor_amplitude_actual,
                 .voltage,
                 &voltage_output.phasor.amplitude,
@@ -293,12 +287,9 @@ pub fn renderPropertyBox(
                 .{},
             );
 
-            dvui.label(@src(), "phase", .{}, .{
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-            });
             _ = renderer.textEntrySI(
                 @src(),
+                "phase",
                 &value_buffer.voltage_source.phasor_phase_actual,
                 .dimensionless,
                 &voltage_output.phasor.phase,
@@ -327,12 +318,9 @@ pub fn renderPropertyBox(
                 };
             }
 
-            dvui.label(@src(), "amplitude", .{}, .{
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-            });
             _ = renderer.textEntrySI(
                 @src(),
+                "amplitude",
                 &value_buffer.voltage_source.sin_amplitude_actual,
                 .voltage,
                 &voltage_output.sin.amplitude,
@@ -340,12 +328,9 @@ pub fn renderPropertyBox(
                 .{},
             );
 
-            dvui.label(@src(), "frequency", .{}, .{
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-            });
             _ = renderer.textEntrySI(
                 @src(),
+                "frequency",
                 &value_buffer.voltage_source.sin_frequency_actual,
                 .frequency,
                 &voltage_output.sin.frequency,
@@ -353,12 +338,9 @@ pub fn renderPropertyBox(
                 .{},
             );
 
-            dvui.label(@src(), "phase", .{}, .{
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-            });
             _ = renderer.textEntrySI(
                 @src(),
+                "phase",
                 &value_buffer.voltage_source.sin_phase_actual,
                 .dimensionless,
                 &voltage_output.sin.phase,

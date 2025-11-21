@@ -200,13 +200,9 @@ pub fn renderPropertyBox(
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    dvui.label(@src(), "capacitance", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
-
     _ = renderer.textEntrySI(
         @src(),
+        "capacitance",
         &value_buffer.capacitor.actual,
         .capacitance,
         c,

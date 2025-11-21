@@ -259,13 +259,9 @@ pub fn renderPropertyBox(
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    dvui.label(@src(), "multiplier", .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
-
     _ = renderer.textEntrySI(
         @src(),
+        "multiplier",
         &value_buffer.cccs.multiplier_actual,
         .dimensionless,
         &inner.multiplier,
