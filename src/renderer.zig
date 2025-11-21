@@ -467,7 +467,12 @@ pub fn render(gpa: std.mem.Allocator) !bool {
     return true;
 }
 
-pub fn renderDCReport(gpa: std.mem.Allocator, dc_report: NetList.DCAnalysisReport) !void {
+pub fn renderDCReport(
+    gpa: std.mem.Allocator,
+    dc_report: NetList.DCAnalysisReport,
+    report_changed: bool,
+) !void {
+    _ = report_changed;
     const S = struct {
         var scroll_info: dvui.ScrollInfo = .{ .vertical = .given, .horizontal = .none };
         var last_col_width: f32 = 0;
@@ -583,9 +588,11 @@ pub fn renderDCReport(gpa: std.mem.Allocator, dc_report: NetList.DCAnalysisRepor
     }
 }
 
-pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepReport) !void {
-    // TODO: reset min, max on fw_rep change
-
+pub fn renderFWReport(
+    gpa: std.mem.Allocator,
+    fw_report: NetList.FrequencySweepReport,
+    report_changed: bool,
+) !void {
     const S = struct {
         var xaxis: dvui.PlotWidget.Axis = .{
             .name = "Frequency (Hz)",
@@ -634,7 +641,7 @@ pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepR
 
     _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
 
-    if (S.prev_var_choice != S.var_choice) {
+    if (S.prev_var_choice != S.var_choice or report_changed) {
         S.xaxis.min = null;
         S.xaxis.max = null;
         S.yaxis.min = null;
@@ -676,7 +683,11 @@ pub fn renderFWReport(gpa: std.mem.Allocator, fw_report: NetList.FrequencySweepR
     s1.stroke(2, dvui.themeGet().focus);
 }
 
-pub fn renderTransientReport(gpa: std.mem.Allocator, report: NetList.TransientReport) !void {
+pub fn renderTransientReport(
+    gpa: std.mem.Allocator,
+    report: NetList.TransientReport,
+    report_changed: bool,
+) !void {
     const S = struct {
         var xaxis: dvui.PlotWidget.Axis = .{
             .name = "Time (s)",
@@ -728,7 +739,7 @@ pub fn renderTransientReport(gpa: std.mem.Allocator, report: NetList.TransientRe
 
     _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
 
-    if (S.prev_var_choice != S.var_choice) {
+    if (S.prev_var_choice != S.var_choice or report_changed) {
         S.xaxis.min = null;
         S.xaxis.max = null;
         S.yaxis.min = null;
@@ -804,7 +815,7 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
         var fw_choice: usize = 0;
     };
 
-    _ = dvui.dropdown(@src(), fw_entries, &S.fw_choice, .{});
+    const changed = dvui.dropdown(@src(), fw_entries, &S.fw_choice, .{});
 
     var report_box = dvui.box(@src(), .{ .dir = .vertical }, .{
         .border = dvui.Rect{ .y = 2 },
@@ -816,9 +827,9 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
 
     const chosen = circuit.analysis_results.items[S.fw_choice];
     switch (chosen) {
-        .dc => |dc_rep| try renderDCReport(gpa, dc_rep),
-        .frequency_sweep => |fw_rep| try renderFWReport(gpa, fw_rep),
-        .transient => |trans_rep| try renderTransientReport(gpa, trans_rep),
+        .dc => |dc_rep| try renderDCReport(gpa, dc_rep, changed),
+        .frequency_sweep => |fw_rep| try renderFWReport(gpa, fw_rep, changed),
+        .transient => |trans_rep| try renderTransientReport(gpa, trans_rep, changed),
     }
 }
 
