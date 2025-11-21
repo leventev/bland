@@ -270,16 +270,6 @@ pub fn renderPropertyBox(
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    //_ = renderer.textEntrySI(
-    //    @src(),
-    //    "current",
-    //    &value_buffer.current_source.actual,
-    //    .current,
-    //    current,
-    //    selected_component_changed,
-    //    .{},
-    //);
-
     const entries = [_][]const u8{ "DC", "Phasor", "Sine" };
     const radio_group = dvui.radioGroup(@src(), .{}, .{ .label = .{ .text = "Function" } });
     defer radio_group.deinit();
@@ -346,7 +336,7 @@ pub fn renderPropertyBox(
                 @src(),
                 "phase",
                 &value_buffer.current_source.phasor_phase_actual,
-                .dimensionless,
+                .radian,
                 &current_output.phasor.phase,
                 changed,
                 .{},
@@ -397,7 +387,7 @@ pub fn renderPropertyBox(
                 @src(),
                 "phase",
                 &value_buffer.current_source.sin_phase_actual,
-                .dimensionless,
+                .radian,
                 &current_output.sin.phase,
                 changed,
                 .{},
