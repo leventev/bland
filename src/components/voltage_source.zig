@@ -221,7 +221,7 @@ pub fn render(
 }
 
 pub fn renderPropertyBox(
-    voltage_output: *vs_module.VoltageOutput,
+    voltage_output: *bland.component.source.OutputFunction,
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {

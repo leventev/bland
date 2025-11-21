@@ -1,6 +1,7 @@
 const std = @import("std");
 const bland = @import("bland.zig");
 const MNA = @import("MNA.zig");
+pub const source = @import("components/source.zig");
 
 const Float = bland.Float;
 
@@ -54,8 +55,8 @@ pub const Component = struct {
     pub const Device = union(DeviceType) {
         ground,
         resistor: Float,
-        voltage_source: voltage_source_module.VoltageOutput,
-        current_source: Float,
+        voltage_source: source.OutputFunction,
+        current_source: source.OutputFunction,
         capacitor: Float,
         inductor: Float,
         ccvs: ccvs_module.Inner,

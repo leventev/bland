@@ -151,19 +151,19 @@ pub const GraphicComponent = struct {
         voltage_source: struct {
             // TODO: store this smarter
 
-            selected_function: bland.component.voltage_source_module.VoltageOutputType,
+            selected_function: bland.component.source.OutputFunctionType,
 
-            // VoltageOutput.dc
+            // OutputFunction.dc
             dc_buff: []u8,
             dc_actual: []u8,
 
-            // VoltageOutput.phasor
+            // OutputFunction.phasor
             phasor_amplitude_buff: []u8,
             phasor_amplitude_actual: []u8,
             phasor_phase_buff: []u8,
             phasor_phase_actual: []u8,
 
-            // VoltageOutput.sin
+            // OutputFunction.sin
             sin_amplitude_buff: []u8,
             sin_amplitude_actual: []u8,
             sin_frequency_buff: []u8,
@@ -172,8 +172,27 @@ pub const GraphicComponent = struct {
             sin_phase_actual: []u8,
         },
         current_source: struct {
-            buff: []u8,
-            actual: []u8,
+            // TODO: store this smarter
+
+            selected_function: bland.component.source.OutputFunctionType,
+
+            // OutputFunction.dc
+            dc_buff: []u8,
+            dc_actual: []u8,
+
+            // OutputFunction.phasor
+            phasor_amplitude_buff: []u8,
+            phasor_amplitude_actual: []u8,
+            phasor_phase_buff: []u8,
+            phasor_phase_actual: []u8,
+
+            // OutputFunction.sin
+            sin_amplitude_buff: []u8,
+            sin_amplitude_actual: []u8,
+            sin_frequency_buff: []u8,
+            sin_frequency_actual: []u8,
+            sin_phase_buff: []u8,
+            sin_phase_actual: []u8,
         },
         capacitor: struct {
             buff: []u8,
@@ -259,8 +278,22 @@ pub const GraphicComponent = struct {
                 },
                 .current_source => .{
                     .current_source = .{
-                        .buff = try gpa.alloc(u8, max_float_length),
-                        .actual = &.{},
+                        .selected_function = .dc,
+
+                        .dc_buff = try gpa.alloc(u8, max_float_length),
+                        .dc_actual = &.{},
+
+                        .phasor_amplitude_buff = try gpa.alloc(u8, max_float_length),
+                        .phasor_amplitude_actual = &.{},
+                        .phasor_phase_buff = try gpa.alloc(u8, max_float_length),
+                        .phasor_phase_actual = &.{},
+
+                        .sin_amplitude_buff = try gpa.alloc(u8, max_float_length),
+                        .sin_amplitude_actual = &.{},
+                        .sin_frequency_buff = try gpa.alloc(u8, max_float_length),
+                        .sin_frequency_actual = &.{},
+                        .sin_phase_buff = try gpa.alloc(u8, max_float_length),
+                        .sin_phase_actual = &.{},
                     },
                 },
             };
@@ -337,11 +370,44 @@ pub const GraphicComponent = struct {
                         precision,
                     );
                 },
-                .current_source => |*buf| buf.actual = try bland.units.formatPrefixBuf(
-                    buf.buff,
-                    dev.current_source,
-                    precision,
-                ),
+                .current_source => |*buf| {
+                    // TODO TODO TODO
+                    buf.dc_actual = try bland.units.formatPrefixBuf(
+                        buf.dc_buff,
+                        dev.current_source.dc,
+                        precision,
+                    );
+
+                    buf.phasor_amplitude_actual = try bland.units.formatPrefixBuf(
+                        buf.phasor_amplitude_buff,
+                        1,
+                        precision,
+                    );
+
+                    buf.phasor_phase_actual = try bland.units.formatPrefixBuf(
+                        buf.phasor_phase_buff,
+                        0,
+                        precision,
+                    );
+
+                    buf.sin_amplitude_actual = try bland.units.formatPrefixBuf(
+                        buf.sin_amplitude_buff,
+                        1,
+                        precision,
+                    );
+
+                    buf.sin_frequency_actual = try bland.units.formatPrefixBuf(
+                        buf.sin_frequency_buff,
+                        10,
+                        precision,
+                    );
+
+                    buf.sin_phase_actual = try bland.units.formatPrefixBuf(
+                        buf.sin_phase_buff,
+                        0,
+                        precision,
+                    );
+                },
             }
         }
 

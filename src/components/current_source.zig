@@ -63,9 +63,9 @@ pub fn render(
     const thickness = render_type.thickness();
 
     var buff: [256]u8 = undefined;
-    const value_str = if (value) |val|
+    const value_str = if (value) |_|
         std.fmt.bufPrint(&buff, "{s}{s}", .{
-            val.current_source.actual,
+            "1",
             bland.units.Unit.current.symbol(),
         }) catch unreachable
     else
@@ -266,17 +266,142 @@ pub fn render(
 }
 
 pub fn renderPropertyBox(
-    current: *Float,
+    current_output: *bland.component.source.OutputFunction,
     value_buffer: *GraphicComponent.ValueBuffer,
     selected_component_changed: bool,
 ) void {
-    _ = renderer.textEntrySI(
-        @src(),
-        "current",
-        &value_buffer.current_source.actual,
-        .current,
-        current,
-        selected_component_changed,
-        .{},
-    );
+    //_ = renderer.textEntrySI(
+    //    @src(),
+    //    "current",
+    //    &value_buffer.current_source.actual,
+    //    .current,
+    //    current,
+    //    selected_component_changed,
+    //    .{},
+    //);
+
+    const entries = [_][]const u8{ "DC", "Phasor", "Sine" };
+    const radio_group = dvui.radioGroup(@src(), .{}, .{ .label = .{ .text = "Function" } });
+    defer radio_group.deinit();
+
+    var function_changed: bool = false;
+
+    for (0..entries.len) |i| {
+        const active = i == @intFromEnum(value_buffer.current_source.selected_function);
+
+        if (dvui.radio(@src(), active, entries[i], .{ .id_extra = i })) {
+            value_buffer.current_source.selected_function = @enumFromInt(i);
+            function_changed = true;
+        }
+    }
+
+    const changed = function_changed or selected_component_changed;
+
+    switch (value_buffer.current_source.selected_function) {
+        .dc => {
+            if (function_changed) {
+                const val = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.dc_actual,
+                ) catch 5;
+                current_output.* = .{ .dc = val };
+            }
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "offset",
+                &value_buffer.current_source.dc_actual,
+                .current,
+                &current_output.dc,
+                changed,
+                .{},
+            );
+        },
+        .phasor => {
+            if (function_changed) {
+                const amplitude = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.phasor_amplitude_actual,
+                ) catch 5;
+                const phase = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.phasor_phase_actual,
+                ) catch 0;
+                current_output.* = .{
+                    .phasor = .{
+                        .amplitude = amplitude,
+                        .phase = phase,
+                    },
+                };
+            }
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "amplitude",
+                &value_buffer.current_source.phasor_amplitude_actual,
+                .current,
+                &current_output.phasor.amplitude,
+                changed,
+                .{},
+            );
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "phase",
+                &value_buffer.current_source.phasor_phase_actual,
+                .dimensionless,
+                &current_output.phasor.phase,
+                changed,
+                .{},
+            );
+        },
+        .sin => {
+            if (function_changed) {
+                const amplitude = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.sin_amplitude_actual,
+                ) catch 5;
+                const frequency = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.sin_frequency_actual,
+                ) catch 10;
+                const phase = bland.units.parseWithoutUnitSymbol(
+                    value_buffer.current_source.sin_phase_actual,
+                ) catch 0;
+
+                current_output.* = .{
+                    .sin = .{
+                        .amplitude = amplitude,
+                        .phase = phase,
+                        .frequency = frequency,
+                    },
+                };
+            }
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "amplitude",
+                &value_buffer.current_source.sin_amplitude_actual,
+                .current,
+                &current_output.sin.amplitude,
+                changed,
+                .{},
+            );
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "frequency",
+                &value_buffer.current_source.sin_frequency_actual,
+                .frequency,
+                &current_output.sin.frequency,
+                changed,
+                .{},
+            );
+
+            _ = renderer.textEntrySI(
+                @src(),
+                "phase",
+                &value_buffer.current_source.sin_phase_actual,
+                .dimensionless,
+                &current_output.sin.phase,
+                changed,
+                .{},
+            );
+        },
+    }
 }

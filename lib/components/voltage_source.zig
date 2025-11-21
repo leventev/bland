@@ -2,37 +2,13 @@ const std = @import("std");
 const bland = @import("../bland.zig");
 const component = @import("../component.zig");
 const MNA = @import("../MNA.zig");
+const source = @import("source.zig");
 
+const OutputFunction = source.OutputFunction;
 const Component = component.Component;
 const Float = bland.Float;
 const Complex = bland.Complex;
 const StampOptions = Component.Device.StampOptions;
-
-pub const VoltageOutputType = enum {
-    dc,
-    phasor,
-    sin,
-};
-
-/// Value of the output voltage
-pub const VoltageOutput = union(VoltageOutputType) {
-    /// Constant DC value
-    dc: Float,
-
-    // TODO: maybe replace with complex
-    /// Phasor, for sinusoidal steady state
-    phasor: struct {
-        amplitude: Float,
-        phase: Float,
-    },
-
-    /// Sinusoidal output: `amplitude`*sin(2*pi*`frequency` * time + `phase`)
-    sin: struct {
-        amplitude: Float,
-        frequency: Float,
-        phase: Float,
-    },
-};
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .voltage_source = .{ .dc = 5 } };
@@ -43,7 +19,7 @@ pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
 }
 
 pub fn stampMatrix(
-    voltage_output: VoltageOutput,
+    voltage_output: OutputFunction,
     terminal_node_ids: []const usize,
     mna: *MNA,
     current_group_2_idx: ?usize,
