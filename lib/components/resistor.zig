@@ -6,6 +6,7 @@ const MNA = @import("../MNA.zig");
 const Component = component.Component;
 const Float = bland.Float;
 const StampOptions = Component.Device.StampOptions;
+const StampError = Component.Device.StampError;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .resistor = 1 };
@@ -21,7 +22,7 @@ pub fn stampMatrix(
     mna: *MNA,
     current_group_2_idx: ?usize,
     stamp_opts: StampOptions,
-) void {
+) StampError!void {
     // stamping is the same for every kind of analysis
     _ = stamp_opts;
 

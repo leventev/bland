@@ -7,6 +7,7 @@ const Component = component.Component;
 const Float = bland.Float;
 const Complex = bland.Complex;
 const StampOptions = Component.Device.StampOptions;
+const StampError = Component.Device.StampError;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .capacitor = 0.001 };
@@ -22,7 +23,7 @@ pub fn stampMatrix(
     mna: *MNA,
     current_group_2_idx: ?usize,
     stamp_opts: StampOptions,
-) void {
+) StampError!void {
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
 

@@ -34,6 +34,7 @@ pub const Error = error{
     InvalidNodeID,
     InvalidFrequency,
     InvalidFrequencyRange,
+    StampingFailed,
 } || std.mem.Allocator.Error;
 
 pub fn init(allocator: std.mem.Allocator) Error!NetList {
@@ -256,7 +257,14 @@ pub fn analyseDC(
             &mna,
             current_group_2_idx,
             .dc,
-        );
+        ) catch |err| {
+            switch (err) {
+                error.InvalidOutputFunctionForAnalysisMode => {
+                    std.log.err("Invalid output function type for {s}", .{comp.name});
+                },
+            }
+            return error.StampingFailed;
+        };
     }
 
     // solve the matrix with Gauss elimination
@@ -343,7 +351,14 @@ pub fn analyseTransient(
                         .prev_voltage = 0,
                         .prev_current = 0,
                     },
-                });
+                }) catch |err| {
+                    switch (err) {
+                        error.InvalidOutputFunctionForAnalysisMode => {
+                            std.log.err("Invalid output function type for {s}", .{comp.name});
+                        },
+                    }
+                    return error.StampingFailed;
+                };
             } else {
                 const voltage_pos = (try transient_report.voltage(comp.terminal_node_ids[0]))[time_idx - 1];
                 const voltage_neg = (try transient_report.voltage(comp.terminal_node_ids[1]))[time_idx - 1];
@@ -357,7 +372,14 @@ pub fn analyseTransient(
                         .prev_voltage = voltage_prev,
                         .prev_current = current_prev,
                     },
-                });
+                }) catch |err| {
+                    switch (err) {
+                        error.InvalidOutputFunctionForAnalysisMode => {
+                            std.log.err("Invalid output function type for {s}", .{comp.name});
+                        },
+                    }
+                    return error.StampingFailed;
+                };
             }
         }
 
@@ -446,7 +468,14 @@ pub fn analyseSinusoidalSteadyState(
             .{
                 .sin_steady_state = angular_frequency,
             },
-        );
+        ) catch |err| {
+            switch (err) {
+                error.InvalidOutputFunctionForAnalysisMode => {
+                    std.log.err("Invalid output function type for {s}", .{comp.name});
+                },
+            }
+            return error.StampingFailed;
+        };
     }
 
     // solve the matrix with Gauss elimination

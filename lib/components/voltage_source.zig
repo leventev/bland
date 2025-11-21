@@ -9,6 +9,7 @@ const Component = component.Component;
 const Float = bland.Float;
 const Complex = bland.Complex;
 const StampOptions = Component.Device.StampOptions;
+const StampError = Component.Device.StampError;
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .voltage_source = .{ .dc = 5 } };
@@ -24,7 +25,7 @@ pub fn stampMatrix(
     mna: *MNA,
     current_group_2_idx: ?usize,
     stamp_opts: StampOptions,
-) void {
+) StampError!void {
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
     const curr_idx = current_group_2_idx orelse @panic("Invalid voltage stamp");
@@ -39,7 +40,7 @@ pub fn stampMatrix(
         .dc => blk: {
             switch (voltage_output) {
                 .dc => |dc_val| break :blk RealOrComplex{ .real = dc_val },
-                else => @panic("TODO: invalid voltage output"),
+                else => return error.InvalidOutputFunctionForAnalysisMode,
             }
         },
         .transient => |trans| blk: {
@@ -51,7 +52,7 @@ pub fn stampMatrix(
                     const arg = ang_freq * trans.time + params.phase;
                     break :blk RealOrComplex{ .real = params.amplitude * @sin(arg) };
                 },
-                .phasor => @panic("TODO: invalid voltage output"),
+                .phasor => return error.InvalidOutputFunctionForAnalysisMode,
             }
         },
         .sin_steady_state => blk: {
@@ -63,7 +64,7 @@ pub fn stampMatrix(
                         .complex = Complex.init(re, im),
                     };
                 },
-                else => @panic("TODO: invalid voltage output"),
+                else => return error.InvalidOutputFunctionForAnalysisMode,
             }
         },
     };

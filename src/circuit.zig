@@ -470,7 +470,8 @@ pub const GraphicCircuit = struct {
 
         // TODO
         const report = netlist.analyseDC(self.allocator, null) catch {
-            @panic("TODO");
+            std.log.err("DC analysis failed", .{});
+            return;
         };
 
         analysis_results.append(self.allocator, .{ .dc = report }) catch @panic("TODO");
@@ -489,7 +490,8 @@ pub const GraphicCircuit = struct {
             null,
             0.1,
         ) catch {
-            @panic("TODO");
+            std.log.err("Transient analysis failed", .{});
+            return;
         };
 
         analysis_results.append(self.allocator, .{ .transient = report }) catch @panic("TODO");
@@ -518,42 +520,14 @@ pub const GraphicCircuit = struct {
             freq_count,
             null,
         ) catch {
-            // TODO:
-            @panic("frequency sweep faied");
+            std.log.err("Sinusoidal steady state frequency sweep failed", .{});
+            return;
         };
 
         analysis_results.append(
             self.allocator,
             .{ .frequency_sweep = fw_report },
         ) catch @panic("TODO");
-
-        //for (0..netlist.nodes.items.len) |i| {
-        //    const voltage_for_freqs = fw_report.voltage(i);
-        //
-        //    std.debug.print("V{}: ", .{i});
-        //
-        //    for (voltage_for_freqs) |val| {
-        //        std.debug.print("{}, ", .{val.magnitude()});
-        //    }
-        //
-        //    std.debug.print("\n", .{});
-        //}
-        //
-        //for (0..netlist.components.items.len) |i| {
-        //    const current_for_freqs = fw_report.current(i);
-        //
-        //    std.debug.print("I{}: ", .{i});
-        //
-        //    // TODO: make the entire array an optional and dont store all nulls
-        //    // for no reason
-        //    for (current_for_freqs) |val| {
-        //        if (val) |v| {
-        //            std.debug.print("{}, ", .{v.magnitude()});
-        //        }
-        //    }
-        //
-        //    std.debug.print("\n", .{});
-        //}
     }
 };
 

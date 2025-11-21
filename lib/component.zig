@@ -73,14 +73,18 @@ pub const Component = struct {
             },
         };
 
+        pub const StampError = error{
+            InvalidOutputFunctionForAnalysisMode,
+        };
+
         pub fn stampMatrix(
             self: *const Device,
             terminal_node_ids: []const usize,
             mna: *MNA,
             current_group_2_idx: ?usize,
             stamp_opts: StampOptions,
-        ) void {
-            switch (@as(DeviceType, self.*)) {
+        ) StampError!void {
+            return switch (@as(DeviceType, self.*)) {
                 .ground => {},
                 inline else => |x| x.module().stampMatrix(
                     @field(self, @tagName(x)),
@@ -89,7 +93,7 @@ pub const Component = struct {
                     current_group_2_idx,
                     stamp_opts,
                 ),
-            }
+            };
         }
     };
 };
