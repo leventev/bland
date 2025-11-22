@@ -13,8 +13,8 @@ nodes: std.ArrayListUnmanaged(Node),
 components: std.ArrayListUnmanaged(Component),
 
 pub const ground_node_id = 0;
-pub const DCAnalysisReport = MNA.RealAnalysisReport;
-pub const ACAnalysisReport = MNA.ComplexAnalysisReport;
+pub const RealAnalysisReport = MNA.RealAnalysisReport;
+pub const ComplexAnalysisReport = MNA.ComplexAnalysisReport;
 
 const NetList = @This();
 
@@ -298,7 +298,7 @@ pub fn analyseTransient(
     var group_2 = try self.createGroup2(allocator, currents_watched);
     defer group_2.deinit(allocator);
 
-    const time_step: Float = 5e-5;
+    const time_step: Float = 5e-6;
 
     const time_point_count: usize = @as(usize, @intFromFloat(until / time_step)) + 1;
 
@@ -580,7 +580,7 @@ pub const FrequencySweepReport = struct {
     pub fn analysisReportForFreq(
         self: *const FrequencySweepReport,
         freq_idx: usize,
-        report_buff: *ACAnalysisReport,
+        report_buff: *ComplexAnalysisReport,
     ) FrequencySweepReport.Error!void {
         if (freq_idx >= self.frequency_values.len) return error.InvalidFequencyIdx;
         for (0..report_buff.voltages.len) |idx| {
@@ -672,6 +672,23 @@ pub const TransientReport = struct {
         const start_idx = comp_idx * self.time_values.len;
         const end_idx = (comp_idx + 1) * self.time_values.len;
         return self.all_currents[start_idx..end_idx];
+    }
+
+    pub fn analysisReportForTime(
+        self: *const TransientReport,
+        time_idx: usize,
+        report_buff: *RealAnalysisReport,
+    ) TransientReport.Error!void {
+        if (time_idx >= self.time_values.len) return error.InvalidTimeIdx;
+        for (0..report_buff.voltages.len) |idx| {
+            const voltage_for_times = self.voltage(idx) catch unreachable;
+            report_buff.voltages[idx] = voltage_for_times[time_idx];
+        }
+
+        for (0..report_buff.currents.len) |idx| {
+            const current_for_times = self.current(idx) catch unreachable;
+            report_buff.currents[idx] = current_for_times[time_idx];
+        }
     }
 
     //pub fn analysisReportForTime(

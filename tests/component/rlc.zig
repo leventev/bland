@@ -83,7 +83,7 @@ test "RLC series" {
     );
     defer res.deinit(gpa);
 
-    var ac_report = try NetList.ACAnalysisReport.init(
+    var ac_report = try NetList.ComplexAnalysisReport.init(
         gpa,
         netlist.nodes.items.len,
         netlist.components.items.len,
@@ -192,7 +192,7 @@ test "RLC parallel" {
     );
     defer res.deinit(gpa);
 
-    var ac_report = try NetList.ACAnalysisReport.init(
+    var ac_report = try NetList.ComplexAnalysisReport.init(
         gpa,
         netlist.nodes.items.len,
         netlist.components.items.len,

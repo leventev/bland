@@ -10,7 +10,7 @@ const expectFloat = main.expectFloat;
 const expectComplex = main.expectComplex;
 
 pub fn checkCurrentDC(
-    report: *const NetList.DCAnalysisReport,
+    report: *const NetList.RealAnalysisReport,
     current_id: usize,
     expected: Float,
 ) !void {
@@ -26,7 +26,7 @@ pub fn checkCurrentDC(
 }
 
 pub fn checkVoltageDC(
-    report: *const NetList.DCAnalysisReport,
+    report: *const NetList.RealAnalysisReport,
     node_id: usize,
     expected: Float,
 ) !void {
@@ -36,7 +36,7 @@ pub fn checkVoltageDC(
 }
 
 pub fn checkVoltage2DC(
-    report: *const NetList.DCAnalysisReport,
+    report: *const NetList.RealAnalysisReport,
     node1_id: usize,
     node2_id: usize,
     expected: Float,
@@ -48,7 +48,7 @@ pub fn checkVoltage2DC(
 }
 
 pub fn checkVoltageAC(
-    report: *const NetList.ACAnalysisReport,
+    report: *const NetList.ComplexAnalysisReport,
     node_id: usize,
     expected: Complex,
 ) !void {
@@ -58,7 +58,7 @@ pub fn checkVoltageAC(
 }
 
 pub fn checkVoltage2AC(
-    report: *const NetList.ACAnalysisReport,
+    report: *const NetList.ComplexAnalysisReport,
     node1_id: usize,
     node2_id: usize,
     expected: Complex,
@@ -70,7 +70,7 @@ pub fn checkVoltage2AC(
 }
 
 pub fn checkCurrentAC(
-    report: *const NetList.ACAnalysisReport,
+    report: *const NetList.ComplexAnalysisReport,
     current_id: usize,
     expected: Complex,
 ) !void {

@@ -106,7 +106,7 @@ test "RC series low-pass  sinusoidal steady state" {
     );
     defer res.deinit(gpa);
 
-    var ac_report = try NetList.ACAnalysisReport.init(
+    var ac_report = try NetList.ComplexAnalysisReport.init(
         gpa,
         netlist.nodes.items.len,
         netlist.components.items.len,
@@ -242,7 +242,7 @@ test "RC series high-pass sinusoidal steady state" {
     );
     defer res.deinit(gpa);
 
-    var ac_report = try NetList.ACAnalysisReport.init(
+    var ac_report = try NetList.ComplexAnalysisReport.init(
         gpa,
         netlist.nodes.items.len,
         netlist.components.items.len,
@@ -345,7 +345,7 @@ test "RC parallel sinusoidal steady state" {
     );
     defer res.deinit(gpa);
 
-    var ac_report = try NetList.ACAnalysisReport.init(
+    var ac_report = try NetList.ComplexAnalysisReport.init(
         gpa,
         netlist.nodes.items.len,
         netlist.components.items.len,
