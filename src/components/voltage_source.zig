@@ -42,6 +42,8 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
+const radius = 25;
+
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
@@ -53,8 +55,8 @@ pub fn render(
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 
     const total_len = 2 * global.grid_size;
-    const middle_len = 50;
-    const wire_len = (total_len - middle_len) / 2;
+    const diameter = 2 * radius;
+    const wire_len = (total_len - diameter) / 2;
 
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
@@ -92,7 +94,7 @@ pub fn render(
                     .x = pos.x + global.grid_size,
                     .y = pos.y,
                 },
-                middle_len / 2,
+                diameter / 2,
                 dvui.math.pi * 2,
                 0,
                 false,
@@ -128,7 +130,7 @@ pub fn render(
             const sign: f32 = if (rot == .right) -1 else 1;
             renderer.renderCenteredText(
                 dvui.Point.Physical{
-                    .x = pos.x + global.grid_size + sign * middle_len / 4,
+                    .x = pos.x + global.grid_size + sign * diameter / 4,
                     .y = pos.y,
                 },
                 render_colors.component_color,
@@ -136,7 +138,7 @@ pub fn render(
             );
             renderer.renderCenteredText(
                 dvui.Point.Physical{
-                    .x = pos.x + global.grid_size - sign * middle_len / 4,
+                    .x = pos.x + global.grid_size - sign * diameter / 4,
                     .y = pos.y,
                 },
                 render_colors.component_color,
@@ -166,7 +168,7 @@ pub fn render(
                     .x = pos.x,
                     .y = pos.y + global.grid_size,
                 },
-                middle_len / 2,
+                diameter / 2,
                 dvui.math.pi * 2,
                 0,
                 false,
@@ -203,7 +205,7 @@ pub fn render(
             renderer.renderCenteredText(
                 dvui.Point.Physical{
                     .x = pos.x,
-                    .y = pos.y + global.grid_size + sign * middle_len / 4,
+                    .y = pos.y + global.grid_size + sign * diameter / 4,
                 },
                 render_colors.component_color,
                 "+",
@@ -211,7 +213,7 @@ pub fn render(
             renderer.renderCenteredText(
                 dvui.Point.Physical{
                     .x = pos.x,
-                    .y = pos.y + global.grid_size - sign * middle_len / 4,
+                    .y = pos.y + global.grid_size - sign * diameter / 4,
                 },
                 render_colors.component_color,
                 "-",
@@ -386,4 +388,25 @@ pub fn renderPropertyBox(
             );
         },
     }
+}
+
+pub fn mouseInside(
+    grid_pos: GridPosition,
+    rotation: Rotation,
+    circuit_rect: dvui.Rect.Physical,
+    mouse_pos: dvui.Point.Physical,
+) bool {
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const center: dvui.Point.Physical = switch (rotation) {
+        .left, .right => .{ .x = pos.x + global.grid_size, .y = pos.y },
+        .top, .bottom => .{ .x = pos.x, .y = pos.y + global.grid_size },
+    };
+
+    const xd = mouse_pos.x - center.x;
+    const yd = mouse_pos.y - center.y;
+
+    const check_radius = radius + 3;
+
+    return xd * xd + yd * yd <= check_radius * check_radius;
 }

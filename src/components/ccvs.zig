@@ -251,3 +251,16 @@ pub fn renderPropertyBox(
 
     te.deinit();
 }
+
+pub fn mouseInside(
+    grid_pos: GridPosition,
+    rotation: Rotation,
+    circuit_rect: dvui.Rect.Physical,
+    mouse_pos: dvui.Point.Physical,
+) bool {
+    _ = grid_pos;
+    _ = rotation;
+    _ = circuit_rect;
+    _ = mouse_pos;
+    return false;
+}

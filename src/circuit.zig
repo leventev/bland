@@ -125,6 +125,10 @@ pub var placement_mode: PlacementMode = .none;
 
 pub var held_component: bland.Component.DeviceType = .resistor;
 pub var placement_rotation: Rotation = .right;
+pub var mb1_down: bool = false;
+pub var hovered_component_id: ?usize = null;
+pub var selected_component_id: ?usize = null;
+pub var selected_component_changed: bool = false;
 
 pub var held_wire_p1: ?GridPosition = null;
 

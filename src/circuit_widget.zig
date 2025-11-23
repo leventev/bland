@@ -6,7 +6,6 @@ const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
 const component = @import("component.zig");
 const global = @import("global.zig");
-const sidebar = @import("sidebar.zig");
 
 const ComponentRenderType = renderer.ComponentRenderType;
 
@@ -100,89 +99,109 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
     }
 }
 
+fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev: dvui.Event.Mouse) !void {
+    for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, comp_idx| {
+        const inside_comp: bool = graphic_comp.mouseInside(circuit_rect, ev.p);
+        if (inside_comp and circuit.placement_mode == .none) {
+            dvui.cursorSet(.hand);
+            circuit.hovered_component_id = comp_idx;
+        }
+    }
+    switch (ev.action) {
+        .press => {
+            switch (circuit.placement_mode) {
+                .none => {
+                    if (circuit.hovered_component_id) |comp_id| {
+                        circuit.selected_component_changed = circuit.selected_component_id == comp_id;
+                        circuit.selected_component_id = comp_id;
+                    }
+                },
+                .component => {
+                    const grid_pos = component.gridPositionFromScreenPos(
+                        circuit.held_component,
+                        circuit_rect,
+                        mouse_pos,
+                        circuit.placement_rotation,
+                    );
+
+                    if (circuit.main_circuit.canPlaceComponent(
+                        circuit.held_component,
+                        grid_pos,
+                        circuit.placement_rotation,
+                    )) {
+                        const graphic_comp = try component.GraphicComponent.init(
+                            gpa,
+                            grid_pos,
+                            circuit.placement_rotation,
+                            circuit.held_component,
+                        );
+                        try circuit.main_circuit.graphic_components.append(
+                            circuit.main_circuit.allocator,
+                            graphic_comp,
+                        );
+                    }
+                },
+                .wire => {
+                    if (circuit.held_wire_p1) |p1| {
+                        const p2 = circuit.gridPositionFromPos(
+                            circuit_rect,
+                            mouse_pos,
+                        );
+                        const xlen = @abs(p2.x - p1.x);
+                        const ylen = @abs(p2.y - p1.y);
+
+                        const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
+                            .direction = .horizontal,
+                            .length = p2.x - p1.x,
+                            .pos = p1,
+                        } else circuit.Wire{
+                            .direction = .vertical,
+                            .length = p2.y - p1.y,
+                            .pos = p1,
+                        };
+
+                        if (wire.length != 0 and circuit.main_circuit.canPlaceWire(wire)) {
+                            try circuit.main_circuit.wires.append(
+                                circuit.main_circuit.allocator,
+                                wire,
+                            );
+                            circuit.held_wire_p1 = null;
+                        }
+                    } else {
+                        circuit.held_wire_p1 = circuit.gridPositionFromPos(
+                            circuit_rect,
+                            mouse_pos,
+                        );
+                    }
+                },
+                .pin => {
+                    const grid_pos = circuit.gridPositionFromPos(
+                        circuit_rect,
+                        mouse_pos,
+                    );
+
+                    if (canPlacePin(grid_pos)) {
+                        try pins.append(gpa, Pin{
+                            .pos = grid_pos,
+                            .rotation = circuit.placement_rotation,
+                            .num = pins.items.len + 1,
+                        });
+                    }
+                },
+            }
+        },
+        else => {},
+    }
+}
+
 fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.BoxWidget) !void {
     for (dvui.events()) |*ev| {
         switch (ev.evt) {
             .mouse => |mouse_ev| {
                 if (!circuit_area.matchEvent(ev)) continue;
                 mouse_pos = mouse_ev.p;
-
                 const circuit_rect = circuit_area.data().rectScale().r;
-
-                switch (mouse_ev.action) {
-                    .press => {
-                        if (circuit.placement_mode == .component) {
-                            const grid_pos = component.gridPositionFromScreenPos(
-                                circuit.held_component,
-                                circuit_rect,
-                                mouse_pos,
-                                circuit.placement_rotation,
-                            );
-                            if (circuit.main_circuit.canPlaceComponent(
-                                circuit.held_component,
-                                grid_pos,
-                                circuit.placement_rotation,
-                            )) {
-                                const graphic_comp = try component.GraphicComponent.init(
-                                    allocator,
-                                    grid_pos,
-                                    circuit.placement_rotation,
-                                    circuit.held_component,
-                                );
-                                try circuit.main_circuit.graphic_components.append(
-                                    circuit.main_circuit.allocator,
-                                    graphic_comp,
-                                );
-                            }
-                        } else if (circuit.placement_mode == .wire) {
-                            if (circuit.held_wire_p1) |p1| {
-                                const p2 = circuit.gridPositionFromPos(
-                                    circuit_rect,
-                                    mouse_pos,
-                                );
-                                const xlen = @abs(p2.x - p1.x);
-                                const ylen = @abs(p2.y - p1.y);
-
-                                const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
-                                    .direction = .horizontal,
-                                    .length = p2.x - p1.x,
-                                    .pos = p1,
-                                } else circuit.Wire{
-                                    .direction = .vertical,
-                                    .length = p2.y - p1.y,
-                                    .pos = p1,
-                                };
-
-                                if (wire.length != 0 and circuit.main_circuit.canPlaceWire(wire)) {
-                                    try circuit.main_circuit.wires.append(
-                                        circuit.main_circuit.allocator,
-                                        wire,
-                                    );
-                                    circuit.held_wire_p1 = null;
-                                }
-                            } else {
-                                circuit.held_wire_p1 = circuit.gridPositionFromPos(
-                                    circuit_rect,
-                                    mouse_pos,
-                                );
-                            }
-                        } else if (circuit.placement_mode == .pin) {
-                            const grid_pos = circuit.gridPositionFromPos(
-                                circuit_rect,
-                                mouse_pos,
-                            );
-
-                            if (canPlacePin(grid_pos)) {
-                                try pins.append(allocator, Pin{
-                                    .pos = grid_pos,
-                                    .rotation = circuit.placement_rotation,
-                                    .num = pins.items.len + 1,
-                                });
-                            }
-                        }
-                    },
-                    else => {},
-                }
+                try handleMouseEvent(allocator, circuit_rect, mouse_ev);
             },
             .key => |key_ev| {
                 if (ev.target_widgetId != null) continue;
@@ -514,9 +533,9 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     }
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
-        const render_type: ComponentRenderType = if (i == sidebar.selected_component_id)
+        const render_type: ComponentRenderType = if (i == circuit.selected_component_id)
             ComponentRenderType.selected
-        else if (i == sidebar.hovered_component_id)
+        else if (i == circuit.hovered_component_id)
             ComponentRenderType.hovered
         else
             ComponentRenderType.normal;

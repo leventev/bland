@@ -570,4 +570,19 @@ pub const GraphicComponent = struct {
             ),
         };
     }
+
+    pub fn mouseInside(
+        self: *const GraphicComponent,
+        circuit_rect: dvui.Rect.Physical,
+        mouse_pos: dvui.Point.Physical,
+    ) bool {
+        return switch (@as(DeviceType, self.comp.device)) {
+            inline else => |x| graphics_module(x).mouseInside(
+                self.pos,
+                self.rotation,
+                circuit_rect,
+                mouse_pos,
+            ),
+        };
+    }
 };

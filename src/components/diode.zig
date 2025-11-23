@@ -153,3 +153,16 @@ pub fn renderPropertyBox(model: *diode_module.Model, value_buffer: *GraphicCompo
     _ = value_buffer;
     _ = selected_component_changed;
 }
+
+pub fn mouseInside(
+    grid_pos: GridPosition,
+    rotation: Rotation,
+    circuit_rect: dvui.Rect.Physical,
+    mouse_pos: dvui.Point.Physical,
+) bool {
+    _ = grid_pos;
+    _ = rotation;
+    _ = circuit_rect;
+    _ = mouse_pos;
+    return false;
+}

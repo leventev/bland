@@ -7,10 +7,6 @@ const renderer = @import("renderer.zig");
 
 const dvui = @import("dvui");
 
-pub var hovered_component_id: ?usize = null;
-pub var selected_component_id: ?usize = null;
-pub var selected_component_changed: bool = false;
-
 pub fn renderComponentList() void {
     {
         var tl_box = dvui.box(
@@ -39,7 +35,7 @@ pub fn renderComponentList() void {
         tl.addText("components", .{});
     }
 
-    hovered_component_id = null;
+    circuit.hovered_component_id = null;
 
     var scroll = dvui.scrollArea(
         @src(),
@@ -51,12 +47,12 @@ pub fn renderComponentList() void {
     defer scroll.deinit();
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, graphic_comp| {
-        const bg = if (selected_component_id == i)
+        const bg = if (circuit.selected_component_id == i)
             dvui.themeGet().color(.highlight, .fill)
         else
             dvui.themeGet().color(.control, .fill);
 
-        const font = if (selected_component_id == i)
+        const font = if (circuit.selected_component_id == i)
             dvui.themeGet().font_title_2
         else
             dvui.themeGet().font_body;
@@ -84,14 +80,14 @@ pub fn renderComponentList() void {
         });
 
         if (bw.hovered()) {
-            hovered_component_id = i;
+            circuit.hovered_component_id = i;
         }
 
         if (bw.clicked()) {
-            if (selected_component_id != i) {
-                selected_component_changed = true;
+            if (circuit.selected_component_id != i) {
+                circuit.selected_component_changed = true;
             }
-            selected_component_id = i;
+            circuit.selected_component_id = i;
         }
 
         bw.deinit();
@@ -126,7 +122,7 @@ pub fn renderPropertyBox() void {
         tl.addText("properties", .{});
     }
 
-    if (selected_component_id) |comp_id| {
+    if (circuit.selected_component_id) |comp_id| {
         var scroll = dvui.scrollArea(
             @src(),
             .{},
@@ -156,15 +152,15 @@ pub fn renderPropertyBox() void {
             .margin = dvui.Rect.all(4),
         });
 
-        if (dvui.firstFrame(te.data().id) or selected_component_changed) {
+        if (dvui.firstFrame(te.data().id) or circuit.selected_component_changed) {
             te.textSet(comp.name, false);
         }
 
         comp.name = te.getText();
         te.deinit();
 
-        selected_graphic_comp.renderPropertyBox(selected_component_changed);
-        selected_component_changed = false;
+        selected_graphic_comp.renderPropertyBox(circuit.selected_component_changed);
+        circuit.selected_component_changed = false;
     }
 }
 
