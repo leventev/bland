@@ -30,6 +30,7 @@ pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     try win.keybinds.putNoClobber(allocator, "ground_placement_mode", .{ .key = .g });
     try win.keybinds.putNoClobber(allocator, "capacitor_placement_mode", .{ .key = .c });
     try win.keybinds.putNoClobber(allocator, "inductor_placement_mode", .{ .key = .l });
+    try win.keybinds.putNoClobber(allocator, "diode_placement_mode", .{ .key = .d });
     try win.keybinds.putNoClobber(allocator, "wire_placement_mode", .{ .key = .w });
     try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .t });
     try win.keybinds.putNoClobber(allocator, "analyse", .{ .key = .a });
@@ -91,6 +92,11 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
 
     if (ev.matchBind("pin_placement_mode") and ev.action == .down) {
         circuit.placement_mode = .pin;
+    }
+
+    if (ev.matchBind("diode_placement_mode") and ev.action == .down) {
+        circuit.placement_mode = .component;
+        circuit.held_component = .diode;
     }
 }
 

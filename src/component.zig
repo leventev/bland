@@ -22,6 +22,7 @@ const inductor_graphics_module = @import("components/inductor.zig");
 const ground_graphics_module = @import("components/ground.zig");
 const ccvs_graphics_module = @import("components/ccvs.zig");
 const cccs_graphics_module = @import("components/cccs.zig");
+const diode_graphics_module = @import("components/diode.zig");
 
 fn graphics_module(comptime self: DeviceType) type {
     return switch (self) {
@@ -33,6 +34,7 @@ fn graphics_module(comptime self: DeviceType) type {
         .ground => ground_graphics_module,
         .ccvs => ccvs_graphics_module,
         .cccs => cccs_graphics_module,
+        .diode => diode_graphics_module,
     };
 }
 
@@ -228,6 +230,7 @@ pub const GraphicComponent = struct {
             controller_name_buff: []u8,
             controller_name_actual: []u8,
         },
+        diode: struct {},
 
         pub fn init(gpa: std.mem.Allocator, device_type: Component.DeviceType) !@This() {
             return switch (device_type) {
@@ -317,6 +320,9 @@ pub const GraphicComponent = struct {
                         .square_frequency_buff = try gpa.alloc(u8, max_float_length),
                         .square_frequency_actual = &.{},
                     },
+                },
+                .diode => .{
+                    .diode = .{},
                 },
             };
         }
@@ -454,6 +460,7 @@ pub const GraphicComponent = struct {
                         precision,
                     );
                 },
+                .diode => {},
             }
         }
 

@@ -13,6 +13,7 @@ pub const inductor_module = @import("components/inductor.zig");
 pub const ground_module = @import("components/ground.zig");
 pub const ccvs_module = @import("components/ccvs.zig");
 pub const cccs_module = @import("components/cccs.zig");
+pub const diode_module = @import("components/diode.zig");
 
 pub const max_component_name_length = 20;
 
@@ -31,6 +32,7 @@ pub const Component = struct {
         inductor,
         ccvs,
         cccs,
+        diode,
 
         fn module(comptime self: DeviceType) type {
             return switch (self) {
@@ -42,6 +44,7 @@ pub const Component = struct {
                 .ground => ground_module,
                 .ccvs => ccvs_module,
                 .cccs => cccs_module,
+                .diode => diode_module,
             };
         }
 
@@ -61,6 +64,7 @@ pub const Component = struct {
         inductor: Float,
         ccvs: ccvs_module.Inner,
         cccs: cccs_module.Inner,
+        diode: diode_module.Model,
 
         pub const StampOptions = union(enum) {
             dc: void,

@@ -361,6 +361,12 @@ fn renderToolbox() bool {
             circuit.held_component = .cccs;
             fw.close();
         }
+
+        if (dvui.menuItemLabel(@src(), "Diode", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .component;
+            circuit.held_component = .diode;
+            fw.close();
+        }
     }
 
     if (dvui.menuItemLabel(@src(), "Circuit", .{ .submenu = true }, .{})) |r| {
@@ -469,7 +475,7 @@ pub fn render(gpa: std.mem.Allocator) !bool {
 
 pub fn renderDCReport(
     gpa: std.mem.Allocator,
-    dc_report: NetList.DCAnalysisReport,
+    dc_report: NetList.RealAnalysisReport,
     report_changed: bool,
 ) !void {
     _ = report_changed;

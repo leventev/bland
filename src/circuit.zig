@@ -47,7 +47,7 @@ pub const GridPosition = struct {
 };
 
 pub const AnalysisResult = union(enum) {
-    dc: NetList.DCAnalysisReport,
+    dc: NetList.RealAnalysisReport,
     frequency_sweep: NetList.FrequencySweepReport,
     transient: NetList.TransientReport,
 };
