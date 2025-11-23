@@ -81,13 +81,15 @@ pub fn render(
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
 
-            // TODO: both sides
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + diode_length, .y = pos.y - diode_width / 2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + diode_length, .y = pos.y });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len, .y = pos.y - diode_width / 2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len, .y = pos.y + diode_width / 2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + diode_length, .y = pos.y });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + diode_length, .y = pos.y + diode_width / 2 });
+            const off_x_1: f32 = if (rot == .right) diode_length else 0;
+            const off_x_2: f32 = if (rot == .right) 0 else diode_length;
+
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y - diode_width / 2 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_2, .y = pos.y - diode_width / 2 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_2, .y = pos.y + diode_width / 2 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y + diode_width / 2 });
 
             path.build().stroke(.{ .color = diode_color, .thickness = thickness });
 
@@ -120,13 +122,15 @@ pub fn render(
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
 
-            // TODO: both sides
-            path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + diode_length });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + diode_length });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + diode_length });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len + diode_length });
+            const off_y_1: f32 = if (rot == .top) diode_length else 0;
+            const off_y_2: f32 = if (rot == .top) 0 else diode_length;
+
+            path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + off_y_1 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + off_y_1 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + off_y_2 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len + off_y_2 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + off_y_1 });
+            path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len + off_y_1 });
 
             path.build().stroke(.{ .color = diode_color, .thickness = thickness });
 
