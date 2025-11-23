@@ -40,6 +40,10 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
+const wire_pixel_len = 55;
+const middle_len = 2 * global.grid_size - 2 * wire_pixel_len;
+const plate_width = 50;
+
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
@@ -48,9 +52,6 @@ pub fn render(
     value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ComponentRenderType,
 ) void {
-    const wire_pixel_len = 55;
-    const plate_width = 50;
-
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 
     const capacitor_color = render_type.colors().component_color;
@@ -217,9 +218,24 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const tolerance = 3;
+
+    const rect: dvui.Rect.Physical = switch (rotation) {
+        .left, .right => dvui.Rect.Physical{
+            .x = pos.x + wire_pixel_len - tolerance,
+            .y = pos.y - plate_width / 2 - tolerance,
+            .w = middle_len + 2 * tolerance,
+            .h = plate_width + 2 * tolerance,
+        },
+        .bottom, .top => dvui.Rect.Physical{
+            .x = pos.x - plate_width / 2 - tolerance,
+            .y = pos.y + wire_pixel_len - tolerance,
+            .w = plate_width + 2 * tolerance,
+            .h = middle_len + 2 * tolerance,
+        },
+    };
+
+    return rect.contains(mouse_pos);
 }

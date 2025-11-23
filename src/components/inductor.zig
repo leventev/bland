@@ -40,6 +40,11 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
+const wire_pixel_len = 22;
+const middle_len = 2 * global.grid_size - 2 * wire_pixel_len;
+const circles = 3;
+const circle_diameter = 2 * (global.grid_size - wire_pixel_len) / circles;
+
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
@@ -48,11 +53,6 @@ pub fn render(
     value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ComponentRenderType,
 ) void {
-    const wire_pixel_len = 22;
-
-    const circles = 3;
-    const circle_diameter = 2 * (global.grid_size - wire_pixel_len) / circles;
-
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 
     const inductor_color = render_type.colors().component_color;
@@ -213,9 +213,24 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const tolerance = 3;
+
+    const rect: dvui.Rect.Physical = switch (rotation) {
+        .left, .right => dvui.Rect.Physical{
+            .x = pos.x + wire_pixel_len - tolerance,
+            .y = pos.y - circle_diameter / 2 - tolerance,
+            .w = middle_len + 2 * tolerance,
+            .h = circle_diameter / 2 + 2 * tolerance,
+        },
+        .bottom, .top => dvui.Rect.Physical{
+            .x = pos.x - circle_diameter / 2 - tolerance,
+            .y = pos.y + wire_pixel_len - tolerance,
+            .w = circle_diameter / 2 + 2 * tolerance,
+            .h = middle_len + 2 * tolerance,
+        },
+    };
+
+    return rect.contains(mouse_pos);
 }
