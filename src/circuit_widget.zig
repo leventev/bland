@@ -112,7 +112,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
             switch (circuit.placement_mode) {
                 .none => {
                     if (circuit.hovered_component_id) |comp_id| {
-                        circuit.selected_component_changed = circuit.selected_component_id == comp_id;
+                        circuit.selected_component_changed = circuit.selected_component_id != comp_id;
                         circuit.selected_component_id = comp_id;
                     }
                 },

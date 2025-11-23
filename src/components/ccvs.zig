@@ -43,6 +43,8 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
+const radius = 25;
+
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
@@ -54,7 +56,7 @@ pub fn render(
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 
     const total_len = 2 * global.grid_size;
-    const middle_len = 50;
+    const middle_len = 2 * radius;
     const wire_len = (total_len - middle_len) / 2;
 
     const diamond_off = middle_len / 2;
@@ -258,9 +260,17 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const center: dvui.Point.Physical = switch (rotation) {
+        .left, .right => .{ .x = pos.x + global.grid_size, .y = pos.y },
+        .top, .bottom => .{ .x = pos.x, .y = pos.y + global.grid_size },
+    };
+
+    const xd = mouse_pos.x - center.x;
+    const yd = mouse_pos.y - center.y;
+
+    const check_radius = radius + 3;
+
+    return xd * xd + yd * yd <= check_radius * check_radius;
 }
