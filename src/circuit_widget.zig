@@ -465,6 +465,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
+    for (circuit.main_circuit.wires.items) |wire| {
+        var it = wire.iterator();
+        while (it.next()) |pos| {
+            try grid_positions.append(allocator, pos);
+        }
+    }
+
     const count_x: usize = @intFromFloat(@divTrunc(circuit_rect.w, global.grid_size) + 1);
     const count_y: usize = @intFromFloat(@divTrunc(circuit_rect.h, global.grid_size) + 1);
 
