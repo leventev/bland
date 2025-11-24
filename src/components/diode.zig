@@ -42,6 +42,11 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
+const diode_width = 40;
+const diode_length = 40;
+
+const wire_pixel_len = global.grid_size - diode_length / 2;
+
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
@@ -51,11 +56,6 @@ pub fn render(
     render_type: renderer.ComponentRenderType,
 ) void {
     _ = value;
-
-    const diode_width = 40;
-    const diode_length = 40;
-
-    const wire_pixel_len = global.grid_size - diode_length / 2;
 
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 
@@ -122,8 +122,8 @@ pub fn render(
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
 
-            const off_y_1: f32 = if (rot == .top) diode_length else 0;
-            const off_y_2: f32 = if (rot == .top) 0 else diode_length;
+            const off_y_1: f32 = if (rot == .bottom) diode_length else 0;
+            const off_y_2: f32 = if (rot == .bottom) 0 else diode_length;
 
             path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + off_y_1 });
             path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + off_y_1 });
@@ -160,9 +160,18 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const center: dvui.Point.Physical = switch (rotation) {
+        .left, .right => .{ .x = pos.x + wire_pixel_len + diode_length / 2, .y = pos.y },
+        .top, .bottom => .{ .x = pos.x, .y = pos.y + wire_pixel_len + diode_length / 2 },
+    };
+
+    const xd = mouse_pos.x - center.x;
+    const yd = mouse_pos.y - center.y;
+
+    const tolerance = 6;
+    const check_radius = diode_length / 2 + tolerance;
+
+    return xd * xd + yd * yd <= check_radius * check_radius;
 }

@@ -81,6 +81,10 @@ pub fn getOccupiedGridPositions(
     return occupied[0..2];
 }
 
+const triangle_side = 45;
+const triangle_height = 39;
+const wire_pixel_len = 16;
+
 pub fn render(
     circuit_area: dvui.Rect.Physical,
     grid_pos: GridPosition,
@@ -90,10 +94,6 @@ pub fn render(
     const pos = grid_pos.toCircuitPosition(circuit_area);
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
-
-    const triangle_side = 45;
-    const triangle_height = 39;
-    const wire_pixel_len = 16;
 
     switch (rot) {
         .right, .left => {
@@ -203,9 +203,18 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const center: dvui.Point.Physical = switch (rotation) {
+        .left, .right => .{ .x = pos.x + wire_pixel_len + triangle_height / 2, .y = pos.y },
+        .top, .bottom => .{ .x = pos.x, .y = pos.y + wire_pixel_len + triangle_height / 2 },
+    };
+
+    const xd = mouse_pos.x - center.x;
+    const yd = mouse_pos.y - center.y;
+
+    const tolerance = 6;
+    const check_radius = triangle_height / 2 + tolerance;
+
+    return xd * xd + yd * yd <= check_radius * check_radius;
 }
