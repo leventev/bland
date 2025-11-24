@@ -315,56 +315,47 @@ fn renderToolbox() bool {
         }
 
         if (dvui.menuItemLabel(@src(), "Resistor", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .resistor;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .resistor } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Voltage source", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .voltage_source;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .voltage_source } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Current source", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .current_source;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .current_source } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Ground", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .ground;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .ground } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Capacitor", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .capacitor;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .capacitor } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Inductor", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .inductor;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .inductor } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Current controlled voltage source", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .ccvs;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .ccvs } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Current controlled current source", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .cccs;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .cccs } };
             fw.close();
         }
 
         if (dvui.menuItemLabel(@src(), "Diode", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .component;
-            circuit.held_component = .diode;
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .diode } };
             fw.close();
         }
     }
@@ -374,7 +365,7 @@ fn renderToolbox() bool {
         defer fw.deinit();
 
         if (dvui.menuItemLabel(@src(), "Wire", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .wire;
+            circuit.placement_mode = .{ .wire = .{ .held_wire_p1 = null } };
             fw.close();
         }
 

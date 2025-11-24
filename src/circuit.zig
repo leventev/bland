@@ -7,13 +7,6 @@ const dvui = @import("dvui");
 
 const NetList = bland.NetList;
 
-pub const PlacementMode = enum {
-    none,
-    component,
-    wire,
-    pin,
-};
-
 pub const Rotation = enum {
     right,
     bottom,
@@ -121,16 +114,41 @@ pub const Wire = struct {
     }
 };
 
-pub var placement_mode: PlacementMode = .none;
+pub const PlacementModeType = enum {
+    none,
+    new_component,
+    dragging_component,
+    wire,
+    pin,
+};
 
-pub var held_component: bland.Component.DeviceType = .resistor;
+pub const PlacementMode = union(PlacementModeType) {
+    none: struct {
+        hovered_component_id: ?usize,
+    },
+    new_component: struct {
+        device_type: bland.Component.DeviceType,
+    },
+    dragging_component: struct {
+        comp_id: usize,
+    },
+    wire: struct {
+        held_wire_p1: ?GridPosition = null,
+    },
+    pin: void,
+};
+
+pub var placement_mode: PlacementMode = .{
+    .none = .{ .hovered_component_id = null },
+};
+
 pub var placement_rotation: Rotation = .right;
-pub var mb1_down: bool = false;
-pub var hovered_component_id: ?usize = null;
+
+// set to null on release
+pub var mb1_click_pos: ?dvui.Point.Physical = null;
+
 pub var selected_component_id: ?usize = null;
 pub var selected_component_changed: bool = false;
-
-pub var held_wire_p1: ?GridPosition = null;
 
 fn getOccupiedGridPositions(
     wire: Wire,
@@ -374,6 +392,7 @@ pub const GraphicCircuit = struct {
         comp_type: bland.Component.DeviceType,
         pos: GridPosition,
         rotation: Rotation,
+        exclude_comp_id: ?usize,
     ) bool {
         var buffer: [100]component.OccupiedGridPosition = undefined;
         const positions = component.deviceOccupiedGridPositions(
@@ -382,7 +401,8 @@ pub const GraphicCircuit = struct {
             rotation,
             buffer[0..],
         );
-        for (self.graphic_components.items) |comp| {
+        for (self.graphic_components.items, 0..) |comp, i| {
+            if (i == exclude_comp_id) continue;
             if (comp.intersects(positions)) return false;
         }
 

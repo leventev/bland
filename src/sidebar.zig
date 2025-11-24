@@ -35,8 +35,6 @@ pub fn renderComponentList() void {
         tl.addText("components", .{});
     }
 
-    circuit.hovered_component_id = null;
-
     var scroll = dvui.scrollArea(
         @src(),
         .{},
@@ -80,7 +78,10 @@ pub fn renderComponentList() void {
         });
 
         if (bw.hovered()) {
-            circuit.hovered_component_id = i;
+            switch (circuit.placement_mode) {
+                .none => |*data| data.hovered_component_id = i,
+                else => {},
+            }
         }
 
         if (bw.clicked()) {

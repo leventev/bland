@@ -486,7 +486,7 @@ pub const GraphicComponent = struct {
                 .device = try device_type.defaultValue(gpa),
                 .terminal_node_ids = try gpa.alloc(usize, 2),
             },
-            .value_buffer = try .init(gpa, circuit.held_component),
+            .value_buffer = try .init(gpa, device_type),
         };
         try graphic_comp.setNewComponentName();
         try graphic_comp.value_buffer.setDeefaultValue(0, graphic_comp.comp.device);
