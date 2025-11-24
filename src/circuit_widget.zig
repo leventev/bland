@@ -542,7 +542,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     var grid_positions = std.ArrayList(circuit.GridPosition){};
     defer grid_positions.deinit(allocator);
 
-    for (circuit.main_circuit.graphic_components.items) |graphic_comp| {
+    for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, i| {
+        switch (circuit.placement_mode) {
+            .dragging_component => |data| {
+                if (data.comp_id == i) continue;
+            },
+            else => {},
+        }
         // TODO
         var buff: [100]component.OccupiedGridPosition = undefined;
         const occupied_positions = graphic_comp.getOccupiedGridPositions(buff[0..]);
