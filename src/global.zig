@@ -23,7 +23,7 @@ pub const circuit_font_size = 18;
 
 // TODO: make this const and make it nicer
 
-const accent = dvui.Color.fromHSLuv(25, 55, 55, 100);
+const accent = dvui.Color.fromHSLuv(39, 80, 55, 100);
 const err = dvui.Color{ .r = 0xe0, .g = 0x1b, .b = 0x24 };
 
 // DARK constants
