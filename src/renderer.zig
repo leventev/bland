@@ -296,7 +296,7 @@ pub fn renderWire(
     }
 }
 
-fn renderToolbox() bool {
+fn renderToolbox(parentSubwindowId: dvui.Id) bool {
     var toolbox = dvui.box(@src(), .{
         .dir = .vertical,
     }, .{
@@ -306,8 +306,18 @@ fn renderToolbox() bool {
     });
     defer toolbox.deinit();
 
-    var menu = dvui.menu(@src(), .horizontal, .{});
+    // TODO: passing parentSubwindowId doesnt seem to work? (after closing the menu
+    // the toolbox is still focused)
+    // maybe im just stupid, regardless if i get this to work later
+    // the dvui.focusWidget call at the end of the function shall be removed
+    var menu = dvui.MenuWidget.init(@src(), .{
+        .dir = .horizontal,
+        .parentSubwindowId = parentSubwindowId,
+    }, .{});
+    menu.install();
     defer menu.deinit();
+
+    var close = false;
 
     if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{ .tag = "first-focusable" })) |r| {
         var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
@@ -325,51 +335,61 @@ fn renderToolbox() bool {
         if (dvui.menuItemLabel(@src(), "Rotate held component", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_rotation = circuit.placement_rotation.rotateClockwise();
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Resistor", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .resistor } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Voltage source", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .voltage_source } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Current source", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .current_source } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Ground", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .ground } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Capacitor", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .capacitor } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Inductor", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .inductor } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Current controlled voltage source", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .ccvs } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Current controlled current source", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .cccs } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Diode", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_component = .{ .device_type = .diode } };
             fw.close();
+            close = true;
         }
     }
 
@@ -380,21 +400,25 @@ fn renderToolbox() bool {
         if (dvui.menuItemLabel(@src(), "Wire", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .wire = .{ .held_wire_p1 = null } };
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "DC analysis", .{}, .{ .expand = .horizontal }) != null) {
             circuit.main_circuit.analyseDC();
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Frequency sweep analysis", .{}, .{ .expand = .horizontal }) != null) {
             circuit.main_circuit.analyseFrequencySweep(1, 1e7, 700);
             fw.close();
+            close = true;
         }
 
         if (dvui.menuItemLabel(@src(), "Transient analysis", .{}, .{ .expand = .horizontal }) != null) {
             circuit.main_circuit.analyseTransient();
             fw.close();
+            close = true;
         }
     }
 
@@ -409,14 +433,20 @@ fn renderToolbox() bool {
                 dvui.themeSet(global.dark_theme)
             else
                 dvui.themeSet(global.light_theme);
+            close = true;
         }
+    }
+
+    if (close) {
+        dvui.focusWidget(null, parentSubwindowId, null);
     }
 
     return true;
 }
 
 pub fn render(gpa: std.mem.Allocator) !bool {
-    if (!renderToolbox())
+    const subwindowId = dvui.subwindowCurrentId();
+    if (!renderToolbox(subwindowId))
         return false;
 
     var paned = dvui.paned(
