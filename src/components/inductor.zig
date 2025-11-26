@@ -225,7 +225,7 @@ pub fn mouseInside(
             .h = circle_diameter / 2 + 2 * tolerance,
         },
         .bottom, .top => dvui.Rect.Physical{
-            .x = pos.x - circle_diameter / 2 - tolerance,
+            .x = pos.x - tolerance,
             .y = pos.y + wire_pixel_len - tolerance,
             .w = circle_diameter / 2 + 2 * tolerance,
             .h = middle_len + 2 * tolerance,
