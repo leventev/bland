@@ -27,10 +27,14 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
-    exe.linkLibrary(bland_lib);
-    exe.linkLibC();
+    exe.root_module.linkLibrary(bland_lib);
+    exe.root_module.link_libc = true;
 
-    b.installArtifact(exe);
+    const lib_only_opt = b.option(bool, "lib-only", "Only build the static library") orelse false;
+    b.installArtifact(bland_lib);
+    if (!lib_only_opt) {
+        b.installArtifact(exe);
+    }
 
     const run_cmd = b.addRunArtifact(exe);
 
@@ -63,11 +67,20 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const test_step = b.step("test", "Run unit tests");
-    const run_unit_tests = b.addRunArtifact(lib_unit_tests);
-    run_unit_tests.skip_foreign_checks = true;
-    test_step.dependOn(&run_unit_tests.step);
+    const lib_test_step = b.step("lib-test", "Run unit tests for the library");
+    const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
+    run_lib_unit_tests.skip_foreign_checks = true;
+    lib_test_step.dependOn(&run_lib_unit_tests.step);
 
-    const run_step = b.step("run", "Run the app");
+    const lib_docs_step = b.step("lib-docs", "Build documentation for the library");
+
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = bland_lib.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+    });
+    lib_docs_step.dependOn(&install_docs.step);
+
+    const run_step = b.step("run", "Run the application");
     run_step.dependOn(&run_cmd.step);
 }
