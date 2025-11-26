@@ -11,12 +11,12 @@ pub const minimum_window_height = 480;
 
 pub const grid_size = 64;
 
-pub const font_name = "JuliaMono";
-pub const font_path = "ttf/JuliaMono-Regular.ttf";
+pub const font_name = "JetBrainsMono";
+pub const font_path = "ttf/JetBrainsMono-Regular.ttf";
 pub const font_data = @embedFile(font_path);
 
-pub const bold_font_name = "JuliaMonoBold";
-pub const bold_font_path = "ttf/JuliaMono-Bold.ttf";
+pub const bold_font_name = "JetBrainsMonoBold";
+pub const bold_font_path = "ttf/JetBrainsMono-Bold.ttf";
 pub const bold_font_data = @embedFile(bold_font_path);
 
 pub const circuit_font_size = 18;
