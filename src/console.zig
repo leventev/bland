@@ -76,14 +76,19 @@ pub fn renderConsole() void {
     tl.install(.{});
     tl.processEvents();
 
+    const err_color = dvui.Color.fromHSLuv(0, 50, 50, 100);
+    const warn_color = dvui.Color.fromHSLuv(60, 85, 85, 100);
+    const debug_color = dvui.Color.fromHSLuv(300, 35, 55, 100);
+    const info_color = dvui.Color.fromHSLuv(0, 0, 85, 100);
+
     for (0..log_entry_count) |i| {
         const log_entry = log_entry_buffer[i];
 
         const color = switch (log_entry.level) {
-            .info => dvui.Color{ .r = 210, .g = 210, .b = 210 },
-            .debug => dvui.Color{ .r = 200, .g = 140, .b = 200 },
-            .warn => dvui.Color{ .r = 230, .g = 180, .b = 90 },
-            .err => dvui.Color{ .r = 210, .g = 120, .b = 120 },
+            .info => info_color,
+            .debug => debug_color,
+            .warn => warn_color,
+            .err => err_color,
         };
 
         tl.addText(log_entry.str, .{

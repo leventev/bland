@@ -69,26 +69,32 @@ pub const ComponentRenderType = enum {
     selected,
 
     pub fn colors(self: ComponentRenderType) ComponentRenderColors {
+        const normal_wire_color = dvui.Color.fromHSLuv(109, 46.2, 51.2, 100);
+        const normal_component_color = dvui.Color.fromHSLuv(250, 73.1, 52.1, 100);
+        const hovered_component_color = normal_component_color.lighten(15);
+        const unable_to_place_color = dvui.Color.fromHSLuv(0, 60, 40, 100);
+        const holding_color = dvui.Color.fromHSLuv(200, 5, 50, 100);
+
         switch (self) {
             .normal => return .{
-                .wire_color = dvuiColorFromHex(0x32f032ff),
-                .component_color = dvuiColorFromHex(0xb428e6ff),
+                .wire_color = normal_wire_color,
+                .component_color = normal_component_color,
             },
             .holding => return .{
-                .wire_color = dvuiColorFromHex(0x999999ff),
-                .component_color = dvuiColorFromHex(0x999999ff),
+                .wire_color = holding_color,
+                .component_color = holding_color,
             },
             .unable_to_place => return .{
-                .wire_color = dvuiColorFromHex(0xbb4040ff),
-                .component_color = dvuiColorFromHex(0xbb4040ff),
+                .wire_color = unable_to_place_color,
+                .component_color = unable_to_place_color,
             },
             .hovered => return .{
-                .wire_color = dvuiColorFromHex(0x32f032ff),
-                .component_color = dvuiColorFromHex(0x44ffffff),
+                .wire_color = normal_wire_color,
+                .component_color = hovered_component_color,
             },
             .selected => return .{
-                .wire_color = dvuiColorFromHex(0x32f032ff),
-                .component_color = dvuiColorFromHex(0xff4444ff),
+                .wire_color = normal_wire_color,
+                .component_color = hovered_component_color,
             },
         }
     }
@@ -99,6 +105,13 @@ pub const ComponentRenderType = enum {
             .holding, .selected, .unable_to_place => 4,
         };
     }
+
+    pub fn wireThickness(self: ComponentRenderType) f32 {
+        return switch (self) {
+            .normal, .hovered, .selected => 1,
+            .holding, .unable_to_place => 4,
+        };
+    }
 };
 
 const ComponentRenderColors = struct {
@@ -106,7 +119,7 @@ const ComponentRenderColors = struct {
     component_color: dvui.Color,
 };
 
-fn dvuiColorFromHex(color: u32) dvui.Color {
+pub fn dvuiColorFromHex(color: u32) dvui.Color {
     return dvui.Color{
         .r = @intCast(color >> 24),
         .g = @intCast((color >> 16) & 0xFF),
@@ -127,7 +140,7 @@ pub fn renderTerminalWire(
 ) void {
     const pos = wire.pos;
     const wire_color = render_type.colors().wire_color;
-    const thickness = render_type.thickness();
+    const thickness = render_type.wireThickness();
 
     switch (wire.direction) {
         .horizontal => {
@@ -205,7 +218,7 @@ pub fn renderWire(
     const length: f32 = @floatFromInt(wire.length * global.grid_size);
 
     const wire_color = render_type.colors().wire_color;
-    const thickness = render_type.thickness();
+    const thickness = render_type.wireThickness();
 
     if (render_type == .holding) {
         const rect1 = dvui.Rect.Physical{
