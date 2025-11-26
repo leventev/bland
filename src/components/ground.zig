@@ -82,8 +82,8 @@ pub fn getOccupiedGridPositions(
 }
 
 const triangle_side = 45;
-const triangle_height = 39;
-const wire_pixel_len = 16;
+const wire_pixel_len = 25;
+const triangle_height = global.grid_size - wire_pixel_len;
 
 pub fn render(
     circuit_area: dvui.Rect.Physical,
