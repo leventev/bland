@@ -44,6 +44,11 @@ pub fn renderComponentList() void {
     );
     defer scroll.deinit();
 
+    switch (circuit.placement_mode) {
+        .none => |*data| data.hovered_component_id = null,
+        else => {},
+    }
+
     for (0.., circuit.main_circuit.graphic_components.items) |i, graphic_comp| {
         const style = if (circuit.selected_component_id == i)
             dvui.Theme.Style.Name.highlight
