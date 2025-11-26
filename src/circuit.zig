@@ -152,8 +152,9 @@ pub const Wire = struct {
 pub const PlacementModeType = enum {
     none,
     new_component,
+    new_wire,
     dragging_component,
-    wire,
+    dragging_wire,
     pin,
 };
 
@@ -169,11 +170,14 @@ pub const PlacementMode = union(PlacementModeType) {
     new_component: struct {
         device_type: bland.Component.DeviceType,
     },
+    new_wire: struct {
+        held_wire_p1: ?GridPosition = null,
+    },
     dragging_component: struct {
         comp_id: usize,
     },
-    wire: struct {
-        held_wire_p1: ?GridPosition = null,
+    dragging_wire: struct {
+        wire_id: usize,
     },
     pin: void,
 };

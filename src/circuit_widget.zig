@@ -72,7 +72,7 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
     }
 
     if (ev.matchBind("wire_placement_mode") and ev.action == .down) {
-        circuit.placement_mode = .{ .wire = .{ .held_wire_p1 = null } };
+        circuit.placement_mode = .{ .new_wire = .{ .held_wire_p1 = null } };
     }
 
     if (ev.matchBind("rotate") and ev.action == .down) {
@@ -149,7 +149,13 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                     const comp = circuit.main_circuit.graphic_components.items[comp_id];
                                     circuit.placement_rotation = comp.rotation;
                                 },
-                                .wire => {},
+                                .wire => |wire_id| {
+                                    circuit.placement_mode = .{
+                                        .dragging_wire = .{
+                                            .wire_id = wire_id,
+                                        },
+                                    };
+                                },
                             }
                         }
                     },
@@ -188,6 +194,30 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                             },
                         };
                     },
+                    .dragging_wire => |data| {
+                        var wire = &circuit.main_circuit.wires.items[data.wire_id];
+
+                        const grid_pos = circuit.gridPositionFromPos(
+                            circuit_rect,
+                            ev.p,
+                        );
+
+                        if (circuit.main_circuit.canPlaceWire(
+                            .{
+                                .direction = wire.direction,
+                                .length = wire.length,
+                                .pos = grid_pos,
+                            },
+                        )) {
+                            wire.pos = grid_pos;
+                        }
+
+                        circuit.placement_mode = .{
+                            .none = .{
+                                .hovered_element = null,
+                            },
+                        };
+                    },
                     else => {},
                 }
             }
@@ -203,7 +233,10 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                 circuit.selection_changed = true;
                                 circuit.selection = .{ .component = comp_id };
                             },
-                            else => {},
+                            .wire => |wire_id| {
+                                circuit.selection_changed = true;
+                                circuit.selection = .{ .wire = wire_id };
+                            },
                         }
                     }
                 },
@@ -211,6 +244,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                     _ = data;
                     std.log.warn("unimplemented", .{});
                 },
+                .dragging_wire => {},
                 .new_component => |data| {
                     const grid_pos = component.gridPositionFromScreenPos(
                         data.device_type,
@@ -232,7 +266,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                         );
                     }
                 },
-                .wire => |*data| {
+                .new_wire => |*data| {
                     if (data.held_wire_p1) |p1| {
                         const p2 = circuit.gridPositionFromPos(
                             circuit_rect,
@@ -695,6 +729,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     }
 
     for (circuit.main_circuit.wires.items, 0..) |wire, i| {
+        switch (circuit.placement_mode) {
+            .dragging_wire => |data| {
+                if (data.wire_id == i) continue;
+            },
+            else => {},
+        }
+
         const render_type = if (i == hovered_wire_id)
             ElementRenderType.hovered
         else
@@ -759,24 +800,43 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             circuit_rect,
             null,
         ),
-        .wire => |data| renderHoldingWire(data.held_wire_p1, circuit_rect),
+        .new_wire => |data| renderHoldingWire(data.held_wire_p1, circuit_rect),
         .pin => renderHoldingPin(circuit_rect),
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;
             renderHoldingComponent(dev_type, circuit_rect, data.comp_id);
         },
+        .dragging_wire => |data| {
+            const wire = circuit.main_circuit.wires.items[data.wire_id];
+
+            const pos = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
+
+            const new_wire = circuit.Wire{
+                .direction = wire.direction,
+                .length = wire.length,
+                .pos = pos,
+            };
+
+            const can_place = circuit.main_circuit.canPlaceWire(new_wire);
+            const render_type = if (can_place)
+                ElementRenderType.holding
+            else
+                ElementRenderType.unable_to_place;
+
+            renderer.renderWire(circuit_rect, new_wire, render_type);
+        },
     }
 
-    if (circuit.placement_mode == .new_component) {} else if (circuit.placement_mode == .wire) {}
+    if (circuit.placement_mode == .new_component) {} else if (circuit.placement_mode == .new_wire) {}
 
     const Cursor = dvui.enums.Cursor;
 
     const cursor = switch (circuit.placement_mode) {
         .none => |data| if (data.hovered_element != null) Cursor.hand else Cursor.arrow,
-        .dragging_component => Cursor.arrow_all,
+        .dragging_component, .dragging_wire => Cursor.arrow_all,
         .new_component => Cursor.arrow,
-        .wire, .pin => Cursor.arrow,
+        .new_wire, .pin => Cursor.arrow,
     };
 
     dvui.cursorSet(cursor);

@@ -86,12 +86,12 @@ pub const ElementRenderType = enum {
             .holding => return .{
                 .terminal_wire_color = holding_color,
                 .component_color = holding_color,
-                .wire_color = normal_wire_color,
+                .wire_color = holding_color,
             },
             .unable_to_place => return .{
                 .terminal_wire_color = unable_to_place_color,
                 .component_color = unable_to_place_color,
-                .wire_color = normal_wire_color,
+                .wire_color = unable_to_place_color,
             },
             .hovered => return .{
                 .terminal_wire_color = normal_wire_color,
@@ -101,7 +101,7 @@ pub const ElementRenderType = enum {
             .selected => return .{
                 .terminal_wire_color = normal_wire_color,
                 .component_color = hovered_component_color,
-                .wire_color = normal_wire_color,
+                .wire_color = hovered_wire_color,
             },
         }
     }
@@ -397,7 +397,7 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
         defer fw.deinit();
 
         if (dvui.menuItemLabel(@src(), "Wire", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .{ .wire = .{ .held_wire_p1 = null } };
+            circuit.placement_mode = .{ .new_wire = .{ .held_wire_p1 = null } };
             fw.close();
             close = true;
         }
