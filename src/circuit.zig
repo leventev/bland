@@ -39,13 +39,19 @@ pub const GridPosition = struct {
     }
 };
 
-pub const AnalysisResult = union(enum) {
-    dc: NetList.RealAnalysisReport,
-    frequency_sweep: NetList.FrequencySweepReport,
-    transient: NetList.TransientReport,
+pub const AnalysisReport = struct {
+    component_names: []?[]const u8,
+    node_count: usize,
+    result: Result,
+
+    pub const Result = union(enum) {
+        dc: NetList.RealAnalysisResult,
+        frequency_sweep: NetList.FrequencySweepResult,
+        transient: NetList.TransientResult,
+    };
 };
 
-pub var analysis_results: std.ArrayList(AnalysisResult) = .{};
+pub var analysis_reports: std.ArrayList(AnalysisReport) = .{};
 
 pub const Wire = struct {
     pos: GridPosition,
@@ -149,6 +155,13 @@ pub var mb1_click_pos: ?dvui.Point.Physical = null;
 
 pub var selected_component_id: ?usize = null;
 pub var selected_component_changed: bool = false;
+
+pub fn delete() void {
+    if (selected_component_id) |comp_id| {
+        main_circuit.deleteComponent(comp_id);
+        selected_component_id = null;
+    }
+}
 
 fn getOccupiedGridPositions(
     wire: Wire,
@@ -485,6 +498,31 @@ pub const GraphicCircuit = struct {
         return null;
     }
 
+    fn copyComponentNames(self: *const GraphicCircuit) ![]?[]const u8 {
+        const comps = self.graphic_components.items;
+        const names = try self.allocator.alloc(?[]const u8, comps.len);
+        var idx: usize = 0;
+        errdefer {
+            for (0..idx) |i| {
+                if (names[i]) |name| {
+                    self.allocator.free(name);
+                }
+            }
+            self.allocator.free(names);
+        }
+
+        while (idx < comps.len) : (idx += 1) {
+            const comp = comps[idx];
+            if (comp.comp.device == .ground) {
+                names[idx] = null;
+            } else {
+                names[idx] = try self.allocator.dupe(u8, comp.comp.name);
+            }
+        }
+
+        return names;
+    }
+
     pub fn analyseDC(self: *const GraphicCircuit) void {
         var netlist = self.createNetlist() catch {
             std.log.err("Failed to build netlist", .{});
@@ -492,13 +530,34 @@ pub const GraphicCircuit = struct {
         };
         defer netlist.deinit(self.allocator);
 
+        // FIXME: errdefer is not ran if we return
+        const component_names = self.copyComponentNames() catch {
+            std.log.err("Failed to copy names", .{});
+            return;
+        };
+        errdefer {
+            for (component_names) |name| {
+                if (name) |str| {
+                    self.allocator.free(str);
+                }
+            }
+            self.allocator.free(component_names);
+        }
         // TODO
-        const report = netlist.analyseDC(self.allocator, null) catch {
+        const result = netlist.analyseDC(self.allocator, null) catch {
             std.log.err("DC analysis failed", .{});
             return;
         };
 
-        analysis_results.append(self.allocator, .{ .dc = report }) catch @panic("TODO");
+        const report = AnalysisReport{
+            .component_names = component_names,
+            .node_count = netlist.nodes.items.len,
+            .result = .{
+                .dc = result,
+            },
+        };
+
+        analysis_reports.append(self.allocator, report) catch @panic("TODO");
     }
 
     pub fn analyseTransient(self: *const GraphicCircuit) void {
@@ -507,9 +566,22 @@ pub const GraphicCircuit = struct {
             return;
         };
         defer netlist.deinit(self.allocator);
+        // FIXME: errdefer is not ran if we return
+        const component_names = self.copyComponentNames() catch {
+            std.log.err("Failed to copy names", .{});
+            return;
+        };
+        errdefer {
+            for (component_names) |name| {
+                if (name) |str| {
+                    self.allocator.free(str);
+                }
+            }
+            self.allocator.free(component_names);
+        }
 
         // TODO
-        const report = netlist.analyseTransient(
+        const result = netlist.analyseTransient(
             self.allocator,
             null,
             0.1,
@@ -518,7 +590,15 @@ pub const GraphicCircuit = struct {
             return;
         };
 
-        analysis_results.append(self.allocator, .{ .transient = report }) catch @panic("TODO");
+        const report = AnalysisReport{
+            .component_names = component_names,
+            .node_count = netlist.nodes.items.len,
+            .result = .{
+                .transient = result,
+            },
+        };
+
+        analysis_reports.append(self.allocator, report) catch @panic("TODO");
     }
 
     pub fn analyseFrequencySweep(
@@ -537,7 +617,21 @@ pub const GraphicCircuit = struct {
         };
         defer netlist.deinit(self.allocator);
 
-        const fw_report = netlist.analyseFrequencySweep(
+        // FIXME: errdefer is not ran if we return
+        const component_names = self.copyComponentNames() catch {
+            std.log.err("Failed to copy names", .{});
+            return;
+        };
+        errdefer {
+            for (component_names) |name| {
+                if (name) |str| {
+                    self.allocator.free(str);
+                }
+            }
+            self.allocator.free(component_names);
+        }
+
+        const result = netlist.analyseFrequencySweep(
             self.allocator,
             start_freq,
             end_freq,
@@ -548,10 +642,22 @@ pub const GraphicCircuit = struct {
             return;
         };
 
-        analysis_results.append(
-            self.allocator,
-            .{ .frequency_sweep = fw_report },
-        ) catch @panic("TODO");
+        const report = AnalysisReport{
+            .component_names = component_names,
+            .node_count = netlist.nodes.items.len,
+            .result = .{
+                .frequency_sweep = result,
+            },
+        };
+
+        analysis_reports.append(self.allocator, report) catch @panic("TODO");
+    }
+
+    pub fn deleteComponent(self: *GraphicCircuit, comp_id: usize) void {
+        std.debug.assert(self.graphic_components.items.len > comp_id);
+
+        var comp = self.graphic_components.orderedRemove(comp_id);
+        comp.deinit(self.allocator);
     }
 };
 

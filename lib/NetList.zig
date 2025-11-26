@@ -13,7 +13,7 @@ nodes: std.ArrayListUnmanaged(Node),
 components: std.ArrayListUnmanaged(Component),
 
 pub const ground_node_id = 0;
-pub const RealAnalysisReport = MNA.RealAnalysisReport;
+pub const RealAnalysisResult = MNA.RealAnalysisReport;
 pub const ComplexAnalysisReport = MNA.ComplexAnalysisReport;
 
 const NetList = @This();
@@ -292,18 +292,18 @@ pub fn analyseTransient(
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
     until: Float,
-) TransientReport.Error!TransientReport {
+) TransientResult.Error!TransientResult {
     const start_time: i64 = std.time.microTimestamp();
 
     var group_2 = try self.createGroup2(allocator, currents_watched);
     defer group_2.deinit(allocator);
 
-    const time_step: Float = 5e-6;
+    const time_step: Float = 5e-5;
 
     const time_point_count: usize = @as(usize, @intFromFloat(until / time_step)) + 1;
 
     // TODO: adaptive time steps
-    var transient_report = try TransientReport.init(
+    var transient_report = try TransientResult.init(
         allocator,
         self.nodes.items.len,
         self.components.items.len,
@@ -483,7 +483,7 @@ pub fn analyseSinusoidalSteadyState(
     return res;
 }
 
-pub const FrequencySweepReport = struct {
+pub const FrequencySweepResult = struct {
     /// frequency values
     frequency_values: []Float,
 
@@ -507,7 +507,7 @@ pub const FrequencySweepReport = struct {
         start_freq: Float,
         end_freq: Float,
         frequency_count: usize,
-    ) FrequencySweepReport.Error!FrequencySweepReport {
+    ) FrequencySweepResult.Error!FrequencySweepResult {
         if (frequency_count < 2) return error.InvalidFrequencyRange;
         if (start_freq <= 0) return error.InvalidFrequencyRange;
         if (start_freq >= end_freq) return error.InvalidFrequencyRange;
@@ -541,7 +541,7 @@ pub const FrequencySweepReport = struct {
             frequency_values[i] = frequency;
         }
 
-        return FrequencySweepReport{
+        return FrequencySweepResult{
             .all_voltages = all_voltages,
             .all_currents = all_currents,
             .node_count = node_count,
@@ -550,7 +550,7 @@ pub const FrequencySweepReport = struct {
         };
     }
 
-    pub fn deinit(self: *FrequencySweepReport, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *FrequencySweepResult, allocator: std.mem.Allocator) void {
         allocator.free(self.frequency_values);
         allocator.free(self.all_voltages);
         allocator.free(self.all_currents);
@@ -558,9 +558,9 @@ pub const FrequencySweepReport = struct {
     }
 
     pub fn voltage(
-        self: *const FrequencySweepReport,
+        self: *const FrequencySweepResult,
         node_idx: usize,
-    ) FrequencySweepReport.Error![]const Complex {
+    ) FrequencySweepResult.Error![]const Complex {
         if (node_idx >= self.node_count) return error.InvalidNodeID;
         const start_idx = node_idx * self.frequency_values.len;
         const end_idx = (node_idx + 1) * self.frequency_values.len;
@@ -568,9 +568,9 @@ pub const FrequencySweepReport = struct {
     }
 
     pub fn current(
-        self: *const FrequencySweepReport,
+        self: *const FrequencySweepResult,
         comp_idx: usize,
-    ) FrequencySweepReport.Error![]const ?Complex {
+    ) FrequencySweepResult.Error![]const ?Complex {
         if (comp_idx >= self.component_count) return error.InvalidComponentID;
         const start_idx = comp_idx * self.frequency_values.len;
         const end_idx = (comp_idx + 1) * self.frequency_values.len;
@@ -578,10 +578,10 @@ pub const FrequencySweepReport = struct {
     }
 
     pub fn analysisReportForFreq(
-        self: *const FrequencySweepReport,
+        self: *const FrequencySweepResult,
         freq_idx: usize,
         report_buff: *ComplexAnalysisReport,
-    ) FrequencySweepReport.Error!void {
+    ) FrequencySweepResult.Error!void {
         if (freq_idx >= self.frequency_values.len) return error.InvalidFequencyIdx;
         for (0..report_buff.voltages.len) |idx| {
             const voltage_for_freqs = self.voltage(idx) catch unreachable;
@@ -595,7 +595,7 @@ pub const FrequencySweepReport = struct {
     }
 };
 
-pub const TransientReport = struct {
+pub const TransientResult = struct {
     /// time values
     time_values: []Float,
 
@@ -617,7 +617,7 @@ pub const TransientReport = struct {
         node_count: usize,
         component_count: usize,
         time_count: usize,
-    ) TransientReport.Error!TransientReport {
+    ) TransientResult.Error!TransientResult {
         if (time_count < 1) return error.InvalidFrequencyRange;
 
         // TODO: figure out whats the best way to go about handling this error
@@ -638,7 +638,7 @@ pub const TransientReport = struct {
 
         const time_values = try allocator.alloc(Float, time_count);
 
-        return TransientReport{
+        return TransientResult{
             .all_voltages = all_voltages,
             .all_currents = all_currents,
             .node_count = node_count,
@@ -647,7 +647,7 @@ pub const TransientReport = struct {
         };
     }
 
-    pub fn deinit(self: *TransientReport, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *TransientResult, allocator: std.mem.Allocator) void {
         allocator.free(self.time_values);
         allocator.free(self.all_voltages);
         allocator.free(self.all_currents);
@@ -655,9 +655,9 @@ pub const TransientReport = struct {
     }
 
     pub fn voltage(
-        self: *const TransientReport,
+        self: *const TransientResult,
         node_idx: usize,
-    ) TransientReport.Error![]const Float {
+    ) TransientResult.Error![]const Float {
         if (node_idx >= self.node_count) return error.InvalidNodeID;
         const start_idx = node_idx * self.time_values.len;
         const end_idx = (node_idx + 1) * self.time_values.len;
@@ -665,9 +665,9 @@ pub const TransientReport = struct {
     }
 
     pub fn current(
-        self: *const TransientReport,
+        self: *const TransientResult,
         comp_idx: usize,
-    ) TransientReport.Error![]const ?Float {
+    ) TransientResult.Error![]const ?Float {
         if (comp_idx >= self.component_count) return error.InvalidComponentID;
         const start_idx = comp_idx * self.time_values.len;
         const end_idx = (comp_idx + 1) * self.time_values.len;
@@ -675,10 +675,10 @@ pub const TransientReport = struct {
     }
 
     pub fn analysisReportForTime(
-        self: *const TransientReport,
+        self: *const TransientResult,
         time_idx: usize,
-        report_buff: *RealAnalysisReport,
-    ) TransientReport.Error!void {
+        report_buff: *RealAnalysisResult,
+    ) TransientResult.Error!void {
         if (time_idx >= self.time_values.len) return error.InvalidTimeIdx;
         for (0..report_buff.voltages.len) |idx| {
             const voltage_for_times = self.voltage(idx) catch unreachable;
@@ -716,10 +716,10 @@ pub fn analyseFrequencySweep(
     end_freq: Float,
     freq_count: usize,
     currents_watched: ?[]const usize,
-) FrequencySweepReport.Error!FrequencySweepReport {
+) FrequencySweepResult.Error!FrequencySweepResult {
     const start_time: i64 = std.time.microTimestamp();
 
-    var fw_report = try FrequencySweepReport.init(
+    var fw_report = try FrequencySweepResult.init(
         allocator,
         self.nodes.items.len,
         self.components.items.len,

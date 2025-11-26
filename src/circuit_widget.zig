@@ -35,6 +35,7 @@ pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     try win.keybinds.putNoClobber(allocator, "analyse", .{ .key = .a });
     try win.keybinds.putNoClobber(allocator, "open_debug_window", .{ .key = .o });
     try win.keybinds.putNoClobber(allocator, "pin_placement_mode", .{ .key = .p });
+    try win.keybinds.putNoClobber(allocator, "delete", .{ .key = .delete });
 }
 
 fn checkForKeybinds(ev: dvui.Event.Key) !void {
@@ -88,6 +89,10 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
 
     if (ev.matchBind("pin_placement_mode") and ev.action == .down) {
         circuit.placement_mode = .pin;
+    }
+
+    if (ev.matchBind("delete") and ev.action == .down) {
+        circuit.delete();
     }
 }
 

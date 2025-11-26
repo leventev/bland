@@ -509,7 +509,7 @@ pub fn render(gpa: std.mem.Allocator) !bool {
 
 pub fn renderDCReport(
     gpa: std.mem.Allocator,
-    dc_report: NetList.RealAnalysisReport,
+    report: circuit.AnalysisReport,
     report_changed: bool,
 ) !void {
     _ = report_changed;
@@ -540,29 +540,31 @@ pub fn renderDCReport(
     const arena = arena_alloc.allocator();
     defer arena_alloc.deinit();
 
+    const voltages = report.result.dc.voltages;
+    const currents = report.result.dc.currents;
+
     // TODO: less allocations?
     var values = try std.ArrayList(DCVariable).initCapacity(
         gpa,
-        dc_report.currents.len + dc_report.voltages.len,
+        currents.len + voltages.len,
     );
 
-    for (dc_report.voltages, 0..) |voltage, i| {
+    for (voltages, 0..) |voltage, i| {
         try values.append(gpa, .{
             .display_name = try std.fmt.allocPrint(arena, "V(n{})", .{i}),
             .value = try bland.units.formatUnitAlloc(arena, .voltage, voltage, 3),
         });
     }
 
-    for (dc_report.currents, 0..) |current, i| {
+    for (currents, 0..) |current, i| {
         if (current) |cur| {
-            const graphic_comp = circuit.main_circuit.graphic_components.items[i];
-            if (graphic_comp.comp.device == .ground) continue;
-
-            const comp_name = graphic_comp.comp.name;
-            try values.append(gpa, .{
-                .display_name = try std.fmt.allocPrint(arena, "I({s})", .{comp_name}),
-                .value = try bland.units.formatUnitAlloc(arena, .current, cur, 3),
-            });
+            const comp_name = report.component_names[i];
+            if (comp_name) |name| {
+                try values.append(gpa, .{
+                    .display_name = try std.fmt.allocPrint(arena, "I({s})", .{name}),
+                    .value = try bland.units.formatUnitAlloc(arena, .current, cur, 3),
+                });
+            }
         }
     }
 
@@ -630,7 +632,7 @@ pub fn renderDCReport(
 
 pub fn renderFWReport(
     gpa: std.mem.Allocator,
-    fw_report: NetList.FrequencySweepReport,
+    report: circuit.AnalysisReport,
     report_changed: bool,
 ) !void {
     const S = struct {
@@ -664,14 +666,30 @@ pub fn renderFWReport(
         var prev_var_choice: usize = 1;
     };
 
-    // TODO: allocate less or use arena or something else
-    var var_entries = try gpa.alloc([]u8, fw_report.node_count + fw_report.component_count);
-    defer gpa.free(var_entries);
-    for (0..fw_report.node_count) |i| {
-        var_entries[i] = try std.fmt.allocPrint(gpa, "Voltage #{}", .{i});
+    var comp_idxs = try gpa.alloc(usize, report.component_names.len);
+    defer gpa.free(comp_idxs);
+
+    var component_entry_count: usize = 0;
+    for (report.component_names, 0..) |name, comp_idx| {
+        if (name != null) {
+            comp_idxs[component_entry_count] = comp_idx;
+            component_entry_count += 1;
+        }
     }
-    for (0..fw_report.component_count) |i| {
-        var_entries[fw_report.node_count + i] = try std.fmt.allocPrint(gpa, "Current #{}", .{i});
+
+    // TODO: allocate less or use arena or something else
+    var var_entries = try gpa.alloc([]u8, report.node_count + component_entry_count);
+    defer gpa.free(var_entries);
+    for (0..report.node_count) |i| {
+        var_entries[i] = try std.fmt.allocPrint(gpa, "V(n{})", .{i});
+    }
+
+    var idx: usize = report.node_count;
+    for (report.component_names) |name| {
+        if (name) |str| {
+            var_entries[idx] = try std.fmt.allocPrint(gpa, "I({s})", .{str});
+            idx += 1;
+        }
     }
     defer {
         for (var_entries) |ent| {
@@ -701,20 +719,23 @@ pub fn renderFWReport(
     var s1 = plot.line();
     defer s1.deinit();
 
-    if (S.var_choice >= fw_report.node_count) {
-        const comp_idx = S.var_choice - fw_report.node_count;
-        const current = fw_report.current(comp_idx) catch @panic("TODO");
+    const fw_result = report.result.frequency_sweep;
+
+    if (S.var_choice >= report.node_count) {
+        const comp_entry_idx = S.var_choice - report.node_count;
+        const comp_idx = comp_idxs[comp_entry_idx];
+        const current = fw_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
             if (c) |c_val| {
-                const freq = fw_report.frequency_values[i];
+                const freq = fw_result.frequency_values[i];
                 const value = 20 * @log10(c_val.magnitude());
                 s1.point(freq, value);
             }
         }
     } else {
-        const voltage = fw_report.voltage(S.var_choice) catch @panic("TODO");
+        const voltage = fw_result.voltage(S.var_choice) catch @panic("TODO");
         for (voltage, 0..) |v, i| {
-            const freq = fw_report.frequency_values[i];
+            const freq = fw_result.frequency_values[i];
             const value = 20 * @log10(v.magnitude());
             s1.point(freq, value);
         }
@@ -725,7 +746,7 @@ pub fn renderFWReport(
 
 pub fn renderTransientReport(
     gpa: std.mem.Allocator,
-    report: NetList.TransientReport,
+    report: circuit.AnalysisReport,
     report_changed: bool,
 ) !void {
     const S = struct {
@@ -755,9 +776,20 @@ pub fn renderTransientReport(
         var prev_var_choice: usize = 1;
     };
 
+    var comp_idxs = try gpa.alloc(usize, report.component_names.len);
+    defer gpa.free(comp_idxs);
+
+    var component_entry_count: usize = 0;
+    for (report.component_names, 0..) |name, comp_idx| {
+        if (name != null) {
+            comp_idxs[component_entry_count] = comp_idx;
+            component_entry_count += 1;
+        }
+    }
+
     // TODO: allocate less or use arena or something else
     // FIXME TODO: dont allocate memory for ground nodes
-    var var_entries = try gpa.alloc([]u8, report.node_count + report.component_count);
+    var var_entries = try gpa.alloc([]u8, report.node_count + component_entry_count);
     defer {
         for (var_entries) |ent| {
             gpa.free(ent);
@@ -769,12 +801,12 @@ pub fn renderTransientReport(
         var_entries[i] = try std.fmt.allocPrint(gpa, "V(n{})", .{i});
     }
 
-    for (0..report.component_count) |i| {
-        const graphic_comp = circuit.main_circuit.graphic_components.items[i];
-        //if (graphic_comp.comp.device == .ground) continue;
-        const comp_name = graphic_comp.comp.name;
-
-        var_entries[report.node_count + i] = try std.fmt.allocPrint(gpa, "I({s})", .{comp_name});
+    var idx: usize = report.node_count;
+    for (report.component_names) |name| {
+        if (name) |str| {
+            var_entries[idx] = try std.fmt.allocPrint(gpa, "I({s})", .{str});
+            idx += 1;
+        }
     }
 
     _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
@@ -799,19 +831,22 @@ pub fn renderTransientReport(
     var s1 = plot.line();
     defer s1.deinit();
 
+    const trans_result = report.result.transient;
+
     if (S.var_choice >= report.node_count) {
-        const comp_idx = S.var_choice - report.node_count;
-        const current = report.current(comp_idx) catch @panic("TODO");
+        const comp_entry_idx = S.var_choice - report.node_count;
+        const comp_idx = comp_idxs[comp_entry_idx];
+        const current = trans_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
             if (c) |c_val| {
-                const time = report.time_values[i];
+                const time = trans_result.time_values[i];
                 s1.point(time, c_val);
             }
         }
     } else {
-        const voltage = report.voltage(S.var_choice) catch @panic("TODO");
+        const voltage = trans_result.voltage(S.var_choice) catch @panic("TODO");
         for (voltage, 0..) |v, i| {
-            const time = report.time_values[i];
+            const time = trans_result.time_values[i];
             s1.point(time, v);
         }
     }
@@ -833,20 +868,20 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     );
     defer vbox.deinit();
 
-    if (circuit.analysis_results.items.len == 0) return;
+    if (circuit.analysis_reports.items.len == 0) return;
 
     // TODO: allocate less or use arena or something else
-    var fw_entries = try gpa.alloc([]u8, circuit.analysis_results.items.len);
-    defer gpa.free(fw_entries);
-    for (circuit.analysis_results.items, 0..) |res, i| {
-        fw_entries[i] = switch (res) {
+    var result_entries = try gpa.alloc([]u8, circuit.analysis_reports.items.len);
+    defer gpa.free(result_entries);
+    for (circuit.analysis_reports.items, 0..) |res, i| {
+        result_entries[i] = switch (res.result) {
             .dc => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (dc)", .{i}),
             .frequency_sweep => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (freq. sweep)", .{i}),
             .transient => |_| try std.fmt.allocPrint(gpa, "Analysis #{} (transient)", .{i}),
         };
     }
     defer {
-        for (fw_entries) |ent| {
+        for (result_entries) |ent| {
             gpa.free(ent);
         }
     }
@@ -855,7 +890,7 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
         var fw_choice: usize = 0;
     };
 
-    const changed = dvui.dropdown(@src(), fw_entries, &S.fw_choice, .{});
+    const changed = dvui.dropdown(@src(), result_entries, &S.fw_choice, .{});
 
     var report_box = dvui.box(@src(), .{ .dir = .vertical }, .{
         .border = dvui.Rect{ .y = 2 },
@@ -865,11 +900,11 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     });
     defer report_box.deinit();
 
-    const chosen = circuit.analysis_results.items[S.fw_choice];
-    switch (chosen) {
-        .dc => |dc_rep| try renderDCReport(gpa, dc_rep, changed),
-        .frequency_sweep => |fw_rep| try renderFWReport(gpa, fw_rep, changed),
-        .transient => |trans_rep| try renderTransientReport(gpa, trans_rep, changed),
+    const chosen = circuit.analysis_reports.items[S.fw_choice];
+    switch (chosen.result) {
+        .dc => try renderDCReport(gpa, chosen, changed),
+        .frequency_sweep => try renderFWReport(gpa, chosen, changed),
+        .transient => try renderTransientReport(gpa, chosen, changed),
     }
 }
 

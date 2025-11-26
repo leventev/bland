@@ -464,10 +464,48 @@ pub const GraphicComponent = struct {
             }
         }
 
-        pub fn deinit(self: @This(), gpa: std.mem.Allocator) void {
-            _ = self;
-            _ = gpa;
-            @panic("TODO");
+        pub fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
+            switch (self.*) {
+                .ground => {},
+                .resistor => |data| {
+                    gpa.free(data.buff);
+                },
+                .voltage_source => |data| {
+                    gpa.free(data.dc_buff);
+                    gpa.free(data.phasor_amplitude_buff);
+                    gpa.free(data.phasor_phase_buff);
+                    gpa.free(data.sin_amplitude_buff);
+                    gpa.free(data.sin_frequency_buff);
+                    gpa.free(data.sin_phase_buff);
+                    gpa.free(data.square_amplitude_buff);
+                    gpa.free(data.square_frequency_buff);
+                },
+                .current_source => |data| {
+                    gpa.free(data.dc_buff);
+                    gpa.free(data.phasor_amplitude_buff);
+                    gpa.free(data.phasor_phase_buff);
+                    gpa.free(data.sin_amplitude_buff);
+                    gpa.free(data.sin_frequency_buff);
+                    gpa.free(data.sin_phase_buff);
+                    gpa.free(data.square_amplitude_buff);
+                    gpa.free(data.square_frequency_buff);
+                },
+                .capacitor => |data| {
+                    gpa.free(data.buff);
+                },
+                .inductor => |data| {
+                    gpa.free(data.buff);
+                },
+                .ccvs => |data| {
+                    gpa.free(data.transresistance_buff);
+                    gpa.free(data.controller_name_buff);
+                },
+                .cccs => |data| {
+                    gpa.free(data.multiplier_buff);
+                    gpa.free(data.controller_name_buff);
+                },
+                .diode => {},
+            }
         }
     };
 
@@ -494,11 +532,9 @@ pub const GraphicComponent = struct {
         return graphic_comp;
     }
 
-    pub fn deinit(self: *Component, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *GraphicComponent, allocator: std.mem.Allocator) void {
         allocator.free(self.name_buffer);
-        self.name = &.{};
-        allocator.free(self.terminal_node_ids);
-        self.value_buffer.deinit();
+        self.value_buffer.deinit(allocator);
     }
 
     pub fn terminals(self: *const GraphicComponent, buffer: []GridPosition) []GridPosition {
