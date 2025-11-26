@@ -60,7 +60,7 @@ pub fn renderComponentHolding(
     circuit_rect: dvui.Rect.Physical,
     pos: GridPosition,
     rot: Rotation,
-    render_type: renderer.ComponentRenderType,
+    render_type: renderer.ElementRenderType,
 ) void {
     switch (dev_type) {
         .ground => graphics_module(DeviceType.ground).render(
@@ -549,7 +549,7 @@ pub const GraphicComponent = struct {
     pub fn render(
         self: *const GraphicComponent,
         circuit_rect: dvui.Rect.Physical,
-        render_type: renderer.ComponentRenderType,
+        render_type: renderer.ElementRenderType,
     ) void {
         switch (@as(DeviceType, self.comp.device)) {
             .ground => graphics_module(DeviceType.ground).render(

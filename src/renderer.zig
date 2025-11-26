@@ -61,15 +61,17 @@ pub fn drawLine(p1: dvui.Point.Physical, p2: dvui.Point.Physical, color: dvui.Co
     );
 }
 
-pub const ComponentRenderType = enum {
+pub const ElementRenderType = enum {
     normal,
     holding,
     unable_to_place,
     hovered,
     selected,
 
-    pub fn colors(self: ComponentRenderType) ComponentRenderColors {
+    pub fn colors(self: ElementRenderType) ElementRenderColors {
         const normal_wire_color = dvui.Color.fromHSLuv(109, 46.2, 51.2, 100);
+        const hovered_wire_color = normal_wire_color.lighten(15);
+
         const normal_component_color = dvui.Color.fromHSLuv(250, 73.1, 52.1, 100);
         const hovered_component_color = normal_component_color.lighten(15);
         const unable_to_place_color = dvui.Color.fromHSLuv(0, 60, 40, 100);
@@ -77,36 +79,41 @@ pub const ComponentRenderType = enum {
 
         switch (self) {
             .normal => return .{
-                .wire_color = normal_wire_color,
+                .terminal_wire_color = normal_wire_color,
                 .component_color = normal_component_color,
+                .wire_color = normal_wire_color,
             },
             .holding => return .{
-                .wire_color = holding_color,
+                .terminal_wire_color = holding_color,
                 .component_color = holding_color,
+                .wire_color = normal_wire_color,
             },
             .unable_to_place => return .{
-                .wire_color = unable_to_place_color,
+                .terminal_wire_color = unable_to_place_color,
                 .component_color = unable_to_place_color,
+                .wire_color = normal_wire_color,
             },
             .hovered => return .{
-                .wire_color = normal_wire_color,
+                .terminal_wire_color = normal_wire_color,
                 .component_color = hovered_component_color,
+                .wire_color = hovered_wire_color,
             },
             .selected => return .{
-                .wire_color = normal_wire_color,
+                .terminal_wire_color = normal_wire_color,
                 .component_color = hovered_component_color,
+                .wire_color = normal_wire_color,
             },
         }
     }
 
-    pub fn thickness(self: ComponentRenderType) f32 {
+    pub fn thickness(self: ElementRenderType) f32 {
         return switch (self) {
             .normal, .hovered => 1,
             .holding, .selected, .unable_to_place => 4,
         };
     }
 
-    pub fn wireThickness(self: ComponentRenderType) f32 {
+    pub fn wireThickness(self: ElementRenderType) f32 {
         return switch (self) {
             .normal, .hovered, .selected => 1,
             .holding, .unable_to_place => 4,
@@ -114,19 +121,11 @@ pub const ComponentRenderType = enum {
     }
 };
 
-const ComponentRenderColors = struct {
-    wire_color: dvui.Color,
+const ElementRenderColors = struct {
     component_color: dvui.Color,
+    terminal_wire_color: dvui.Color,
+    wire_color: dvui.Color,
 };
-
-pub fn dvuiColorFromHex(color: u32) dvui.Color {
-    return dvui.Color{
-        .r = @intCast(color >> 24),
-        .g = @intCast((color >> 16) & 0xFF),
-        .b = @intCast((color >> 8) & 0xFF),
-        .a = @intCast(color & 0xFF),
-    };
-}
 
 pub const TerminalWire = struct {
     pos: dvui.Point,
@@ -136,10 +135,10 @@ pub const TerminalWire = struct {
 
 pub fn renderTerminalWire(
     wire: TerminalWire,
-    render_type: ComponentRenderType,
+    render_type: ElementRenderType,
 ) void {
     const pos = wire.pos;
-    const wire_color = render_type.colors().wire_color;
+    const wire_color = render_type.colors().terminal_wire_color;
     const thickness = render_type.wireThickness();
 
     switch (wire.direction) {
@@ -202,7 +201,7 @@ pub fn renderTerminalWire(
 
 fn renderTerminalWires(
     wires: []TerminalWire,
-    render_type: ComponentRenderType,
+    render_type: ElementRenderType,
 ) void {
     for (wires) |wire| {
         renderTerminalWire(wire, render_type);
@@ -212,7 +211,7 @@ fn renderTerminalWires(
 pub fn renderWire(
     circuit_rect: dvui.Rect.Physical,
     wire: circuit.Wire,
-    render_type: ComponentRenderType,
+    render_type: ElementRenderType,
 ) void {
     const pos = wire.pos.toCircuitPosition(circuit_rect);
     const length: f32 = @floatFromInt(wire.length * global.grid_size);

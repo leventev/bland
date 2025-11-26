@@ -51,7 +51,7 @@ pub fn render(
     rot: Rotation,
     name: ?[]const u8,
     value: ?GraphicComponent.ValueBuffer,
-    render_type: renderer.ComponentRenderType,
+    render_type: renderer.ElementRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_rect);
 

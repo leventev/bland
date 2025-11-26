@@ -89,7 +89,7 @@ pub fn render(
     circuit_area: dvui.Rect.Physical,
     grid_pos: GridPosition,
     rot: Rotation,
-    render_type: renderer.ComponentRenderType,
+    render_type: renderer.ElementRenderType,
 ) void {
     const pos = grid_pos.toCircuitPosition(circuit_area);
     const render_colors = render_type.colors();

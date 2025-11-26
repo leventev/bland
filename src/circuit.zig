@@ -118,6 +118,35 @@ pub const Wire = struct {
 
         return false;
     }
+
+    pub fn hovered(
+        self: Wire,
+        circuit_rect: dvui.Rect.Physical,
+        mouse_pos: dvui.Point.Physical,
+    ) bool {
+        const tolerance = 12;
+
+        switch (self.direction) {
+            .horizontal => {
+                const start_pos = self.pos.toCircuitPosition(circuit_rect);
+                const end_pos = self.end().toCircuitPosition(circuit_rect);
+
+                const left = if (end_pos.x > start_pos.x) start_pos else end_pos;
+                const right = if (end_pos.x > start_pos.x) end_pos else start_pos;
+
+                return @abs(mouse_pos.y - start_pos.y) < tolerance and mouse_pos.x >= left.x and mouse_pos.x <= right.x;
+            },
+            .vertical => {
+                const start_pos = self.pos.toCircuitPosition(circuit_rect);
+                const end_pos = self.end().toCircuitPosition(circuit_rect);
+
+                const top = if (end_pos.y > start_pos.y) start_pos else end_pos;
+                const bottom = if (end_pos.y > start_pos.y) end_pos else start_pos;
+
+                return @abs(mouse_pos.x - start_pos.x) < tolerance and mouse_pos.y >= top.y and mouse_pos.y <= bottom.y;
+            },
+        }
+    }
 };
 
 pub const PlacementModeType = enum {
@@ -128,9 +157,14 @@ pub const PlacementModeType = enum {
     pin,
 };
 
+pub const Element = union(enum) {
+    component: usize,
+    wire: usize,
+};
+
 pub const PlacementMode = union(PlacementModeType) {
     none: struct {
-        hovered_component_id: ?usize,
+        hovered_element: ?Element,
     },
     new_component: struct {
         device_type: bland.Component.DeviceType,
@@ -145,7 +179,7 @@ pub const PlacementMode = union(PlacementModeType) {
 };
 
 pub var placement_mode: PlacementMode = .{
-    .none = .{ .hovered_component_id = null },
+    .none = .{ .hovered_element = null },
 };
 
 pub var placement_rotation: Rotation = .right;
@@ -153,13 +187,18 @@ pub var placement_rotation: Rotation = .right;
 // set to null on release
 pub var mb1_click_pos: ?dvui.Point.Physical = null;
 
-pub var selected_component_id: ?usize = null;
-pub var selected_component_changed: bool = false;
+pub var selection: ?Element = null;
+pub var selection_changed: bool = false;
 
 pub fn delete() void {
-    if (selected_component_id) |comp_id| {
-        main_circuit.deleteComponent(comp_id);
-        selected_component_id = null;
+    if (selection) |selected| {
+        switch (selected) {
+            .component => |comp_id| {
+                main_circuit.deleteComponent(comp_id);
+            },
+            .wire => {},
+        }
+        selection = null;
     }
 }
 

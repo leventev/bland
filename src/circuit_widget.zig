@@ -7,7 +7,7 @@ const circuit = @import("circuit.zig");
 const component = @import("component.zig");
 const global = @import("global.zig");
 
-const ComponentRenderType = renderer.ComponentRenderType;
+const ElementRenderType = renderer.ElementRenderType;
 
 var mouse_pos: dvui.Point.Physical = undefined;
 
@@ -40,7 +40,7 @@ pub fn initKeybinds(allocator: std.mem.Allocator) !void {
 
 fn checkForKeybinds(ev: dvui.Event.Key) !void {
     if (ev.matchBind("normal_mode") and ev.action == .down) {
-        circuit.placement_mode = .{ .none = .{ .hovered_component_id = null } };
+        circuit.placement_mode = .{ .none = .{ .hovered_element = null } };
     }
 
     if (ev.matchBind("register_placement_mode") and ev.action == .down) {
@@ -97,20 +97,37 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
 }
 
 fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev: dvui.Event.Mouse) !void {
-    var hovered_comp_id: ?usize = null;
-
-    for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, comp_idx| {
-        const inside_comp: bool = graphic_comp.mouseInside(circuit_rect, ev.p);
-
-        if (!inside_comp) continue;
-
-        hovered_comp_id = comp_idx;
-        break;
-    }
-
     switch (circuit.placement_mode) {
         .none => |*data| {
-            data.hovered_component_id = hovered_comp_id;
+            data.hovered_element = null;
+
+            var hovered_comp_id: ?usize = null;
+
+            for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, comp_id| {
+                const inside_comp: bool = graphic_comp.mouseInside(circuit_rect, ev.p);
+
+                if (!inside_comp) continue;
+
+                hovered_comp_id = comp_id;
+                break;
+            }
+
+            if (hovered_comp_id) |id| {
+                data.hovered_element = .{ .component = id };
+            } else {
+                var hovered_wire_id: ?usize = null;
+
+                for (circuit.main_circuit.wires.items, 0..) |wire, wire_id| {
+                    const hovered = wire.hovered(circuit_rect, ev.p);
+
+                    if (!hovered) continue;
+                    hovered_wire_id = wire_id;
+                }
+
+                if (hovered_wire_id) |id| {
+                    data.hovered_element = .{ .wire = id };
+                }
+            }
         },
         else => {},
     }
@@ -120,15 +137,20 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
             if (circuit.mb1_click_pos) |_| {
                 switch (circuit.placement_mode) {
                     .none => |data| {
-                        if (data.hovered_component_id) |comp_id| {
-                            circuit.placement_mode = .{
-                                .dragging_component = .{
-                                    .comp_id = comp_id,
-                                },
-                            };
+                        if (data.hovered_element) |element| {
+                            switch (element) {
+                                .component => |comp_id| {
+                                    circuit.placement_mode = .{
+                                        .dragging_component = .{
+                                            .comp_id = comp_id,
+                                        },
+                                    };
 
-                            const comp = circuit.main_circuit.graphic_components.items[comp_id];
-                            circuit.placement_rotation = comp.rotation;
+                                    const comp = circuit.main_circuit.graphic_components.items[comp_id];
+                                    circuit.placement_rotation = comp.rotation;
+                                },
+                                .wire => {},
+                            }
                         }
                     },
                     else => {},
@@ -162,7 +184,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
 
                         circuit.placement_mode = .{
                             .none = .{
-                                .hovered_component_id = null,
+                                .hovered_element = null,
                             },
                         };
                     },
@@ -175,9 +197,14 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                 circuit.mb1_click_pos = ev.p;
             switch (circuit.placement_mode) {
                 .none => |data| {
-                    if (data.hovered_component_id) |comp_id| {
-                        circuit.selected_component_changed = circuit.selected_component_id != comp_id;
-                        circuit.selected_component_id = comp_id;
+                    if (data.hovered_element) |element| {
+                        switch (element) {
+                            .component => |comp_id| {
+                                circuit.selection_changed = true;
+                                circuit.selection = .{ .component = comp_id };
+                            },
+                            else => {},
+                        }
                     }
                 },
                 .dragging_component => |data| {
@@ -301,9 +328,9 @@ fn renderHoldingComponent(
         exclude_comp_id,
     );
     const render_type = if (can_place)
-        ComponentRenderType.holding
+        ElementRenderType.holding
     else
-        ComponentRenderType.unable_to_place;
+        ElementRenderType.unable_to_place;
 
     component.renderComponentHolding(
         device_type,
@@ -335,9 +362,9 @@ fn renderHoldingWire(
 
     const can_place = circuit.main_circuit.canPlaceWire(wire);
     const render_type = if (can_place)
-        ComponentRenderType.holding
+        ElementRenderType.holding
     else
-        ComponentRenderType.unable_to_place;
+        ElementRenderType.unable_to_place;
 
     renderer.renderWire(circuit_rect, wire, render_type);
 }
@@ -347,7 +374,7 @@ fn renderPin(
     grid_pos: circuit.GridPosition,
     rotation: circuit.Rotation,
     label: []const u8,
-    render_type: renderer.ComponentRenderType,
+    render_type: renderer.ElementRenderType,
 ) void {
     // TODO: better font handling
     const f = dvui.Font{
@@ -493,9 +520,9 @@ fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
 
     const can_place = canPlacePin(grid_pos);
     const render_type = if (can_place)
-        ComponentRenderType.holding
+        ElementRenderType.holding
     else
-        ComponentRenderType.unable_to_place;
+        ElementRenderType.unable_to_place;
 
     var buff: [256]u8 = undefined;
     const label = std.fmt.bufPrint(
@@ -610,8 +637,30 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
-    const hovered_component_id: ?usize = switch (circuit.placement_mode) {
-        .none => |data| data.hovered_component_id,
+    const hovered_component_id: ?usize = blk: switch (circuit.placement_mode) {
+        .none => |data| if (data.hovered_element) |element| {
+            break :blk switch (element) {
+                .component => |comp_id| comp_id,
+                else => null,
+            };
+        } else break :blk null,
+        else => null,
+    };
+
+    const selected_component_id: ?usize = if (circuit.selection) |element| blk: {
+        break :blk switch (element) {
+            .component => |comp_id| comp_id,
+            else => null,
+        };
+    } else null;
+
+    const hovered_wire_id: ?usize = blk: switch (circuit.placement_mode) {
+        .none => |data| if (data.hovered_element) |element| {
+            break :blk switch (element) {
+                .wire => |wire_id| wire_id,
+                else => null,
+            };
+        } else break :blk null,
         else => null,
     };
 
@@ -623,12 +672,12 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             else => {},
         }
 
-        const render_type: ComponentRenderType = if (i == circuit.selected_component_id)
-            ComponentRenderType.selected
+        const render_type: ElementRenderType = if (i == selected_component_id)
+            ElementRenderType.selected
         else if (i == hovered_component_id)
-            ComponentRenderType.hovered
+            ElementRenderType.hovered
         else
-            ComponentRenderType.normal;
+            ElementRenderType.normal;
 
         var terminal_buff: [8]circuit.GridPosition = undefined;
         const terminals = comp.terminals(&terminal_buff);
@@ -645,7 +694,12 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         comp.render(circuit_rect, render_type);
     }
 
-    for (circuit.main_circuit.wires.items) |wire| {
+    for (circuit.main_circuit.wires.items, 0..) |wire, i| {
+        const render_type = if (i == hovered_wire_id)
+            ElementRenderType.hovered
+        else
+            ElementRenderType.normal;
+
         var it = wire.iterator();
         while (it.next()) |gpos| {
             // ensure key existsterm
@@ -660,7 +714,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 ptr.non_end_connection += 1;
             }
         }
-        renderer.renderWire(circuit_rect, wire, .normal);
+        renderer.renderWire(circuit_rect, wire, render_type);
     }
 
     var it = grid_pos_wire_connections.iterator();
@@ -687,7 +741,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             );
 
             path.build().fillConvex(.{
-                .color = ComponentRenderType.normal.colors().wire_color,
+                .color = ElementRenderType.normal.colors().terminal_wire_color,
             });
         }
     }
@@ -719,7 +773,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     const Cursor = dvui.enums.Cursor;
 
     const cursor = switch (circuit.placement_mode) {
-        .none => |data| if (data.hovered_component_id != null) Cursor.hand else Cursor.arrow,
+        .none => |data| if (data.hovered_element != null) Cursor.hand else Cursor.arrow,
         .dragging_component => Cursor.arrow_all,
         .new_component => Cursor.arrow,
         .wire, .pin => Cursor.arrow,

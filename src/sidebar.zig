@@ -45,17 +45,24 @@ pub fn renderComponentList() void {
     defer scroll.deinit();
 
     switch (circuit.placement_mode) {
-        .none => |*data| data.hovered_component_id = null,
+        .none => |*data| data.hovered_element = null,
         else => {},
     }
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, graphic_comp| {
-        const style = if (circuit.selected_component_id == i)
+        const select_component_id: ?usize = if (circuit.selection) |element| blk: {
+            break :blk switch (element) {
+                .component => |comp_id| comp_id,
+                .wire => null,
+            };
+        } else null;
+
+        const style = if (select_component_id == i)
             dvui.Theme.Style.Name.highlight
         else
             dvui.Theme.Style.Name.control;
 
-        const font = if (circuit.selected_component_id == i)
+        const font = if (select_component_id == i)
             dvui.themeGet().font_title_2
         else
             dvui.themeGet().font_body;
@@ -83,16 +90,16 @@ pub fn renderComponentList() void {
 
         if (bw.hovered()) {
             switch (circuit.placement_mode) {
-                .none => |*data| data.hovered_component_id = i,
+                .none => |*data| data.hovered_element = .{ .component = i },
                 else => {},
             }
         }
 
         if (bw.clicked()) {
-            if (circuit.selected_component_id != i) {
-                circuit.selected_component_changed = true;
+            if (select_component_id != i) {
+                circuit.selection_changed = true;
             }
-            circuit.selected_component_id = i;
+            circuit.selection = .{ .component = i };
         }
 
         bw.deinit();
@@ -127,45 +134,50 @@ pub fn renderPropertyBox() void {
         tl.addText("properties", .{});
     }
 
-    if (circuit.selected_component_id) |comp_id| {
-        var scroll = dvui.scrollArea(
-            @src(),
-            .{},
-            .{
-                .expand = .horizontal,
+    if (circuit.selection) |element| {
+        switch (element) {
+            .component => |comp_id| {
+                var scroll = dvui.scrollArea(
+                    @src(),
+                    .{},
+                    .{
+                        .expand = .horizontal,
+                    },
+                );
+                defer scroll.deinit();
+
+                var selected_graphic_comp = &circuit.main_circuit.graphic_components.items[comp_id];
+                var comp = &selected_graphic_comp.comp;
+
+                dvui.label(@src(), "name", .{}, .{
+                    .color_text = dvui.themeGet().color(.content, .text),
+                    .font = dvui.themeGet().font_body,
+                });
+
+                var te = dvui.textEntry(@src(), .{
+                    .text = .{
+                        .buffer = selected_graphic_comp.name_buffer,
+                    },
+                }, .{
+                    .color_fill = dvui.themeGet().color(.control, .fill),
+                    .color_text = dvui.themeGet().color(.content, .text),
+                    .font = dvui.themeGet().font_body,
+                    .expand = .horizontal,
+                    .margin = dvui.Rect.all(4),
+                });
+
+                if (dvui.firstFrame(te.data().id) or circuit.selection_changed) {
+                    te.textSet(comp.name, false);
+                }
+
+                comp.name = te.getText();
+                te.deinit();
+
+                selected_graphic_comp.renderPropertyBox(circuit.selection_changed);
+                circuit.selection_changed = false;
             },
-        );
-        defer scroll.deinit();
-
-        var selected_graphic_comp = &circuit.main_circuit.graphic_components.items[comp_id];
-        var comp = &selected_graphic_comp.comp;
-
-        dvui.label(@src(), "name", .{}, .{
-            .color_text = dvui.themeGet().color(.content, .text),
-            .font = dvui.themeGet().font_body,
-        });
-
-        var te = dvui.textEntry(@src(), .{
-            .text = .{
-                .buffer = selected_graphic_comp.name_buffer,
-            },
-        }, .{
-            .color_fill = dvui.themeGet().color(.control, .fill),
-            .color_text = dvui.themeGet().color(.content, .text),
-            .font = dvui.themeGet().font_body,
-            .expand = .horizontal,
-            .margin = dvui.Rect.all(4),
-        });
-
-        if (dvui.firstFrame(te.data().id) or circuit.selected_component_changed) {
-            te.textSet(comp.name, false);
+            .wire => {},
         }
-
-        comp.name = te.getText();
-        te.deinit();
-
-        selected_graphic_comp.renderPropertyBox(circuit.selected_component_changed);
-        circuit.selected_component_changed = false;
     }
 }
 
