@@ -79,7 +79,7 @@ pub fn renderConsole() void {
     const err_color = dvui.Color.fromHSLuv(0, 50, 50, 100);
     const warn_color = dvui.Color.fromHSLuv(60, 85, 85, 100);
     const debug_color = dvui.Color.fromHSLuv(300, 35, 55, 100);
-    const info_color = dvui.Color.fromHSLuv(0, 0, 85, 100);
+    const info_color = dvui.themeGet().text;
 
     for (0..log_entry_count) |i| {
         const log_entry = log_entry_buffer[i];
