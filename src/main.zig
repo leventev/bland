@@ -23,15 +23,6 @@ fn init(win: *dvui.Window) !void {
 
     try circuit_widget.initKeybinds(allocator);
 
-    // TODO
-    global.light_theme.font_body = .{ .id = .fromName(global.font_name), .size = 18 };
-    global.light_theme.font_caption = .{ .id = .fromName(global.font_name), .size = 15 };
-    global.light_theme.font_title = .{ .id = .fromName(global.font_name), .size = 20 };
-    global.light_theme.font_title_1 = .{ .id = .fromName(global.bold_font_name), .size = 19 };
-    global.light_theme.font_title_2 = .{ .id = .fromName(global.bold_font_name), .size = 18 };
-    global.light_theme.font_title_3 = .{ .id = .fromName(global.bold_font_name), .size = 17 };
-    global.light_theme.font_title_4 = .{ .id = .fromName(global.bold_font_name), .size = 16 };
-
     dvui.themeSet(global.dark_theme);
 
     circuit.main_circuit = circuit.GraphicCircuit{

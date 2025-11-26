@@ -45,10 +45,10 @@ pub fn renderComponentList() void {
     defer scroll.deinit();
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, graphic_comp| {
-        const bg = if (circuit.selected_component_id == i)
-            dvui.themeGet().color(.highlight, .fill)
+        const style = if (circuit.selected_component_id == i)
+            dvui.Theme.Style.Name.highlight
         else
-            dvui.themeGet().color(.control, .fill);
+            dvui.Theme.Style.Name.control;
 
         const font = if (circuit.selected_component_id == i)
             dvui.themeGet().font_title_2
@@ -58,7 +58,7 @@ pub fn renderComponentList() void {
         var bw = dvui.ButtonWidget.init(@src(), .{}, .{
             .id_extra = i,
             .expand = .horizontal,
-            .color_fill = bg,
+            .style = style,
             .margin = dvui.Rect.all(0),
             .corner_radius = dvui.Rect.all(0),
         });
@@ -70,9 +70,8 @@ pub fn renderComponentList() void {
         dvui.labelNoFmt(@src(), graphic_comp.comp.name, .{}, .{
             .id_extra = 0,
             .expand = .horizontal,
-            .color_text = dvui.themeGet().color(.control, .text),
             .font = font,
-            .color_fill = bg,
+            .style = style,
             .margin = dvui.Rect.all(0),
             .padding = dvui.Rect.all(2),
         });
