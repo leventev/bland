@@ -150,9 +150,20 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                     circuit.placement_rotation = comp.rotation;
                                 },
                                 .wire => |wire_id| {
+                                    const wire = circuit.main_circuit.wires.items[wire_id];
+                                    const wire_pos = wire.pos.toCircuitPosition(
+                                        circuit_rect,
+                                    );
+
+                                    const offset: f32 = switch (wire.direction) {
+                                        .vertical => ev.p.y - wire_pos.y,
+                                        .horizontal => ev.p.x - wire_pos.x,
+                                    };
+
                                     circuit.placement_mode = .{
                                         .dragging_wire = .{
                                             .wire_id = wire_id,
+                                            .offset = offset,
                                         },
                                     };
                                 },
@@ -197,9 +208,19 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                     .dragging_wire => |data| {
                         var wire = &circuit.main_circuit.wires.items[data.wire_id];
 
+                        const adjusted_pos = switch (wire.direction) {
+                            .vertical => dvui.Point.Physical{
+                                .x = ev.p.x,
+                                .y = ev.p.y - data.offset,
+                            },
+                            .horizontal => dvui.Point.Physical{
+                                .x = ev.p.x - data.offset,
+                                .y = ev.p.y,
+                            },
+                        };
                         const grid_pos = circuit.gridPositionFromPos(
                             circuit_rect,
-                            ev.p,
+                            adjusted_pos,
                         );
 
                         if (circuit.main_circuit.canPlaceWire(
@@ -208,6 +229,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                 .length = wire.length,
                                 .pos = grid_pos,
                             },
+                            data.wire_id,
                         )) {
                             wire.pos = grid_pos;
                         }
@@ -285,7 +307,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                             .pos = p1,
                         };
 
-                        if (wire.length != 0 and circuit.main_circuit.canPlaceWire(wire)) {
+                        if (wire.length != 0 and circuit.main_circuit.canPlaceWire(wire, null)) {
                             try circuit.main_circuit.wires.append(
                                 circuit.main_circuit.allocator,
                                 wire,
@@ -394,7 +416,7 @@ fn renderHoldingWire(
         .pos = p1,
     };
 
-    const can_place = circuit.main_circuit.canPlaceWire(wire);
+    const can_place = circuit.main_circuit.canPlaceWire(wire, null);
     const render_type = if (can_place)
         ElementRenderType.holding
     else
@@ -623,7 +645,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
-    for (circuit.main_circuit.wires.items) |wire| {
+    for (circuit.main_circuit.wires.items, 0..) |wire, i| {
+        switch (circuit.placement_mode) {
+            .dragging_wire => |data| {
+                if (data.wire_id == i) continue;
+            },
+            else => {},
+        }
         var it = wire.iterator();
         while (it.next()) |pos| {
             try grid_positions.append(allocator, pos);
@@ -810,7 +838,18 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         .dragging_wire => |data| {
             const wire = circuit.main_circuit.wires.items[data.wire_id];
 
-            const pos = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
+            const adjusted_pos = switch (wire.direction) {
+                .vertical => dvui.Point.Physical{
+                    .x = mouse_pos.x,
+                    .y = mouse_pos.y - data.offset,
+                },
+                .horizontal => dvui.Point.Physical{
+                    .x = mouse_pos.x - data.offset,
+                    .y = mouse_pos.y,
+                },
+            };
+
+            const pos = circuit.gridPositionFromPos(circuit_rect, adjusted_pos);
 
             const new_wire = circuit.Wire{
                 .direction = wire.direction,
@@ -818,7 +857,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .pos = pos,
             };
 
-            const can_place = circuit.main_circuit.canPlaceWire(new_wire);
+            const can_place = circuit.main_circuit.canPlaceWire(new_wire, data.wire_id);
             const render_type = if (can_place)
                 ElementRenderType.holding
             else

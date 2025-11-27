@@ -178,6 +178,7 @@ pub const PlacementMode = union(PlacementModeType) {
     },
     dragging_wire: struct {
         wire_id: usize,
+        offset: f32,
     },
     pin: void,
 };
@@ -397,7 +398,7 @@ pub const GraphicCircuit = struct {
         return false;
     }
 
-    pub fn canPlaceWire(self: *const GraphicCircuit, wire: Wire) bool {
+    pub fn canPlaceWire(self: *const GraphicCircuit, wire: Wire, exclude_wire_id: ?usize) bool {
         var buffer: [100]component.OccupiedGridPosition = undefined;
         const positions = getOccupiedGridPositions(wire, buffer[0..]);
 
@@ -405,7 +406,9 @@ pub const GraphicCircuit = struct {
             if (comp.intersects(positions)) return false;
         }
 
-        for (self.wires.items) |other_wire| {
+        for (self.wires.items, 0..) |other_wire, i| {
+            if (exclude_wire_id == i) continue;
+
             if (wire.direction != other_wire.direction) continue;
             if (wire.direction == .horizontal) {
                 if (wire.pos.y != other_wire.pos.y) continue;
