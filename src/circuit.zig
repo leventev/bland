@@ -201,7 +201,9 @@ pub fn delete() void {
             .component => |comp_id| {
                 main_circuit.deleteComponent(comp_id);
             },
-            .wire => {},
+            .wire => |wire_id| {
+                main_circuit.deleteWire(wire_id);
+            },
         }
         selection = null;
     }
@@ -704,6 +706,11 @@ pub const GraphicCircuit = struct {
 
         var comp = self.graphic_components.orderedRemove(comp_id);
         comp.deinit(self.allocator);
+    }
+
+    pub fn deleteWire(self: *GraphicCircuit, wire_id: usize) void {
+        std.debug.assert(self.wires.items.len > wire_id);
+        _ = self.wires.orderedRemove(wire_id);
     }
 };
 

@@ -726,6 +726,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else => null,
     };
 
+    const selected_wire_id: ?usize = if (circuit.selection) |element| blk: {
+        break :blk switch (element) {
+            .wire => |wire_id| wire_id,
+            else => null,
+        };
+    } else null;
+
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
         switch (circuit.placement_mode) {
             .dragging_component => |data| {
@@ -764,7 +771,9 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             else => {},
         }
 
-        const render_type = if (i == hovered_wire_id)
+        const render_type = if (i == selected_wire_id)
+            ElementRenderType.selected
+        else if (i == hovered_wire_id)
             ElementRenderType.hovered
         else
             ElementRenderType.normal;

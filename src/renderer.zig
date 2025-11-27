@@ -115,7 +115,8 @@ pub const ElementRenderType = enum {
 
     pub fn wireThickness(self: ElementRenderType) f32 {
         return switch (self) {
-            .normal, .hovered, .selected => 1,
+            .normal, .hovered => 1,
+            .selected => 4,
             .holding, .unable_to_place => 4,
         };
     }
