@@ -786,6 +786,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .non_end_connection = 0,
             });
             var ptr = grid_pos_wire_connections.getPtr(gpos).?;
+
             if (gpos.eql(wire.pos) or gpos.eql(wire.end())) {
                 ptr.end_connection += 1;
             } else {
@@ -799,9 +800,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     while (it.next()) |entry| {
         const gpos = entry.key_ptr.*;
         const wire_connections = entry.value_ptr.*;
-        if (wire_connections.end_connection > 0 and wire_connections.non_end_connection > 0 or
-            wire_connections.end_connection > 2 or wire_connections.non_end_connection == 2)
-        {
+
+        const is_junction = wire_connections.end_connection > 0 and wire_connections.non_end_connection > 0 or
+            wire_connections.end_connection > 2 or wire_connections.non_end_connection == 2;
+
+        const is_end = wire_connections.end_connection == 1 and wire_connections.non_end_connection == 0;
+
+        if (is_junction) {
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
 
@@ -820,6 +825,30 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
 
             path.build().fillConvex(.{
                 .color = ElementRenderType.normal.colors().terminal_wire_color,
+            });
+        } else if (is_end) {
+            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+            defer path.deinit();
+
+            const pos = gpos.toCircuitPosition(circuit_rect);
+
+            path.addArc(
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y,
+                },
+                7,
+                dvui.math.pi * 2,
+                0,
+                false,
+            );
+
+            path.build().fillConvex(.{
+                .color = dvui.themeGet().fill,
+            });
+            path.build().stroke(.{
+                .color = ElementRenderType.normal.colors().terminal_wire_color,
+                .thickness = 2,
             });
         }
     }
