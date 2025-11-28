@@ -921,6 +921,26 @@ fn formatFrequency(gpa: std.mem.Allocator, freq: f64) ![]const u8 {
     return bland.units.formatUnitAlloc(gpa, .frequency, freq, 1);
 }
 
+pub const radioGroupOpts = dvui.Options{
+    .padding = dvui.Rect.all(3),
+};
+
+pub const textEntryLabelOpts = dvui.Options{
+    .expand = .horizontal,
+    .padding = dvui.Rect.all(2),
+    .margin = dvui.Rect{
+        .x = 4,
+    },
+};
+
+pub const textEntryOpts = dvui.Options{
+    .expand = .horizontal,
+    .margin = dvui.Rect.all(4),
+    .padding = dvui.Rect.all(4),
+    .border = dvui.Rect{ .h = 2 },
+    .corner_radius = dvui.Rect.all(0),
+};
+
 pub fn textEntrySI(
     location: std.builtin.SourceLocation,
     comptime label_str: []const u8,
@@ -939,10 +959,7 @@ pub fn textEntrySI(
     defer box.deinit();
 
     // TODO: styling
-    dvui.label(@src(), label_str, .{}, .{
-        .color_text = dvui.themeGet().color(.content, .text),
-        .font = dvui.themeGet().font_body,
-    });
+    dvui.label(@src(), label_str, .{}, textEntryLabelOpts);
 
     var box2 = dvui.box(@src(), .{
         .dir = .horizontal,
@@ -964,13 +981,7 @@ pub fn textEntrySI(
                     },
                 },
             },
-            .{
-                .color_fill = dvui.themeGet().color(.control, .fill),
-                .color_text = dvui.themeGet().color(.content, .text),
-                .font = dvui.themeGet().font_body,
-                .expand = .horizontal,
-                .margin = dvui.Rect.all(4),
-            },
+            textEntryOpts,
         );
         defer te.deinit();
 

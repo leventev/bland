@@ -72,6 +72,7 @@ pub fn renderComponentList() void {
             .expand = .horizontal,
             .style = style,
             .margin = dvui.Rect.all(0),
+            .padding = dvui.Rect.all(4),
             .corner_radius = dvui.Rect.all(0),
         });
 
@@ -85,7 +86,7 @@ pub fn renderComponentList() void {
             .font = font,
             .style = style,
             .margin = dvui.Rect.all(0),
-            .padding = dvui.Rect.all(2),
+            .padding = dvui.Rect.all(1),
         });
 
         if (bw.hovered()) {
@@ -149,22 +150,17 @@ pub fn renderPropertyBox() void {
                 var selected_graphic_comp = &circuit.main_circuit.graphic_components.items[comp_id];
                 var comp = &selected_graphic_comp.comp;
 
-                dvui.label(@src(), "name", .{}, .{
-                    .color_text = dvui.themeGet().color(.content, .text),
-                    .font = dvui.themeGet().font_body,
-                });
+                dvui.label(@src(), "name", .{}, renderer.textEntryLabelOpts);
 
-                var te = dvui.textEntry(@src(), .{
-                    .text = .{
-                        .buffer = selected_graphic_comp.name_buffer,
+                var te = dvui.textEntry(
+                    @src(),
+                    .{
+                        .text = .{
+                            .buffer = selected_graphic_comp.name_buffer,
+                        },
                     },
-                }, .{
-                    .color_fill = dvui.themeGet().color(.control, .fill),
-                    .color_text = dvui.themeGet().color(.content, .text),
-                    .font = dvui.themeGet().font_body,
-                    .expand = .horizontal,
-                    .margin = dvui.Rect.all(4),
-                });
+                    renderer.textEntryOpts,
+                );
 
                 if (dvui.firstFrame(te.data().id) or circuit.selection_changed) {
                     te.textSet(comp.name, false);

@@ -281,7 +281,7 @@ pub fn renderPropertyBox(
     for (0..entries.len) |i| {
         const active = i == @intFromEnum(value_buffer.current_source.selected_function);
 
-        if (dvui.radio(@src(), active, entries[i], .{ .id_extra = i })) {
+        if (dvui.radio(@src(), active, entries[i], renderer.radioGroupOpts.override(.{ .id_extra = i }))) {
             value_buffer.current_source.selected_function = @enumFromInt(i);
             function_changed = true;
         }
