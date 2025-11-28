@@ -5,34 +5,28 @@ const component = @import("component.zig");
 const circuit = @import("circuit.zig");
 const renderer = @import("renderer.zig");
 
+const bland = @import("bland");
 const dvui = @import("dvui");
+
+const tl_box_opts = dvui.Options{
+    .expand = .horizontal,
+    .background = true,
+    .border = dvui.Rect{ .h = 1 },
+};
+
+const tl_opts = dvui.Options{
+    .gravity_x = 0.5,
+};
 
 pub fn renderComponentList() void {
     {
-        var tl_box = dvui.box(
-            @src(),
-            .{
-                .dir = .horizontal,
-            },
-            .{
-                .color_fill = dvui.themeGet().color(.content, .fill),
-                .expand = .horizontal,
-                .background = true,
-                .border = dvui.Rect{ .h = 1 },
-                .color_border = dvui.themeGet().color(.content, .border),
-            },
-        );
+        var tl_box = dvui.box(@src(), .{ .dir = .horizontal }, tl_box_opts);
         defer tl_box.deinit();
 
-        var tl = dvui.textLayout(@src(), .{}, .{
-            .color_fill = dvui.themeGet().color(.content, .fill),
-            .color_text = dvui.themeGet().color(.window, .text),
-            .font = dvui.themeGet().font_title,
-            .gravity_x = 0.5,
-        });
+        var tl = dvui.textLayout(@src(), .{}, tl_opts);
         defer tl.deinit();
 
-        tl.addText("components", .{});
+        tl.addText("Components", .{});
     }
 
     var scroll = dvui.scrollArea(
@@ -107,32 +101,15 @@ pub fn renderComponentList() void {
     }
 }
 
-pub fn renderPropertyBox() void {
+pub fn renderProperties() void {
     {
-        var tl_box = dvui.box(
-            @src(),
-            .{
-                .dir = .horizontal,
-            },
-            .{
-                .color_fill = dvui.themeGet().color(.content, .fill),
-                .expand = .horizontal,
-                .background = true,
-                .border = dvui.Rect{ .h = 1 },
-                .color_border = dvui.themeGet().color(.content, .border),
-            },
-        );
+        var tl_box = dvui.box(@src(), .{ .dir = .horizontal }, tl_box_opts);
         defer tl_box.deinit();
 
-        var tl = dvui.textLayout(@src(), .{}, .{
-            .color_fill = dvui.themeGet().color(.content, .fill),
-            .color_text = dvui.themeGet().color(.window, .text),
-            .font = dvui.themeGet().font_title,
-            .gravity_x = 0.5,
-        });
+        var tl = dvui.textLayout(@src(), .{}, tl_opts);
         defer tl.deinit();
 
-        tl.addText("properties", .{});
+        tl.addText("Properties", .{});
     }
 
     if (circuit.selection) |element| {
@@ -201,53 +178,197 @@ pub fn renderPropertyBox() void {
     }
 }
 
+pub fn renderAnalysisOptions() void {
+    {
+        var tl_box = dvui.box(@src(), .{ .dir = .horizontal }, tl_box_opts);
+        defer tl_box.deinit();
+
+        var tl = dvui.textLayout(@src(), .{}, tl_opts);
+        defer tl.deinit();
+
+        tl.addText("Analysis", .{});
+    }
+
+    const AnalysisType = enum {
+        dc,
+        sin_ss_freq_sweep,
+        transient,
+    };
+
+    const S = struct {
+        var analysis_type = AnalysisType.dc;
+
+        var transient_duration_buffer: [64]u8 = undefined;
+        var transient_duration_actual: []u8 = transient_duration_buffer[0..0];
+        var transient_duration: bland.Float = 0;
+
+        var fs_start_buffer: [64]u8 = undefined;
+        var fs_start_actual: []u8 = fs_start_buffer[0..0];
+        var fs_start: bland.Float = 0;
+
+        var fs_end_buffer: [64]u8 = undefined;
+        var fs_end_actual: []u8 = fs_end_buffer[0..0];
+        var fs_end: bland.Float = 0;
+
+        var fs_count_buffer: [64]u8 = undefined;
+        var fs_count_actual: []u8 = fs_count_buffer[0..0];
+        var fs_count: bland.Float = 0;
+    };
+
+    var function_changed = false;
+
+    const scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .horizontal });
+    defer scroll.deinit();
+
+    if (dvui.button(@src(), "analyse", .{}, .{
+        .gravity_x = 0.5,
+    })) {
+        switch (S.analysis_type) {
+            .dc => {
+                circuit.main_circuit.analyseDC();
+            },
+            .sin_ss_freq_sweep => {
+                circuit.main_circuit.analyseFrequencySweep(
+                    S.fs_start,
+                    S.fs_end,
+                    @intFromFloat(S.fs_count),
+                );
+            },
+            .transient => {
+                circuit.main_circuit.analyseTransient(S.transient_duration);
+            },
+        }
+    }
+
+    {
+        var radio_group = dvui.radioGroup(@src(), .{}, .{ .label = .{ .text = "Mode" } });
+        defer radio_group.deinit();
+        const entries = [_][]const u8{ "DC", "Freq. sweep", "Transient" };
+        for (0..entries.len) |i| {
+            const active = i == @intFromEnum(S.analysis_type);
+
+            if (dvui.radio(
+                @src(),
+                active,
+                entries[i],
+                renderer.radioGroupOpts.override(.{ .id_extra = i }),
+            )) {
+                S.analysis_type = @enumFromInt(i);
+                function_changed = true;
+            }
+        }
+    }
+
+    switch (S.analysis_type) {
+        .dc => {},
+        .sin_ss_freq_sweep => {
+            _ = renderer.textEntrySI(
+                @src(),
+                "start frequency",
+                &S.fs_start_actual,
+                .frequency,
+                &S.fs_start,
+                function_changed,
+                .{},
+            );
+            _ = renderer.textEntrySI(
+                @src(),
+                "end frequency",
+                &S.fs_end_actual,
+                .frequency,
+                &S.fs_end,
+                function_changed,
+                .{},
+            );
+            _ = renderer.textEntrySI(
+                @src(),
+                "frequency points",
+                &S.fs_count_actual,
+                .dimensionless,
+                &S.fs_count,
+                function_changed,
+                .{},
+            );
+        },
+        .transient => {
+            _ = renderer.textEntrySI(
+                @src(),
+                "duration",
+                &S.transient_duration_actual,
+                .time,
+                &S.transient_duration,
+                function_changed,
+                .{},
+            );
+        },
+    }
+}
+
 pub fn render() void {
+    const paned_opts = dvui.Options{
+        .background = true,
+        .min_size_content = .{ .w = 150, .h = dvui.windowRect().h },
+        .border = .{ .w = 2 }, // right 2px
+        .color_fill = dvui.themeGet().color(.window, .fill),
+        .color_border = dvui.themeGet().color(.window, .border),
+        .expand = .horizontal,
+    };
+
+    const paned_box_opts = dvui.Options{
+        .background = true,
+        .color_fill = dvui.themeGet().color(.window, .fill),
+        .expand = .both,
+    };
+
     var menu = dvui.paned(
         @src(),
         .{
             .direction = .vertical,
             .collapsed_size = 100,
         },
-        .{
-            .background = true,
-            .min_size_content = .{ .w = 150, .h = dvui.windowRect().h },
-            .border = .{ .w = 2 }, // right 2px
-            .color_fill = dvui.themeGet().color(.window, .fill),
-            .color_border = dvui.themeGet().color(.window, .border),
-            .expand = .horizontal,
-        },
+        paned_opts,
     );
     defer menu.deinit();
 
     if (dvui.firstFrame(menu.data().id)) {
-        menu.split_ratio.* = 0.5;
+        menu.split_ratio.* = 0.33;
     }
 
     if (menu.showFirst()) {
         var components_box = dvui.box(
             @src(),
             .{ .dir = .vertical },
-            .{
-                .background = true,
-                .color_fill = dvui.themeGet().color(.window, .fill),
-                .expand = .both,
-            },
+            paned_box_opts,
         );
         renderComponentList();
         components_box.deinit();
     }
 
     if (menu.showSecond()) {
-        var property_box = dvui.box(
-            @src(),
-            .{ .dir = .vertical },
-            .{
-                .background = true,
-                .color_fill = dvui.themeGet().color(.window, .fill),
-                .expand = .both,
-            },
-        );
-        renderPropertyBox();
-        property_box.deinit();
+        var menu2 = dvui.paned(@src(), .{
+            .direction = .vertical,
+            .collapsed_size = 100,
+        }, paned_opts);
+        defer menu2.deinit();
+
+        if (menu2.showFirst()) {
+            var property_box = dvui.box(
+                @src(),
+                .{ .dir = .vertical },
+                paned_box_opts,
+            );
+            renderProperties();
+            property_box.deinit();
+        }
+
+        if (menu2.showSecond()) {
+            var analysis_box = dvui.box(
+                @src(),
+                .{ .dir = .vertical },
+                paned_box_opts,
+            );
+            renderAnalysisOptions();
+            analysis_box.deinit();
+        }
     }
 }

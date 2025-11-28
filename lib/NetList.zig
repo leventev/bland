@@ -291,7 +291,7 @@ pub fn analyseTransient(
     self: *NetList,
     allocator: std.mem.Allocator,
     currents_watched: ?[]const usize,
-    until: Float,
+    duration: Float,
 ) TransientResult.Error!TransientResult {
     const start_time: i64 = std.time.microTimestamp();
 
@@ -300,7 +300,7 @@ pub fn analyseTransient(
 
     const time_step: Float = 5e-5;
 
-    const time_point_count: usize = @as(usize, @intFromFloat(until / time_step)) + 1;
+    const time_point_count: usize = @as(usize, @intFromFloat(duration / time_step)) + 1;
 
     // TODO: adaptive time steps
     var transient_report = try TransientResult.init(

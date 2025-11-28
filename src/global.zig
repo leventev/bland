@@ -84,8 +84,8 @@ pub const dark_theme = dark: {
         .border = dark_fill.lighten(20),
 
         .control = .{
-            .fill = dark_fill.lighten(6),
-            .fill_hover = dark_fill.lighten(10),
+            .fill = dark_fill.lighten(10),
+            .fill_hover = dark_fill.lighten(12),
             .fill_press = dark_fill.lighten(15),
         },
 

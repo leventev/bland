@@ -408,24 +408,6 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
             fw.close();
             close = true;
         }
-
-        if (dvui.menuItemLabel(@src(), "DC analysis", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.main_circuit.analyseDC();
-            fw.close();
-            close = true;
-        }
-
-        if (dvui.menuItemLabel(@src(), "Frequency sweep analysis", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.main_circuit.analyseFrequencySweep(1, 1e7, 700);
-            fw.close();
-            close = true;
-        }
-
-        if (dvui.menuItemLabel(@src(), "Transient analysis", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.main_circuit.analyseTransient();
-            fw.close();
-            close = true;
-        }
     }
 
     if (dvui.menuItemLabel(@src(), "Settings", .{ .submenu = true }, .{})) |r| {

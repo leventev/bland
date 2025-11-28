@@ -864,7 +864,7 @@ pub const GraphicCircuit = struct {
         analysis_reports.append(self.allocator, report) catch @panic("TODO");
     }
 
-    pub fn analyseTransient(self: *const GraphicCircuit) void {
+    pub fn analyseTransient(self: *const GraphicCircuit, duration: bland.Float) void {
         var simulation_params = self.createSimulationParams() catch {
             std.log.err("Failed to build netlist", .{});
             return;
@@ -888,7 +888,7 @@ pub const GraphicCircuit = struct {
         const result = simulation_params.netlist.analyseTransient(
             self.allocator,
             null,
-            0.1,
+            duration,
         ) catch {
             std.log.err("Transient analysis failed", .{});
             return;
