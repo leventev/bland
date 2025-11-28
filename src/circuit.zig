@@ -43,6 +43,7 @@ pub const AnalysisReport = struct {
     component_names: []?[]const u8,
     node_count: usize,
     result: Result,
+    pinned_nodes: []GraphicCircuit.PinnedNode,
 
     pub const Result = union(enum) {
         dc: NetList.RealAnalysisResult,
@@ -327,8 +328,8 @@ pub const GraphicCircuit = struct {
             const rect_width = label_size.w + 20;
             const rect_height = label_size.h + 10;
 
-            const trig_height_vert = std.math.tan(angle) * rect_width / 2;
-            const trig_height_hor = std.math.tan(angle) * rect_height / 2;
+            const trig_height_vert = (comptime std.math.tan(angle)) * rect_width / 2;
+            const trig_height_hor = (comptime std.math.tan(angle)) * rect_height / 2;
 
             const rect = switch (self.rotation) {
                 .right => dvui.Rect.Physical{
@@ -661,7 +662,18 @@ pub const GraphicCircuit = struct {
         return pin_to_node_assignments;
     }
 
-    pub fn createNetlist(self: *const GraphicCircuit) !NetList {
+    const PinnedNode = struct {
+        name: []const u8,
+        node_id: usize,
+    };
+
+    const SimulationParams = struct {
+        netlist: NetList,
+        comp_names: []?[]const u8,
+        pinned_nodes: []PinnedNode,
+    };
+
+    pub fn createSimulationParams(self: *const GraphicCircuit) !SimulationParams {
         var node_terminals = std.ArrayList(
             std.ArrayList(NetList.Terminal),
         ){};
@@ -674,6 +686,8 @@ pub const GraphicCircuit = struct {
             }
             node_wires.deinit(self.allocator);
         }
+
+        const component_names = try self.copyComponentNames();
 
         var remaining_terminals = try self.getAllTerminals();
         defer remaining_terminals.deinit();
@@ -711,12 +725,32 @@ pub const GraphicCircuit = struct {
 
         const pin_to_node_assignments = try self.findPinNodes(nodes.items, wires.items);
 
-        for (pin_to_node_assignments, 0..) |node_id, pin_id| {
-            if (node_id == null) {
-                std.log.warn("Pin {} is not connected to any node", .{pin_id});
-            }
+        var pinned_node_count: usize = 0;
+
+        for (pin_to_node_assignments) |node_id_for_pin| {
+            if (node_id_for_pin != null) pinned_node_count += 1;
         }
 
+        const pinned_nodes = blk: {
+            const pinned_nodes = try self.allocator.alloc(PinnedNode, pinned_node_count);
+            var pinned_node_counter: usize = 0;
+
+            for (pin_to_node_assignments, 0..) |node_id_for_pin, pin_idx| {
+                const pin = self.pins.items[pin_idx];
+
+                if (node_id_for_pin) |node_id| {
+                    pinned_nodes[pinned_node_counter] = PinnedNode{
+                        .name = try self.allocator.dupe(u8, pin.name),
+                        .node_id = node_id,
+                    };
+                    pinned_node_counter += 1;
+                } else {
+                    std.log.warn("Pin '{s}' is not connected to any node", .{pin.name});
+                }
+            }
+
+            break :blk pinned_nodes;
+        };
         var netlist_comps = try std.ArrayList(bland.Component).initCapacity(
             self.allocator,
             self.graphic_components.items.len,
@@ -749,9 +783,13 @@ pub const GraphicCircuit = struct {
             );
         }
 
-        return NetList{
-            .nodes = nodes,
-            .components = netlist_comps,
+        return SimulationParams{
+            .netlist = NetList{
+                .nodes = nodes,
+                .components = netlist_comps,
+            },
+            .comp_names = component_names,
+            .pinned_nodes = pinned_nodes,
         };
     }
 
@@ -789,34 +827,35 @@ pub const GraphicCircuit = struct {
     }
 
     pub fn analyseDC(self: *const GraphicCircuit) void {
-        var netlist = self.createNetlist() catch {
+        var simulation_params = self.createSimulationParams() catch {
             std.log.err("Failed to build netlist", .{});
             return;
         };
-        defer netlist.deinit(self.allocator);
+        defer simulation_params.netlist.deinit(self.allocator);
 
-        // FIXME: errdefer is not ran if we return
-        const component_names = self.copyComponentNames() catch {
-            std.log.err("Failed to copy names", .{});
-            return;
-        };
         errdefer {
-            for (component_names) |name| {
+            for (simulation_params.comp_names) |name| {
                 if (name) |str| {
                     self.allocator.free(str);
                 }
             }
-            self.allocator.free(component_names);
+            self.allocator.free(simulation_params.comp_names);
+            for (simulation_params.pinned_nodes) |pinned_node| {
+                self.allocator.free(pinned_node.name);
+            }
+            self.allocator.free(simulation_params.pinned_nodes);
         }
+
         // TODO
-        const result = netlist.analyseDC(self.allocator, null) catch {
+        const result = simulation_params.netlist.analyseDC(self.allocator, null) catch {
             std.log.err("DC analysis failed", .{});
             return;
         };
 
         const report = AnalysisReport{
-            .component_names = component_names,
-            .node_count = netlist.nodes.items.len,
+            .component_names = simulation_params.comp_names,
+            .node_count = simulation_params.netlist.nodes.items.len,
+            .pinned_nodes = simulation_params.pinned_nodes,
             .result = .{
                 .dc = result,
             },
@@ -826,27 +865,27 @@ pub const GraphicCircuit = struct {
     }
 
     pub fn analyseTransient(self: *const GraphicCircuit) void {
-        var netlist = self.createNetlist() catch {
+        var simulation_params = self.createSimulationParams() catch {
             std.log.err("Failed to build netlist", .{});
             return;
         };
-        defer netlist.deinit(self.allocator);
-        // FIXME: errdefer is not ran if we return
-        const component_names = self.copyComponentNames() catch {
-            std.log.err("Failed to copy names", .{});
-            return;
-        };
+        defer simulation_params.netlist.deinit(self.allocator);
+
         errdefer {
-            for (component_names) |name| {
+            for (simulation_params.comp_names) |name| {
                 if (name) |str| {
                     self.allocator.free(str);
                 }
             }
-            self.allocator.free(component_names);
+            self.allocator.free(simulation_params.comp_names);
+            for (simulation_params.pinned_nodes) |pinned_node| {
+                self.allocator.free(pinned_node.name);
+            }
+            self.allocator.free(simulation_params.pinned_nodes);
         }
 
         // TODO
-        const result = netlist.analyseTransient(
+        const result = simulation_params.netlist.analyseTransient(
             self.allocator,
             null,
             0.1,
@@ -856,8 +895,9 @@ pub const GraphicCircuit = struct {
         };
 
         const report = AnalysisReport{
-            .component_names = component_names,
-            .node_count = netlist.nodes.items.len,
+            .component_names = simulation_params.comp_names,
+            .node_count = simulation_params.netlist.nodes.items.len,
+            .pinned_nodes = simulation_params.pinned_nodes,
             .result = .{
                 .transient = result,
             },
@@ -877,26 +917,26 @@ pub const GraphicCircuit = struct {
         std.debug.assert(end_freq > start_freq);
         std.debug.assert(freq_count > 0);
 
-        var netlist = self.createNetlist() catch {
-            @panic("Failed to build netlist");
-        };
-        defer netlist.deinit(self.allocator);
-
-        // FIXME: errdefer is not ran if we return
-        const component_names = self.copyComponentNames() catch {
-            std.log.err("Failed to copy names", .{});
+        var simulation_params = self.createSimulationParams() catch {
+            std.log.err("Failed to build netlist", .{});
             return;
         };
+        defer simulation_params.netlist.deinit(self.allocator);
+
         errdefer {
-            for (component_names) |name| {
+            for (simulation_params.comp_names) |name| {
                 if (name) |str| {
                     self.allocator.free(str);
                 }
             }
-            self.allocator.free(component_names);
+            self.allocator.free(simulation_params.comp_names);
+            for (simulation_params.pinned_nodes) |pinned_node| {
+                self.allocator.free(pinned_node.name);
+            }
+            self.allocator.free(simulation_params.pinned_nodes);
         }
 
-        const result = netlist.analyseFrequencySweep(
+        const result = simulation_params.netlist.analyseFrequencySweep(
             self.allocator,
             start_freq,
             end_freq,
@@ -908,8 +948,9 @@ pub const GraphicCircuit = struct {
         };
 
         const report = AnalysisReport{
-            .component_names = component_names,
-            .node_count = netlist.nodes.items.len,
+            .component_names = simulation_params.comp_names,
+            .node_count = simulation_params.netlist.nodes.items.len,
+            .pinned_nodes = simulation_params.pinned_nodes,
             .result = .{
                 .frequency_sweep = result,
             },

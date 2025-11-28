@@ -549,9 +549,10 @@ pub fn renderDCReport(
         currents.len + voltages.len,
     );
 
-    for (voltages, 0..) |voltage, i| {
+    for (report.pinned_nodes) |pinned_node| {
+        const voltage = voltages[pinned_node.node_id];
         try values.append(gpa, .{
-            .display_name = try std.fmt.allocPrint(arena, "V(n{})", .{i}),
+            .display_name = try std.fmt.allocPrint(arena, "V({s})", .{pinned_node.name}),
             .value = try bland.units.formatUnitAlloc(arena, .voltage, voltage, 3),
         });
     }
@@ -678,22 +679,23 @@ pub fn renderFWReport(
     }
 
     // TODO: allocate less or use arena or something else
-    var var_entries = try gpa.alloc([]u8, report.node_count + component_entry_count);
-    defer gpa.free(var_entries);
-    for (0..report.node_count) |i| {
-        var_entries[i] = try std.fmt.allocPrint(gpa, "V(n{})", .{i});
+    var var_entries = try gpa.alloc([]u8, report.pinned_nodes.len + component_entry_count);
+    defer {
+        for (var_entries) |ent| {
+            gpa.free(ent);
+        }
+        gpa.free(var_entries);
     }
 
-    var idx: usize = report.node_count;
+    for (report.pinned_nodes, 0..) |pin, i| {
+        var_entries[i] = try std.fmt.allocPrint(gpa, "V({s})", .{pin.name});
+    }
+
+    var idx: usize = report.pinned_nodes.len;
     for (report.component_names) |name| {
         if (name) |str| {
             var_entries[idx] = try std.fmt.allocPrint(gpa, "I({s})", .{str});
             idx += 1;
-        }
-    }
-    defer {
-        for (var_entries) |ent| {
-            gpa.free(ent);
         }
     }
 
@@ -721,8 +723,8 @@ pub fn renderFWReport(
 
     const fw_result = report.result.frequency_sweep;
 
-    if (S.var_choice >= report.node_count) {
-        const comp_entry_idx = S.var_choice - report.node_count;
+    if (S.var_choice >= report.pinned_nodes.len) {
+        const comp_entry_idx = S.var_choice - report.pinned_nodes.len;
         const comp_idx = comp_idxs[comp_entry_idx];
         const current = fw_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
@@ -733,7 +735,8 @@ pub fn renderFWReport(
             }
         }
     } else {
-        const voltage = fw_result.voltage(S.var_choice) catch @panic("TODO");
+        const node_id = report.pinned_nodes[S.var_choice].node_id;
+        const voltage = fw_result.voltage(node_id) catch @panic("TODO");
         for (voltage, 0..) |v, i| {
             const freq = fw_result.frequency_values[i];
             const value = 20 * @log10(v.magnitude());
@@ -788,8 +791,7 @@ pub fn renderTransientReport(
     }
 
     // TODO: allocate less or use arena or something else
-    // FIXME TODO: dont allocate memory for ground nodes
-    var var_entries = try gpa.alloc([]u8, report.node_count + component_entry_count);
+    var var_entries = try gpa.alloc([]u8, report.pinned_nodes.len + component_entry_count);
     defer {
         for (var_entries) |ent| {
             gpa.free(ent);
@@ -797,11 +799,11 @@ pub fn renderTransientReport(
         gpa.free(var_entries);
     }
 
-    for (0..report.node_count) |i| {
-        var_entries[i] = try std.fmt.allocPrint(gpa, "V(n{})", .{i});
+    for (0.., report.pinned_nodes) |i, pinned_node| {
+        var_entries[i] = try std.fmt.allocPrint(gpa, "V({s})", .{pinned_node.name});
     }
 
-    var idx: usize = report.node_count;
+    var idx: usize = report.pinned_nodes.len;
     for (report.component_names) |name| {
         if (name) |str| {
             var_entries[idx] = try std.fmt.allocPrint(gpa, "I({s})", .{str});
@@ -833,8 +835,8 @@ pub fn renderTransientReport(
 
     const trans_result = report.result.transient;
 
-    if (S.var_choice >= report.node_count) {
-        const comp_entry_idx = S.var_choice - report.node_count;
+    if (S.var_choice >= report.pinned_nodes.len) {
+        const comp_entry_idx = S.var_choice - report.pinned_nodes.len;
         const comp_idx = comp_idxs[comp_entry_idx];
         const current = trans_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
@@ -844,7 +846,8 @@ pub fn renderTransientReport(
             }
         }
     } else {
-        const voltage = trans_result.voltage(S.var_choice) catch @panic("TODO");
+        const node_id = report.pinned_nodes[S.var_choice].node_id;
+        const voltage = trans_result.voltage(node_id) catch @panic("TODO");
         for (voltage, 0..) |v, i| {
             const time = trans_result.time_values[i];
             s1.point(time, v);

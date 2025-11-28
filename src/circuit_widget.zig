@@ -490,7 +490,7 @@ fn renderPin(
 
     switch (rotation) {
         .top, .bottom => {
-            const trig_height = std.math.tan(angle) * rect_width / 2;
+            const trig_height = (comptime std.math.tan(angle)) * rect_width / 2;
 
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
@@ -547,7 +547,7 @@ fn renderPin(
             );
         },
         .right, .left => {
-            const trig_height = std.math.tan(angle) * rect_height / 2;
+            const trig_height = (comptime std.math.tan(angle)) * rect_height / 2;
 
             var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
             defer path.deinit();
