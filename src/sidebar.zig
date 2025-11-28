@@ -170,11 +170,34 @@ pub fn renderPropertyBox() void {
                 te.deinit();
 
                 selected_graphic_comp.renderPropertyBox(circuit.selection_changed);
-                circuit.selection_changed = false;
             },
             .wire => {},
-            .pin => {},
+            .pin => |pin_id| {
+                // TODO: there should be no scrollArea here right?
+                var pin = &circuit.main_circuit.pins.items[pin_id];
+
+                dvui.label(@src(), "name", .{}, renderer.textEntryLabelOpts);
+
+                var te = dvui.textEntry(
+                    @src(),
+                    .{
+                        .text = .{
+                            .buffer = pin.name_buffer,
+                        },
+                    },
+                    renderer.textEntryOpts,
+                );
+
+                if (dvui.firstFrame(te.data().id) or circuit.selection_changed) {
+                    te.textSet(pin.name, false);
+                }
+
+                pin.name = te.getText();
+                te.deinit();
+            },
         }
+
+        circuit.selection_changed = false;
     }
 }
 
