@@ -380,8 +380,8 @@ pub fn render() void {
         if (dvui.button(@src(), "analyse", .{}, .{
             .expand = .both,
             .color_border = dvui.themeGet().color(.highlight, .fill),
-            .border = dvui.Rect.all(1),
-            .corner_radius = dvui.Rect.all(3),
+            .border = dvui.Rect.all(2),
+            .corner_radius = dvui.Rect.all(4),
         })) {
             switch (AnalysisMode.analysis_type) {
                 .dc => {
