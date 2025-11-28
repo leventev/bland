@@ -44,8 +44,8 @@ pub const OccupiedGridPosition = struct {
 };
 
 pub fn occupiedPointsIntersect(
-    occupied1: []OccupiedGridPosition,
-    occupied2: []OccupiedGridPosition,
+    occupied1: []const OccupiedGridPosition,
+    occupied2: []const OccupiedGridPosition,
 ) bool {
     for (occupied1) |p1| {
         for (occupied2) |p2| {
@@ -569,7 +569,7 @@ pub const GraphicComponent = struct {
         }
     }
 
-    pub fn intersects(self: *const GraphicComponent, positions: []OccupiedGridPosition) bool {
+    pub fn intersects(self: *const GraphicComponent, positions: []const OccupiedGridPosition) bool {
         var buffer: [100]OccupiedGridPosition = undefined;
 
         const self_positons = self.getOccupiedGridPositions(buffer[0..]);

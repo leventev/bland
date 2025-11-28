@@ -587,6 +587,42 @@ pub const GraphicCircuit = struct {
         return true;
     }
 
+    pub fn canPlacePin(
+        self: *const GraphicCircuit,
+        pos: GridPosition,
+        rotation: Rotation,
+        exclude_pin_id: ?usize,
+    ) bool {
+        for (self.pins.items, 0..) |pin, pin_id| {
+            if (exclude_pin_id == pin_id) continue;
+            if (pin.pos.eql(pos) and pin.rotation == rotation) return false;
+        }
+
+        const body_pos: GridPosition = switch (rotation) {
+            .left => GridPosition{ .x = pos.x - 1, .y = pos.y },
+            .right => GridPosition{ .x = pos.x + 1, .y = pos.y },
+            .top => GridPosition{ .x = pos.x, .y = pos.y - 1 },
+            .bottom => GridPosition{ .x = pos.x, .y = pos.y + 1 },
+        };
+
+        const positions: []const component.OccupiedGridPosition = &.{.{
+            .pos = body_pos,
+            .terminal = false,
+        }};
+
+        for (self.graphic_components.items) |comp| {
+            if (comp.intersects(positions)) return false;
+        }
+
+        var buffer: [100]component.OccupiedGridPosition = undefined;
+        for (self.wires.items) |wire| {
+            const wire_positions = getOccupiedGridPositions(wire, buffer[0..]);
+            if (component.occupiedPointsIntersect(positions, wire_positions)) return false;
+        }
+
+        return true;
+    }
+
     pub fn canPlaceComponent(
         self: *const GraphicCircuit,
         comp_type: bland.Component.DeviceType,

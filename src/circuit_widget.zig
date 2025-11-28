@@ -256,7 +256,11 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                             ev.p,
                         );
 
-                        if (canPlacePin(grid_pos, circuit.placement_rotation, data.pin_id)) {
+                        if (circuit.main_circuit.canPlacePin(
+                            grid_pos,
+                            circuit.placement_rotation,
+                            data.pin_id,
+                        )) {
                             pin.pos = grid_pos;
                             pin.rotation = circuit.placement_rotation;
                         }
@@ -359,7 +363,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                         mouse_pos,
                     );
 
-                    if (canPlacePin(grid_pos, circuit.placement_rotation, null)) {
+                    if (circuit.main_circuit.canPlacePin(grid_pos, circuit.placement_rotation, null)) {
                         const pin = try circuit.GraphicCircuit.Pin.init(
                             gpa,
                             grid_pos,
@@ -607,7 +611,11 @@ fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
         mouse_pos,
     );
 
-    const can_place = canPlacePin(grid_pos, circuit.placement_rotation, null);
+    const can_place = circuit.main_circuit.canPlacePin(
+        grid_pos,
+        circuit.placement_rotation,
+        null,
+    );
     const render_type = if (can_place)
         ElementRenderType.holding
     else
@@ -621,15 +629,6 @@ fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
     ) catch @panic("Invalid fmt");
 
     renderPin(circuit_rect, grid_pos, circuit.placement_rotation, label, render_type);
-}
-
-fn canPlacePin(pos: circuit.GridPosition, rotation: circuit.Rotation, exclude_pin_id: ?usize) bool {
-    for (circuit.main_circuit.pins.items, 0..) |pin, pin_id| {
-        if (exclude_pin_id == pin_id) continue;
-        if (pin.pos.eql(pos) and pin.rotation == rotation) return false;
-    }
-
-    return true;
 }
 
 pub fn renderCircuit(allocator: std.mem.Allocator) !void {
@@ -977,7 +976,11 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         .dragging_pin => |data| {
             const pin = circuit.main_circuit.pins.items[data.pin_id];
             const pos = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
-            const can_place = canPlacePin(pos, circuit.placement_rotation, null);
+            const can_place = circuit.main_circuit.canPlacePin(
+                pos,
+                circuit.placement_rotation,
+                null,
+            );
 
             const render_type = if (can_place)
                 ElementRenderType.holding
