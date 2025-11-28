@@ -178,6 +178,32 @@ pub fn renderProperties() void {
     }
 }
 
+const AnalysisType = enum {
+    dc,
+    sin_ss_freq_sweep,
+    transient,
+};
+
+const AnalysisMode = struct {
+    var analysis_type = AnalysisType.dc;
+
+    var transient_duration_buffer: [64]u8 = undefined;
+    var transient_duration_actual: []u8 = transient_duration_buffer[0..0];
+    var transient_duration: bland.Float = 0;
+
+    var fs_start_buffer: [64]u8 = undefined;
+    var fs_start_actual: []u8 = fs_start_buffer[0..0];
+    var fs_start: bland.Float = 0;
+
+    var fs_end_buffer: [64]u8 = undefined;
+    var fs_end_actual: []u8 = fs_end_buffer[0..0];
+    var fs_end: bland.Float = 0;
+
+    var fs_count_buffer: [64]u8 = undefined;
+    var fs_count_actual: []u8 = fs_count_buffer[0..0];
+    var fs_count: bland.Float = 0;
+};
+
 pub fn renderAnalysisOptions() void {
     {
         var tl_box = dvui.box(@src(), .{ .dir = .horizontal }, tl_box_opts);
@@ -189,118 +215,74 @@ pub fn renderAnalysisOptions() void {
         tl.addText("Analysis", .{});
     }
 
-    const AnalysisType = enum {
-        dc,
-        sin_ss_freq_sweep,
-        transient,
-    };
-
-    const S = struct {
-        var analysis_type = AnalysisType.dc;
-
-        var transient_duration_buffer: [64]u8 = undefined;
-        var transient_duration_actual: []u8 = transient_duration_buffer[0..0];
-        var transient_duration: bland.Float = 0;
-
-        var fs_start_buffer: [64]u8 = undefined;
-        var fs_start_actual: []u8 = fs_start_buffer[0..0];
-        var fs_start: bland.Float = 0;
-
-        var fs_end_buffer: [64]u8 = undefined;
-        var fs_end_actual: []u8 = fs_end_buffer[0..0];
-        var fs_end: bland.Float = 0;
-
-        var fs_count_buffer: [64]u8 = undefined;
-        var fs_count_actual: []u8 = fs_count_buffer[0..0];
-        var fs_count: bland.Float = 0;
-    };
-
     var function_changed = false;
 
-    const scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .horizontal });
-    defer scroll.deinit();
+    {
+        const scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .horizontal });
+        defer scroll.deinit();
 
-    if (dvui.button(@src(), "analyse", .{}, .{
-        .gravity_x = 0.5,
-    })) {
-        switch (S.analysis_type) {
-            .dc => {
-                circuit.main_circuit.analyseDC();
-            },
+        {
+            var radio_group = dvui.radioGroup(@src(), .{}, .{ .label = .{ .text = "Mode" } });
+            defer radio_group.deinit();
+            const entries = [_][]const u8{ "DC", "Freq. sweep", "Transient" };
+            for (0..entries.len) |i| {
+                const active = i == @intFromEnum(AnalysisMode.analysis_type);
+
+                if (dvui.radio(
+                    @src(),
+                    active,
+                    entries[i],
+                    renderer.radioGroupOpts.override(.{ .id_extra = i }),
+                )) {
+                    AnalysisMode.analysis_type = @enumFromInt(i);
+                    function_changed = true;
+                }
+            }
+        }
+
+        switch (AnalysisMode.analysis_type) {
+            .dc => {},
             .sin_ss_freq_sweep => {
-                circuit.main_circuit.analyseFrequencySweep(
-                    S.fs_start,
-                    S.fs_end,
-                    @intFromFloat(S.fs_count),
+                _ = renderer.textEntrySI(
+                    @src(),
+                    "start frequency",
+                    &AnalysisMode.fs_start_actual,
+                    .frequency,
+                    &AnalysisMode.fs_start,
+                    function_changed,
+                    .{},
+                );
+                _ = renderer.textEntrySI(
+                    @src(),
+                    "end frequency",
+                    &AnalysisMode.fs_end_actual,
+                    .frequency,
+                    &AnalysisMode.fs_end,
+                    function_changed,
+                    .{},
+                );
+                _ = renderer.textEntrySI(
+                    @src(),
+                    "frequency points",
+                    &AnalysisMode.fs_count_actual,
+                    .dimensionless,
+                    &AnalysisMode.fs_count,
+                    function_changed,
+                    .{},
                 );
             },
             .transient => {
-                circuit.main_circuit.analyseTransient(S.transient_duration);
+                _ = renderer.textEntrySI(
+                    @src(),
+                    "duration",
+                    &AnalysisMode.transient_duration_actual,
+                    .time,
+                    &AnalysisMode.transient_duration,
+                    function_changed,
+                    .{},
+                );
             },
         }
-    }
-
-    {
-        var radio_group = dvui.radioGroup(@src(), .{}, .{ .label = .{ .text = "Mode" } });
-        defer radio_group.deinit();
-        const entries = [_][]const u8{ "DC", "Freq. sweep", "Transient" };
-        for (0..entries.len) |i| {
-            const active = i == @intFromEnum(S.analysis_type);
-
-            if (dvui.radio(
-                @src(),
-                active,
-                entries[i],
-                renderer.radioGroupOpts.override(.{ .id_extra = i }),
-            )) {
-                S.analysis_type = @enumFromInt(i);
-                function_changed = true;
-            }
-        }
-    }
-
-    switch (S.analysis_type) {
-        .dc => {},
-        .sin_ss_freq_sweep => {
-            _ = renderer.textEntrySI(
-                @src(),
-                "start frequency",
-                &S.fs_start_actual,
-                .frequency,
-                &S.fs_start,
-                function_changed,
-                .{},
-            );
-            _ = renderer.textEntrySI(
-                @src(),
-                "end frequency",
-                &S.fs_end_actual,
-                .frequency,
-                &S.fs_end,
-                function_changed,
-                .{},
-            );
-            _ = renderer.textEntrySI(
-                @src(),
-                "frequency points",
-                &S.fs_count_actual,
-                .dimensionless,
-                &S.fs_count,
-                function_changed,
-                .{},
-            );
-        },
-        .transient => {
-            _ = renderer.textEntrySI(
-                @src(),
-                "duration",
-                &S.transient_duration_actual,
-                .time,
-                &S.transient_duration,
-                function_changed,
-                .{},
-            );
-        },
     }
 }
 
@@ -320,55 +302,102 @@ pub fn render() void {
         .expand = .both,
     };
 
-    var menu = dvui.paned(
-        @src(),
-        .{
-            .direction = .vertical,
-            .collapsed_size = 100,
-        },
-        paned_opts,
-    );
-    defer menu.deinit();
+    // TODO: find a better way to do this
+    const button_min_height = 80;
+    const window_height = dvui.currentWindow().rectScale().r.h;
 
-    if (dvui.firstFrame(menu.data().id)) {
-        menu.split_ratio.* = 0.33;
-    }
-
-    if (menu.showFirst()) {
-        var components_box = dvui.box(
+    {
+        var vbox = dvui.box(
             @src(),
             .{ .dir = .vertical },
-            paned_box_opts,
+            .{ .expand = .horizontal },
         );
-        renderComponentList();
-        components_box.deinit();
-    }
+        defer vbox.deinit();
 
-    if (menu.showSecond()) {
-        var menu2 = dvui.paned(@src(), .{
-            .direction = .vertical,
-            .collapsed_size = 100,
-        }, paned_opts);
-        defer menu2.deinit();
+        var menu = dvui.paned(
+            @src(),
+            .{
+                .direction = .vertical,
+                .collapsed_size = 100,
+            },
+            paned_opts.override(.{
+                .max_size_content = .height(window_height - button_min_height),
+            }),
+        );
+        defer menu.deinit();
 
-        if (menu2.showFirst()) {
-            var property_box = dvui.box(
-                @src(),
-                .{ .dir = .vertical },
-                paned_box_opts,
-            );
-            renderProperties();
-            property_box.deinit();
+        if (dvui.firstFrame(menu.data().id)) {
+            menu.split_ratio.* = 0.33;
         }
 
-        if (menu2.showSecond()) {
-            var analysis_box = dvui.box(
+        if (menu.showFirst()) {
+            var components_box = dvui.box(
                 @src(),
                 .{ .dir = .vertical },
                 paned_box_opts,
             );
-            renderAnalysisOptions();
-            analysis_box.deinit();
+            renderComponentList();
+            components_box.deinit();
+        }
+
+        if (menu.showSecond()) {
+            var menu2 = dvui.paned(@src(), .{
+                .direction = .vertical,
+                .collapsed_size = 100,
+            }, paned_opts);
+            defer menu2.deinit();
+
+            if (menu2.showFirst()) {
+                var property_box = dvui.box(
+                    @src(),
+                    .{ .dir = .vertical },
+                    paned_box_opts,
+                );
+                renderProperties();
+                property_box.deinit();
+            }
+
+            if (menu2.showSecond()) {
+                var analysis_box = dvui.box(
+                    @src(),
+                    .{ .dir = .vertical },
+                    paned_box_opts,
+                );
+                renderAnalysisOptions();
+                analysis_box.deinit();
+            }
+        }
+    }
+
+    {
+        const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
+            .expand = .both,
+            .background = true,
+            .color_fill = dvui.themeGet().color(.window, .fill),
+        });
+        defer vbox.deinit();
+
+        if (dvui.button(@src(), "analyse", .{}, .{
+            .expand = .both,
+            .color_border = dvui.themeGet().color(.highlight, .fill),
+            .border = dvui.Rect.all(1),
+            .corner_radius = dvui.Rect.all(3),
+        })) {
+            switch (AnalysisMode.analysis_type) {
+                .dc => {
+                    circuit.main_circuit.analyseDC();
+                },
+                .sin_ss_freq_sweep => {
+                    circuit.main_circuit.analyseFrequencySweep(
+                        AnalysisMode.fs_start,
+                        AnalysisMode.fs_end,
+                        @intFromFloat(AnalysisMode.fs_count),
+                    );
+                },
+                .transient => {
+                    circuit.main_circuit.analyseTransient(AnalysisMode.transient_duration);
+                },
+            }
         }
     }
 }
