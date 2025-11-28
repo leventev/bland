@@ -59,7 +59,7 @@ pub fn zero(self: *MNA) void {
         .dc => |mat| {
             for (0..mat.row_count) |row| {
                 for (0..mat.col_count) |col| {
-                    mat.data[row][col] = 0;
+                    mat.data[row * mat.col_count + col] = 0;
                 }
             }
         },
@@ -92,7 +92,7 @@ fn addRealToMatrixCell(
 ) void {
     switch (self.mat) {
         .dc => |*mat| {
-            mat.data[row][col] += val;
+            mat.data[row * mat.col_count + col] += val;
         },
         .ac => |*mat| {
             const z = Complex.init(val, 0);
@@ -318,7 +318,7 @@ pub fn solveReal(self: *MNA, allocator: std.mem.Allocator) !RealAnalysisReport {
 
     dc_results.voltages[0] = 0;
     for (1..self.nodes.len) |i| {
-        dc_results.voltages[i] = mat.data[i - 1][mat.col_count - 1];
+        dc_results.voltages[i] = mat.data[(i - 1) * mat.col_count + mat.col_count - 1];
     }
 
     // null out currents
@@ -327,7 +327,7 @@ pub fn solveReal(self: *MNA, allocator: std.mem.Allocator) !RealAnalysisReport {
     }
 
     for (self.group_2, 0..) |current_idx, i| {
-        dc_results.currents[current_idx] = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
+        dc_results.currents[current_idx] = mat.data[(self.nodes.len + i - 1) * mat.col_count + mat.col_count - 1];
     }
 
     return dc_results;
