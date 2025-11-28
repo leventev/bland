@@ -53,7 +53,7 @@ pub fn renderComponentList() void {
         const select_component_id: ?usize = if (circuit.selection) |element| blk: {
             break :blk switch (element) {
                 .component => |comp_id| comp_id,
-                .wire => null,
+                .wire, .pin => null,
             };
         } else null;
 
@@ -177,6 +177,7 @@ pub fn renderPropertyBox() void {
                 circuit.selection_changed = false;
             },
             .wire => {},
+            .pin => {},
         }
     }
 }

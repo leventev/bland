@@ -156,11 +156,13 @@ pub const PlacementModeType = enum {
     new_pin,
     dragging_component,
     dragging_wire,
+    dragging_pin,
 };
 
 pub const Element = union(enum) {
     component: usize,
     wire: usize,
+    pin: usize,
 };
 
 pub const PlacementMode = union(PlacementModeType) {
@@ -180,6 +182,9 @@ pub const PlacementMode = union(PlacementModeType) {
     dragging_wire: struct {
         wire_id: usize,
         offset: f32,
+    },
+    dragging_pin: struct {
+        pin_id: usize,
     },
 };
 
@@ -203,6 +208,9 @@ pub fn delete() void {
             },
             .wire => |wire_id| {
                 main_circuit.deleteWire(wire_id);
+            },
+            .pin => |pin_id| {
+                main_circuit.deletePin(pin_id);
             },
         }
         selection = null;
@@ -263,16 +271,94 @@ const TerminalWithPos = struct {
 
 pub var main_circuit: GraphicCircuit = undefined;
 
+pub var pin_counter: usize = 1;
+
 pub const GraphicCircuit = struct {
     allocator: std.mem.Allocator,
     graphic_components: std.ArrayList(component.GraphicComponent),
     wires: std.ArrayList(Wire),
     pins: std.ArrayList(Pin),
 
-    // TODO: be able to rename pins
+    const max_pin_name_lengh = bland.component.max_component_name_length;
+
     pub const Pin = struct {
         pos: GridPosition,
         rotation: Rotation,
+        name_buffer: []u8,
+        // name is a slice into name_buffer
+        name: []const u8,
+
+        pub fn init(gpa: std.mem.Allocator, pos: GridPosition, rotation: Rotation) !Pin {
+            var pin = Pin{
+                .pos = pos,
+                .rotation = rotation,
+                .name_buffer = try gpa.alloc(u8, max_pin_name_lengh),
+                .name = &.{},
+            };
+
+            pin.name = std.fmt.bufPrint(pin.name_buffer, "P{}", .{pin_counter}) catch @panic("not possible");
+            pin_counter += 1;
+
+            return pin;
+        }
+
+        pub fn deinit(self: *Pin, gpa: std.mem.Allocator) void {
+            gpa.free(self.name_buffer);
+        }
+
+        pub fn hovered(
+            self: Pin,
+            circuit_rect: dvui.Rect.Physical,
+            mouse_pos: dvui.Point.Physical,
+        ) bool {
+            const f = dvui.Font{
+                .id = .fromName(global.font_name),
+                .size = global.circuit_font_size,
+            };
+
+            const tolerance = 3;
+
+            const dist_from_point = 10;
+            const angle = 15.0 / 180.0 * std.math.pi;
+
+            const start_pos = self.pos.toCircuitPosition(circuit_rect);
+
+            const label_size = dvui.Font.textSize(f, self.name);
+            const rect_width = label_size.w + 20;
+            const rect_height = label_size.h + 10;
+
+            const trig_height_vert = std.math.tan(angle) * rect_width / 2;
+            const trig_height_hor = std.math.tan(angle) * rect_height / 2;
+
+            const rect = switch (self.rotation) {
+                .right => dvui.Rect.Physical{
+                    .x = start_pos.x + dist_from_point + trig_height_hor - tolerance,
+                    .y = start_pos.y - rect_height / 2 - tolerance,
+                    .w = rect_width + tolerance * 2,
+                    .h = rect_height + tolerance * 2,
+                },
+                .left => dvui.Rect.Physical{
+                    .x = start_pos.x - (dist_from_point + rect_width + trig_height_hor) - tolerance,
+                    .y = start_pos.y - rect_height / 2 - tolerance,
+                    .w = rect_width + tolerance * 2,
+                    .h = rect_height + tolerance * 2,
+                },
+                .top => dvui.Rect.Physical{
+                    .x = start_pos.x - rect_width / 2 - tolerance,
+                    .y = start_pos.y - (rect_height + trig_height_vert + dist_from_point) - tolerance,
+                    .w = rect_width + tolerance * 2,
+                    .h = rect_height + tolerance * 2,
+                },
+                .bottom => dvui.Rect.Physical{
+                    .x = start_pos.x - rect_width / 2 - tolerance,
+                    .y = start_pos.y + trig_height_vert + dist_from_point - tolerance,
+                    .w = rect_width + tolerance * 2,
+                    .h = rect_height + tolerance * 2,
+                },
+            };
+
+            return rect.contains(mouse_pos);
+        }
     };
 
     pub fn getAllTerminals(self: *const GraphicCircuit) !std.array_list.Managed(TerminalWithPos) {
@@ -535,7 +621,10 @@ pub const GraphicCircuit = struct {
     ) ![]?usize {
         std.debug.assert(nodes.len == node_wires.len);
         const node_count = nodes.len;
-        const pin_to_node_assignments = try self.allocator.alloc(?usize, self.pins.items.len);
+        const pin_to_node_assignments = try self.allocator.alloc(
+            ?usize,
+            self.pins.items.len,
+        );
 
         for (self.pins.items, 0..) |pin, pin_id| {
             const node_id_found: ?usize = blk: {
@@ -839,6 +928,12 @@ pub const GraphicCircuit = struct {
     pub fn deleteWire(self: *GraphicCircuit, wire_id: usize) void {
         std.debug.assert(self.wires.items.len > wire_id);
         _ = self.wires.orderedRemove(wire_id);
+    }
+
+    pub fn deletePin(self: *GraphicCircuit, pin_id: usize) void {
+        std.debug.assert(self.pins.items.len > pin_id);
+        var pin = self.pins.orderedRemove(pin_id);
+        pin.deinit(self.allocator);
     }
 };
 
