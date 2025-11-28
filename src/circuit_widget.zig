@@ -23,7 +23,6 @@ pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     try win.keybinds.putNoClobber(allocator, "diode_placement_mode", .{ .key = .d });
     try win.keybinds.putNoClobber(allocator, "wire_placement_mode", .{ .key = .w });
     try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .t });
-    try win.keybinds.putNoClobber(allocator, "analyse", .{ .key = .a });
     try win.keybinds.putNoClobber(allocator, "open_debug_window", .{ .key = .o });
     try win.keybinds.putNoClobber(allocator, "pin_placement_mode", .{ .key = .p });
     try win.keybinds.putNoClobber(allocator, "delete", .{ .key = .delete });
@@ -68,10 +67,6 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
 
     if (ev.matchBind("rotate") and ev.action == .down) {
         circuit.placement_rotation = circuit.placement_rotation.rotateClockwise();
-    }
-
-    if (ev.matchBind("analyse") and ev.action == .down) {
-        circuit.main_circuit.analyseDC();
     }
 
     if (ev.matchBind("open_debug_window") and ev.action == .down) {
