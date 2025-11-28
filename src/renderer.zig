@@ -332,7 +332,7 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
         var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
 
-        if (dvui.menuItemLabel(@src(), "Rotate held component", .{}, .{ .expand = .horizontal }) != null) {
+        if (dvui.menuItemLabel(@src(), "Rotate held element", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_rotation = circuit.placement_rotation.rotateClockwise();
             fw.close();
             close = true;
@@ -399,6 +399,12 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
 
         if (dvui.menuItemLabel(@src(), "Wire", .{}, .{ .expand = .horizontal }) != null) {
             circuit.placement_mode = .{ .new_wire = .{ .held_wire_p1 = null } };
+            fw.close();
+            close = true;
+        }
+
+        if (dvui.menuItemLabel(@src(), "Pin", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .{ .new_pin = {} };
             fw.close();
             close = true;
         }
