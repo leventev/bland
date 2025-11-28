@@ -29,6 +29,7 @@ fn init(win: *dvui.Window) !void {
         .allocator = allocator,
         .graphic_components = std.ArrayList(component.GraphicComponent){},
         .wires = std.ArrayList(circuit.Wire){},
+        .pins = std.ArrayList(circuit.GraphicCircuit.Pin){},
     };
 
     console_initialized = true;

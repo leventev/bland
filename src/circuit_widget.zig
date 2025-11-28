@@ -11,15 +11,6 @@ const ElementRenderType = renderer.ElementRenderType;
 
 var mouse_pos: dvui.Point.Physical = undefined;
 
-// TODO: be able to rename pins
-const Pin = struct {
-    pos: circuit.GridPosition,
-    rotation: circuit.Rotation,
-    num: usize,
-};
-
-var pins = std.ArrayListUnmanaged(Pin){};
-
 pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     const win = dvui.currentWindow();
     try win.keybinds.putNoClobber(allocator, "normal_mode", .{ .key = .escape });
@@ -88,7 +79,7 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
     }
 
     if (ev.matchBind("pin_placement_mode") and ev.action == .down) {
-        circuit.placement_mode = .pin;
+        circuit.placement_mode = .new_pin;
     }
 
     if (ev.matchBind("delete") and ev.action == .down) {
@@ -321,17 +312,16 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                         );
                     }
                 },
-                .pin => {
+                .new_pin => {
                     const grid_pos = circuit.gridPositionFromPos(
                         circuit_rect,
                         mouse_pos,
                     );
 
                     if (canPlacePin(grid_pos)) {
-                        try pins.append(gpa, Pin{
+                        try circuit.main_circuit.pins.append(gpa, circuit.GraphicCircuit.Pin{
                             .pos = grid_pos,
                             .rotation = circuit.placement_rotation,
-                            .num = pins.items.len + 1,
                         });
                     }
                 },
@@ -584,14 +574,14 @@ fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
     const label = std.fmt.bufPrint(
         &buff,
         "Pin {}",
-        .{pins.items.len + 1},
+        .{circuit.main_circuit.pins.items.len + 1},
     ) catch @panic("Invalid fmt");
 
     renderPin(circuit_rect, grid_pos, circuit.placement_rotation, label, render_type);
 }
 
 fn canPlacePin(pos: circuit.GridPosition) bool {
-    for (pins.items) |pin| {
+    for (circuit.main_circuit.pins.items) |pin| {
         if (pin.pos.eql(pos)) return false;
     }
 
@@ -853,9 +843,9 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
-    for (pins.items) |pin| {
+    for (circuit.main_circuit.pins.items, 0..) |pin, i| {
         var buff: [256]u8 = undefined;
-        const label = try std.fmt.bufPrint(&buff, "Pin {}", .{pin.num});
+        const label = try std.fmt.bufPrint(&buff, "Pin {}", .{i});
         renderPin(circuit_rect, pin.pos, pin.rotation, label, .normal);
     }
 
@@ -867,7 +857,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             null,
         ),
         .new_wire => |data| renderHoldingWire(data.held_wire_p1, circuit_rect),
-        .pin => renderHoldingPin(circuit_rect),
+        .new_pin => renderHoldingPin(circuit_rect),
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;
@@ -913,7 +903,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         .none => |data| if (data.hovered_element != null) Cursor.hand else Cursor.arrow,
         .dragging_component, .dragging_wire => Cursor.arrow_all,
         .new_component => Cursor.arrow,
-        .new_wire, .pin => Cursor.arrow,
+        .new_wire, .new_pin => Cursor.arrow,
     };
 
     dvui.cursorSet(cursor);

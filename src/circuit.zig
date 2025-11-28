@@ -153,9 +153,9 @@ pub const PlacementModeType = enum {
     none,
     new_component,
     new_wire,
+    new_pin,
     dragging_component,
     dragging_wire,
-    pin,
 };
 
 pub const Element = union(enum) {
@@ -173,6 +173,7 @@ pub const PlacementMode = union(PlacementModeType) {
     new_wire: struct {
         held_wire_p1: ?GridPosition = null,
     },
+    new_pin: void,
     dragging_component: struct {
         comp_id: usize,
     },
@@ -180,7 +181,6 @@ pub const PlacementMode = union(PlacementModeType) {
         wire_id: usize,
         offset: f32,
     },
-    pin: void,
 };
 
 pub var placement_mode: PlacementMode = .{
@@ -267,6 +267,13 @@ pub const GraphicCircuit = struct {
     allocator: std.mem.Allocator,
     graphic_components: std.ArrayList(component.GraphicComponent),
     wires: std.ArrayList(Wire),
+    pins: std.ArrayList(Pin),
+
+    // TODO: be able to rename pins
+    pub const Pin = struct {
+        pos: GridPosition,
+        rotation: Rotation,
+    };
 
     pub fn getAllTerminals(self: *const GraphicCircuit) !std.array_list.Managed(TerminalWithPos) {
         const terminal_count_approx = self.graphic_components.items.len * 2;
@@ -297,22 +304,37 @@ pub const GraphicCircuit = struct {
     pub fn traverseWiresForNodes(
         self: *const GraphicCircuit,
         remaining_terminals: *std.array_list.Managed(TerminalWithPos),
-        nodes: *std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)),
+        node_terminals: *std.ArrayList(std.ArrayList(NetList.Terminal)),
+        node_wires: *std.ArrayList([]usize),
     ) !void {
+        // TODO: use wire IDs instead of Wire
+
         var connected_wire_buffer = try self.allocator.alloc(usize, self.wires.items.len);
         defer self.allocator.free(connected_wire_buffer);
 
         var remaining_wires = try self.allocator.dupe(Wire, self.wires.items);
         var rem: usize = remaining_wires.len;
 
+        // while there are unconnected wires remaining
         while (rem > 0) {
-            var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
+            //
+            var connected_terminals = std.ArrayList(NetList.Terminal){};
+
+            // we choose the wire with the highest ID/index(the last one)
+            // so that removing it doesnt change the index of the other wires
+            // then we find all the wires that are connected to the chosen wire
+            const last_remaining_wire_id = remaining_wires.len - 1;
             const connected_wires = getConnectedWires(
                 remaining_wires,
-                remaining_wires.len - 1,
+                last_remaining_wire_id,
                 connected_wire_buffer[0..],
             );
 
+            // now connected_wires contains all wires that intersect the chosen wire
+            // including the chosen wire itself
+
+            // next we find all terminals that are connected to any of the wires
+            // we found in the previous step since all these terminals are on the same potential
             for (connected_wires) |wire_idx| {
                 const wire = remaining_wires[wire_idx];
                 while (getNextConnectedTerminalToWire(wire, remaining_terminals)) |term| {
@@ -320,6 +342,11 @@ pub const GraphicCircuit = struct {
                 }
             }
 
+            try node_terminals.append(self.allocator, connected_terminals);
+            const connected_wire_copy = try self.allocator.dupe(usize, connected_wires);
+            try node_wires.append(self.allocator, connected_wire_copy);
+
+            // if there are wires remaining copy them into a new buffer
             rem = remaining_wires.len - connected_wires.len;
             if (rem == 0) {
                 self.allocator.free(remaining_wires);
@@ -341,51 +368,76 @@ pub const GraphicCircuit = struct {
                 self.allocator.free(remaining_wires);
                 remaining_wires = new_remaining_wires;
             }
-
-            try nodes.append(self.allocator, connected_terminals);
         }
     }
 
+    const MergedCircuit = struct {
+        nodes: std.ArrayList(NetList.Node),
+        wires: std.ArrayList(std.ArrayList(usize)),
+    };
+
     pub fn mergeGroundNodes(
         self: *const GraphicCircuit,
-        node_terminals: []std.ArrayListUnmanaged(NetList.Terminal),
-    ) !std.ArrayListUnmanaged(NetList.Node) {
-        var nodes = std.ArrayListUnmanaged(NetList.Node){};
+        node_terminals: []std.ArrayList(NetList.Terminal),
+        node_wires: [][]usize,
+    ) !MergedCircuit {
+        // TODO: rewrite this function so that the input parameters
+        // are not changed or deallocated
+        std.debug.assert(node_terminals.len == node_wires.len);
+
+        const pre_node_count = node_terminals.len;
+
+        var nodes = std.ArrayList(NetList.Node){};
+        var wires = std.ArrayList(std.ArrayList(usize)){};
 
         // add ground node
         try nodes.append(self.allocator, NetList.Node{
             .id = 0,
-            .connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){},
+            .connected_terminals = std.ArrayList(NetList.Terminal){},
             .voltage = null,
         });
 
-        for (node_terminals) |*terminals| {
-            if (self.nodeHasGround(terminals.items)) {
+        try wires.append(self.allocator, std.ArrayList(usize){});
+
+        for (0..pre_node_count) |pre_node_id| {
+            var terminals_for_node = node_terminals[pre_node_id];
+            const wires_for_node = node_wires[pre_node_id];
+
+            if (self.nodeHasGround(terminals_for_node.items)) {
                 // the terminals are added to the ground node's list of terminals
                 // so we can deinit the list containing them
-                for (terminals.items) |term| {
+                for (terminals_for_node.items) |term| {
                     const graphic_comp = self.graphic_components.items[term.component_id];
                     graphic_comp.comp.terminal_node_ids[term.terminal_id] = 0;
                     try nodes.items[0].connected_terminals.append(self.allocator, term);
                 }
-                terminals.deinit(self.allocator);
+                terminals_for_node.deinit(self.allocator);
+
+                try wires.items[0].appendSlice(self.allocator, wires_for_node);
             } else {
                 // if the node doesnt have a GND component connected to it
                 // then create its own node
                 const node_id = nodes.items.len;
                 try nodes.append(self.allocator, NetList.Node{
                     .id = node_id,
-                    .connected_terminals = terminals.*,
+                    .connected_terminals = terminals_for_node,
                     .voltage = null,
                 });
-                for (terminals.items) |term| {
+                for (terminals_for_node.items) |term| {
                     const graphic_comp = self.graphic_components.items[term.component_id];
                     graphic_comp.comp.terminal_node_ids[term.terminal_id] = node_id;
                 }
+
+                var wire_buffer = std.ArrayList(usize){};
+                try wire_buffer.appendSlice(self.allocator, wires_for_node);
+                try wires.append(self.allocator, wire_buffer);
             }
         }
 
-        return nodes;
+        return MergedCircuit{
+            .nodes = nodes,
+            .wires = wires,
+        };
     }
 
     fn nodeHasGround(self: *const GraphicCircuit, terminals: []const NetList.Terminal) bool {
@@ -476,18 +528,78 @@ pub const GraphicCircuit = struct {
         return true;
     }
 
+    fn findPinNodes(
+        self: *const GraphicCircuit,
+        nodes: []const NetList.Node,
+        node_wires: []const std.ArrayList(usize),
+    ) ![]?usize {
+        std.debug.assert(nodes.len == node_wires.len);
+        const node_count = nodes.len;
+        const pin_to_node_assignments = try self.allocator.alloc(?usize, self.pins.items.len);
+
+        for (self.pins.items, 0..) |pin, pin_id| {
+            const node_id_found: ?usize = blk: {
+                for (0..node_count) |node_id| {
+                    const wires = node_wires[node_id].items;
+                    for (wires) |wire_id| {
+                        const wire = self.wires.items[wire_id];
+                        var it = wire.iterator();
+                        while (it.next()) |pos| {
+                            if (pin.pos.eql(pos)) {
+                                break :blk node_id;
+                            }
+                        }
+                    }
+
+                    const terminals = nodes[node_id].connected_terminals.items;
+                    for (terminals) |terminal| {
+                        // TODO: dont get all the terminals every iteration
+                        const comp = self.graphic_components.items[terminal.component_id];
+                        var buffer: [16]GridPosition = undefined;
+                        const terms_for_comp = comp.terminals(&buffer);
+                        const pos = terms_for_comp[terminal.terminal_id];
+                        if (pin.pos.eql(pos)) {
+                            break :blk node_id;
+                        }
+                    }
+                }
+                break :blk null;
+            };
+
+            pin_to_node_assignments[pin_id] = node_id_found;
+        }
+
+        return pin_to_node_assignments;
+    }
+
     pub fn createNetlist(self: *const GraphicCircuit) !NetList {
-        var node_terminals = std.ArrayListUnmanaged(
-            std.ArrayListUnmanaged(NetList.Terminal),
+        var node_terminals = std.ArrayList(
+            std.ArrayList(NetList.Terminal),
         ){};
         defer node_terminals.deinit(self.allocator);
+
+        var node_wires = std.ArrayList([]usize){};
+        defer {
+            for (node_wires.items) |wires| {
+                self.allocator.free(wires);
+            }
+            node_wires.deinit(self.allocator);
+        }
 
         var remaining_terminals = try self.getAllTerminals();
         defer remaining_terminals.deinit();
 
+        // to create the netlist:
+        // 1. traverse all the wires
+        // 2. find all direct connections (terminal-terminal)
+        // 3. merge all the nodes that have a ground connected to them,
+        // since they will all have the same potential
+        // 4. find the nodes associated with pins
+
         try self.traverseWiresForNodes(
             &remaining_terminals,
             &node_terminals,
+            &node_wires,
         );
 
         try findAllDirectConnections(
@@ -495,10 +607,26 @@ pub const GraphicCircuit = struct {
             &remaining_terminals,
             &node_terminals,
         );
+        const direct_connection_count = node_terminals.items.len - node_wires.items.len;
+        for (0..direct_connection_count) |_| {
+            try node_wires.append(self.allocator, &.{});
+        }
 
-        const nodes = try self.mergeGroundNodes(
+        const merged_circuit = try self.mergeGroundNodes(
             node_terminals.items,
+            node_wires.items,
         );
+
+        const nodes = merged_circuit.nodes;
+        const wires = merged_circuit.wires;
+
+        const pin_to_node_assignments = try self.findPinNodes(nodes.items, wires.items);
+
+        for (pin_to_node_assignments, 0..) |node_id, pin_id| {
+            if (node_id == null) {
+                std.log.warn("Pin {} is not connected to any node", .{pin_id});
+            }
+        }
 
         var netlist_comps = try std.ArrayList(bland.Component).initCapacity(
             self.allocator,
@@ -717,10 +845,10 @@ pub const GraphicCircuit = struct {
 pub fn findAllDirectConnections(
     allocator: std.mem.Allocator,
     remaining_terminals: *std.array_list.Managed(TerminalWithPos),
-    nodes: *std.ArrayListUnmanaged(std.ArrayListUnmanaged(NetList.Terminal)),
+    nodes: *std.ArrayList(std.ArrayList(NetList.Terminal)),
 ) !void {
     while (remaining_terminals.pop()) |selected_terminal| {
-        var connected_terminals = std.ArrayListUnmanaged(NetList.Terminal){};
+        var connected_terminals = std.ArrayList(NetList.Terminal){};
         try connected_terminals.append(allocator, selected_terminal.term);
 
         while (getLastConnected(selected_terminal.pos, remaining_terminals)) |other_term| {
@@ -734,6 +862,8 @@ fn getNextConnectedTerminalToWire(
     wire: Wire,
     remaining_terminals: *std.array_list.Managed(TerminalWithPos),
 ) ?NetList.Terminal {
+    // we iterate from the back because if the last element
+    // is connected then swapRemove doesnt need to copy
     var i = remaining_terminals.items.len;
     while (i > 0) {
         i -= 1;
