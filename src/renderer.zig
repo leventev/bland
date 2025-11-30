@@ -310,11 +310,12 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
     // the toolbox is still focused)
     // maybe im just stupid, regardless if i get this to work later
     // the dvui.focusWidget call at the end of the function shall be removed
-    var menu = dvui.MenuWidget.init(@src(), .{
+    var menu = dvui.widgetAlloc(dvui.MenuWidget);
+    menu.init(@src(), .{
         .dir = .horizontal,
         .parentSubwindowId = parentSubwindowId,
     }, .{});
-    menu.install();
+    menu.data().was_allocated_on_widget_stack = true;
     defer menu.deinit();
 
     var close = false;
@@ -626,7 +627,7 @@ pub fn renderFWReport(
 ) !void {
     const S = struct {
         var xaxis: dvui.PlotWidget.Axis = .{
-            .name = "Frequency (Hz)",
+            .name = "Angular frequency (rad/s)",
             .scale = .{ .log = .{ .base = 10 } },
             .ticks = .{
                 .format = .{
@@ -634,9 +635,10 @@ pub fn renderFWReport(
                 },
                 .locations = .{
                     .auto = .{
-                        .num_ticks = 8,
+                        .tick_num_suggestion = 10,
                     },
                 },
+                .subticks = true,
             },
         };
 
@@ -645,15 +647,19 @@ pub fn renderFWReport(
             .ticks = .{
                 .locations = .{
                     .auto = .{
-                        .num_ticks = 8,
+                        .tick_num_suggestion = 10,
                     },
                 },
             },
         };
 
-        var var_choice: usize = 1;
-        var prev_var_choice: usize = 1;
+        var var_choice: usize = 0;
+        var prev_var_choice: usize = 0;
     };
+
+    S.xaxis.gridline_color = dvui.themeGet().color(.control, .fill).lighten(20);
+    S.yaxis.gridline_color = dvui.themeGet().color(.control, .fill).lighten(20);
+    S.xaxis.subtick_gridline_color = dvui.themeGet().color(.control, .fill);
 
     var comp_idxs = try gpa.alloc(usize, report.component_names.len);
     defer gpa.free(comp_idxs);
@@ -718,8 +724,9 @@ pub fn renderFWReport(
         for (current, 0..) |c, i| {
             if (c) |c_val| {
                 const freq = fw_result.frequency_values[i];
+                const angular_freq = freq * 2 * std.math.pi;
                 const value = 20 * @log10(c_val.magnitude());
-                s1.point(freq, value);
+                s1.point(angular_freq, value);
             }
         }
     } else {
@@ -727,8 +734,9 @@ pub fn renderFWReport(
         const voltage = fw_result.voltage(node_id) catch @panic("TODO");
         for (voltage, 0..) |v, i| {
             const freq = fw_result.frequency_values[i];
+            const angular_freq = freq * 2 * std.math.pi;
             const value = 20 * @log10(v.magnitude());
-            s1.point(freq, value);
+            s1.point(angular_freq, value);
         }
     }
 
@@ -742,11 +750,14 @@ pub fn renderTransientReport(
 ) !void {
     const S = struct {
         var xaxis: dvui.PlotWidget.Axis = .{
-            .name = "Time (s)",
+            .name = "Time",
             .ticks = .{
+                .format = .{
+                    .custom = formatTime,
+                },
                 .locations = .{
                     .auto = .{
-                        .num_ticks = 8,
+                        .tick_num_suggestion = 10,
                     },
                 },
             },
@@ -757,15 +768,18 @@ pub fn renderTransientReport(
             .ticks = .{
                 .locations = .{
                     .auto = .{
-                        .num_ticks = 8,
+                        .tick_num_suggestion = 10,
                     },
                 },
             },
         };
 
-        var var_choice: usize = 1;
-        var prev_var_choice: usize = 1;
+        var var_choice: usize = 0;
+        var prev_var_choice: usize = 0;
     };
+
+    S.xaxis.gridline_color = dvui.themeGet().color(.control, .fill).lighten(20);
+    S.yaxis.gridline_color = dvui.themeGet().color(.control, .fill).lighten(20);
 
     var comp_idxs = try gpa.alloc(usize, report.component_names.len);
     defer gpa.free(comp_idxs);
@@ -900,7 +914,11 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
 }
 
 fn formatFrequency(gpa: std.mem.Allocator, freq: f64) ![]const u8 {
-    return bland.units.formatUnitAlloc(gpa, .frequency, freq, 1);
+    return bland.units.formatPrefixAlloc(gpa, freq, 1);
+}
+
+fn formatTime(gpa: std.mem.Allocator, time: f64) ![]const u8 {
+    return bland.units.formatUnitAlloc(gpa, .time, time, 2);
 }
 
 pub const radioGroupOpts = dvui.Options{
@@ -954,7 +972,8 @@ pub fn textEntrySI(
     var changed = false;
 
     {
-        var te = dvui.TextEntryWidget.init(
+        var te = dvui.widgetAlloc(dvui.TextEntryWidget);
+        te.init(
             location,
             .{
                 .text = .{
@@ -966,8 +985,6 @@ pub fn textEntrySI(
             textEntryOpts,
         );
         defer te.deinit();
-
-        te.install();
 
         if (change) {
             te.textSet(buff_actual.*, false);

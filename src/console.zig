@@ -63,7 +63,8 @@ pub fn renderConsole() void {
     });
     defer scroller.deinit();
 
-    var tl = dvui.TextLayoutWidget.init(
+    var tl = dvui.widgetAlloc(dvui.TextLayoutWidget);
+    tl.init(
         @src(),
         .{},
         .{
@@ -73,7 +74,6 @@ pub fn renderConsole() void {
         },
     );
     defer tl.deinit();
-    tl.install(.{});
     tl.processEvents();
 
     const err_color = dvui.Color.fromHSLuv(0, 50, 50, 100);

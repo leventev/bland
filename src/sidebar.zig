@@ -61,7 +61,8 @@ pub fn renderComponentList() void {
         else
             dvui.themeGet().font_body;
 
-        var bw = dvui.ButtonWidget.init(@src(), .{}, .{
+        var bw = dvui.widgetAlloc(dvui.ButtonWidget);
+        bw.init(@src(), .{}, .{
             .id_extra = i,
             .expand = .horizontal,
             .style = style,
@@ -70,7 +71,6 @@ pub fn renderComponentList() void {
             .corner_radius = dvui.Rect.all(0),
         });
 
-        bw.install();
         bw.processEvents();
         bw.drawBackground();
 

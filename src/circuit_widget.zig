@@ -644,18 +644,19 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     );
     defer grid_pos_wire_connections.deinit();
 
-    var circuit_area = dvui.BoxWidget.init(@src(), .{
+    var circuit_area = dvui.widgetAlloc(dvui.BoxWidget);
+    circuit_area.init(@src(), .{
         .dir = .horizontal,
     }, .{
         .color_fill = dvui.themeGet().color(.content, .fill),
         .background = true,
         .expand = .both,
     });
+    circuit_area.data().was_allocated_on_widget_stack = true;
     defer circuit_area.deinit();
 
-    circuit_area.install();
     circuit_area.drawBackground();
-    try handleCircuitAreaEvents(allocator, &circuit_area);
+    try handleCircuitAreaEvents(allocator, circuit_area);
 
     const circuit_rect = circuit_area.data().rectScale().r;
 
