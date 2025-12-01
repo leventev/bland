@@ -693,6 +693,10 @@ pub fn renderFWReport(
         }
     }
 
+    if (report_changed) {
+        S.var_choice = 0;
+    }
+
     _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
 
     if (S.prev_var_choice != S.var_choice or report_changed) {
@@ -813,6 +817,10 @@ pub fn renderTransientReport(
         }
     }
 
+    if (report_changed) {
+        S.var_choice = 0;
+    }
+
     _ = dvui.dropdown(@src(), var_entries, &S.var_choice, .{});
 
     if (S.prev_var_choice != S.var_choice or report_changed) {
@@ -859,6 +867,9 @@ pub fn renderTransientReport(
     s1.stroke(2, dvui.themeGet().focus);
 }
 
+pub var analysis_report_choice: usize = 0;
+pub var prev_analysis_report_choice: usize = 0;
+
 pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     var vbox = dvui.box(
         @src(),
@@ -891,11 +902,10 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
         }
     }
 
-    const S = struct {
-        var fw_choice: usize = 0;
-    };
+    _ = dvui.dropdown(@src(), result_entries, &analysis_report_choice, .{});
 
-    const changed = dvui.dropdown(@src(), result_entries, &S.fw_choice, .{});
+    const changed = prev_analysis_report_choice != analysis_report_choice;
+    prev_analysis_report_choice = analysis_report_choice;
 
     var report_box = dvui.box(@src(), .{ .dir = .vertical }, .{
         .border = dvui.Rect{ .y = 2 },
@@ -905,7 +915,7 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     });
     defer report_box.deinit();
 
-    const chosen = circuit.analysis_reports.items[S.fw_choice];
+    const chosen = circuit.analysis_reports.items[analysis_report_choice];
     switch (chosen.result) {
         .dc => try renderDCReport(gpa, chosen, changed),
         .frequency_sweep => try renderFWReport(gpa, chosen, changed),

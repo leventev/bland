@@ -898,6 +898,8 @@ pub const GraphicCircuit = struct {
         };
 
         analysis_reports.append(self.allocator, report) catch @panic("TODO");
+        renderer.prev_analysis_report_choice = renderer.analysis_report_choice;
+        renderer.analysis_report_choice = analysis_reports.items.len - 1;
     }
 
     pub fn analyseTransient(self: *const GraphicCircuit, duration: bland.Float) void {
@@ -940,6 +942,8 @@ pub const GraphicCircuit = struct {
         };
 
         analysis_reports.append(self.allocator, report) catch @panic("TODO");
+        renderer.prev_analysis_report_choice = renderer.analysis_report_choice;
+        renderer.analysis_report_choice = analysis_reports.items.len - 1;
     }
 
     pub fn analyseFrequencySweep(
@@ -993,6 +997,8 @@ pub const GraphicCircuit = struct {
         };
 
         analysis_reports.append(self.allocator, report) catch @panic("TODO");
+        renderer.prev_analysis_report_choice = renderer.analysis_report_choice;
+        renderer.analysis_report_choice = analysis_reports.items.len - 1;
     }
 
     pub fn deleteComponent(self: *GraphicCircuit, comp_id: usize) void {
