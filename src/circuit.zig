@@ -883,8 +883,8 @@ pub const GraphicCircuit = struct {
         }
 
         // TODO
-        const result = simulation_params.netlist.analyseDC(self.allocator, null) catch {
-            std.log.err("DC analysis failed", .{});
+        const result = simulation_params.netlist.analyseDC(self.allocator, null) catch |err| {
+            std.log.err("DC analysis failed: {t}", .{err});
             return;
         };
 

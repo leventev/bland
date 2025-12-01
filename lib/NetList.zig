@@ -35,6 +35,7 @@ pub const Error = error{
     InvalidFrequency,
     InvalidFrequencyRange,
     StampingFailed,
+    NotEnoughComponents,
 } || std.mem.Allocator.Error;
 
 pub fn init(allocator: std.mem.Allocator) Error!NetList {
@@ -118,6 +119,10 @@ fn createMNAMatrix(
     angular_frequency: Float,
     ac_analysis: bool,
 ) Error!MNA {
+    // the simplest circuit is a voltage/current source, resistor and a ground
+    // if there are less than 3 components then the circuit is sure to be invalid
+    if (self.components.items.len < 3) return error.NotEnoughComponents;
+
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // where v is all nodes except ground
     // the last column is the RHS of the equation Ax=b
