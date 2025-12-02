@@ -121,7 +121,7 @@ fn createMNAMatrix(
 ) Error!MNA {
     // the simplest circuit is a voltage/current source, resistor and a ground
     // if there are less than 3 components then the circuit is sure to be invalid
-    if (self.components.items.len < 3) return error.NotEnoughComponents;
+    if (self.components.items.len < 2) return error.NotEnoughComponents;
 
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // where v is all nodes except ground
