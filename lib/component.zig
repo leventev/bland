@@ -12,7 +12,6 @@ pub const voltage_source_module = @import("components/voltage_source.zig");
 pub const current_source_module = @import("components/current_source.zig");
 pub const capacitor_module = @import("components/capacitor.zig");
 pub const inductor_module = @import("components/inductor.zig");
-pub const ground_module = @import("components/ground.zig");
 pub const ccvs_module = @import("components/ccvs.zig");
 pub const cccs_module = @import("components/cccs.zig");
 pub const diode_module = @import("components/diode.zig");
@@ -33,7 +32,6 @@ pub const Component = struct {
     }
 
     pub const DeviceType = enum {
-        ground,
         resistor,
         voltage_source,
         current_source,
@@ -50,7 +48,6 @@ pub const Component = struct {
                 .current_source => current_source_module,
                 .capacitor => capacitor_module,
                 .inductor => inductor_module,
-                .ground => ground_module,
                 .ccvs => ccvs_module,
                 .cccs => cccs_module,
                 .diode => diode_module,
@@ -65,7 +62,6 @@ pub const Component = struct {
     };
 
     pub const Device = union(DeviceType) {
-        ground,
         resistor: Float,
         voltage_source: source.OutputFunction,
         current_source: source.OutputFunction,
@@ -81,10 +77,6 @@ pub const Component = struct {
             terminal_node_ids: []const usize,
         ) validator.ComponentValidationResult {
             return switch (@as(DeviceType, self.*)) {
-                .ground => .{
-                    .shorted = false,
-                    .value_invalid = false,
-                },
                 inline else => |x| x.module().validate(
                     @field(self, @tagName(x)),
                     netlist,
@@ -115,7 +107,6 @@ pub const Component = struct {
             stamp_opts: StampOptions,
         ) StampError!void {
             return switch (@as(DeviceType, self.*)) {
-                .ground => {},
                 inline else => |x| x.module().stampMatrix(
                     @field(self, @tagName(x)),
                     terminal_node_ids,

@@ -372,44 +372,26 @@ pub fn analyseTransient(
         for (0.., self.components.items) |comp_id, comp| {
             const current_group_2_idx = std.mem.indexOf(usize, group_2.arr.items, &.{comp_id});
             // TODO:
-            if (comp.device == .ground) {
-                comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
-                    .transient = .{
-                        .time = time,
-                        .time_step = time_step,
-                        .prev_voltage = 0,
-                        .prev_current = 0,
-                    },
-                }) catch |err| {
-                    switch (err) {
-                        error.InvalidOutputFunctionForAnalysisMode => {
-                            std.log.err("Invalid output function type for {s}", .{comp.name});
-                        },
-                    }
-                    return error.StampingFailed;
-                };
-            } else {
-                const voltage_pos = (try transient_report.voltage(comp.terminal_node_ids[0]))[time_idx - 1];
-                const voltage_neg = (try transient_report.voltage(comp.terminal_node_ids[1]))[time_idx - 1];
-                const voltage_prev = voltage_pos - voltage_neg;
-                const current_prev = (try transient_report.current(comp_id))[time_idx - 1];
+            const voltage_pos = (try transient_report.voltage(comp.terminal_node_ids[0]))[time_idx - 1];
+            const voltage_neg = (try transient_report.voltage(comp.terminal_node_ids[1]))[time_idx - 1];
+            const voltage_prev = voltage_pos - voltage_neg;
+            const current_prev = (try transient_report.current(comp_id))[time_idx - 1];
 
-                comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
-                    .transient = .{
-                        .time = time,
-                        .time_step = time_step,
-                        .prev_voltage = voltage_prev,
-                        .prev_current = current_prev,
+            comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
+                .transient = .{
+                    .time = time,
+                    .time_step = time_step,
+                    .prev_voltage = voltage_prev,
+                    .prev_current = current_prev,
+                },
+            }) catch |err| {
+                switch (err) {
+                    error.InvalidOutputFunctionForAnalysisMode => {
+                        std.log.err("Invalid output function type for {s}", .{comp.name});
                     },
-                }) catch |err| {
-                    switch (err) {
-                        error.InvalidOutputFunctionForAnalysisMode => {
-                            std.log.err("Invalid output function type for {s}", .{comp.name});
-                        },
-                    }
-                    return error.StampingFailed;
-                };
-            }
+                }
+                return error.StampingFailed;
+            };
         }
 
         // TODO: no allocation
