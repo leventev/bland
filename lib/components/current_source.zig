@@ -3,6 +3,8 @@ const bland = @import("../bland.zig");
 const component = @import("../component.zig");
 const MNA = @import("../MNA.zig");
 const source = @import("source.zig");
+const NetList = @import("../NetList.zig");
+const validator = @import("../validator.zig");
 
 const OutputFunction = source.OutputFunction;
 const Component = component.Component;
@@ -99,4 +101,21 @@ pub fn stampMatrix(
             },
         }
     }
+}
+
+pub fn validate(
+    output_function: OutputFunction,
+    _: *const NetList,
+    terminal_node_ids: []const usize,
+) validator.ComponentValidationResult {
+    const value_invalid = switch (output_function) {
+        .dc, .phasor => false,
+        .sin => |sin_data| sin_data.frequency <= 0,
+        .square => |square_data| square_data.frequency <= 0,
+    };
+
+    return validator.ComponentValidationResult{
+        .value_invalid = value_invalid,
+        .shorted = terminal_node_ids[0] == terminal_node_ids[1],
+    };
 }

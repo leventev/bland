@@ -3,6 +3,8 @@ const bland = @import("../bland.zig");
 const component = @import("../component.zig");
 const MNA = @import("../MNA.zig");
 const source = @import("source.zig");
+const NetList = @import("../NetList.zig");
+const validator = @import("../validator.zig");
 
 const Component = component.Component;
 const Float = bland.Float;
@@ -38,4 +40,16 @@ pub fn stampMatrix(
     _ = stamp_opts;
     _ = v_plus;
     _ = v_minus;
+}
+
+pub fn validate(
+    model: Model,
+    _: *const NetList,
+    terminal_node_ids: []const usize,
+) validator.ComponentValidationResult {
+    _ = model;
+    return validator.ComponentValidationResult{
+        .value_invalid = false,
+        .shorted = terminal_node_ids[0] == terminal_node_ids[1],
+    };
 }

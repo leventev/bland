@@ -1,6 +1,8 @@
 const std = @import("std");
 const bland = @import("bland.zig");
 const MNA = @import("MNA.zig");
+const validator = @import("validator.zig");
+const NetList = @import("NetList.zig");
 pub const source = @import("components/source.zig");
 
 const Float = bland.Float;
@@ -22,6 +24,13 @@ pub const Component = struct {
     terminal_node_ids: []usize,
 
     name: []const u8,
+
+    pub fn validate(
+        self: *const Component,
+        netlist: *const NetList,
+    ) validator.ComponentValidationResult {
+        return self.device.validate(netlist, self.terminal_node_ids);
+    }
 
     pub const DeviceType = enum {
         ground,
@@ -66,6 +75,23 @@ pub const Component = struct {
         cccs: cccs_module.Inner,
         diode: diode_module.Model,
 
+        pub fn validate(
+            self: *const Device,
+            netlist: *const bland.NetList,
+            terminal_node_ids: []const usize,
+        ) validator.ComponentValidationResult {
+            return switch (@as(DeviceType, self.*)) {
+                .ground => .{
+                    .shorted = false,
+                    .value_invalid = false,
+                },
+                inline else => |x| x.module().validate(
+                    @field(self, @tagName(x)),
+                    netlist,
+                    terminal_node_ids,
+                ),
+            };
+        }
         pub const StampOptions = union(enum) {
             dc: void,
             sin_steady_state: Float,

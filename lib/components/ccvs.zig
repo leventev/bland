@@ -2,6 +2,8 @@ const std = @import("std");
 const bland = @import("../bland.zig");
 const component = @import("../component.zig");
 const MNA = @import("../MNA.zig");
+const NetList = @import("../NetList.zig");
+const validator = @import("../validator.zig");
 
 const Component = component.Component;
 const Float = bland.Float;
@@ -46,4 +48,15 @@ pub fn stampMatrix(
         inner.controller_comp_id,
         -inner.transresistance,
     );
+}
+
+pub fn validate(
+    value: Inner,
+    netlist: *const NetList,
+    terminal_node_ids: []const usize,
+) validator.ComponentValidationResult {
+    return validator.ComponentValidationResult{
+        .value_invalid = netlist.components.items.len <= value.controller_comp_id,
+        .shorted = terminal_node_ids[0] == terminal_node_ids[1],
+    };
 }

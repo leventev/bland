@@ -2,6 +2,7 @@ const std = @import("std");
 const bland = @import("bland.zig");
 const component = @import("component.zig");
 const MNA = @import("MNA.zig");
+const validator = @import("validator.zig");
 
 const Float = bland.Float;
 const Complex = bland.Complex;
@@ -36,6 +37,8 @@ pub const Error = error{
     InvalidFrequencyRange,
     StampingFailed,
     NotEnoughComponents,
+    InvalidComponentValue,
+    SourceShorted,
 } || std.mem.Allocator.Error;
 
 pub fn init(allocator: std.mem.Allocator) Error!NetList {
@@ -122,6 +125,27 @@ fn createMNAMatrix(
     // the simplest circuit is a voltage/current source, resistor and a ground
     // if there are less than 3 components then the circuit is sure to be invalid
     if (self.components.items.len < 2) return error.NotEnoughComponents;
+
+    const validation_result = try validator.validate(allocator, self);
+    for (validation_result.comps, 0..) |comp_result, comp_id| {
+        const comp = self.components.items[comp_id];
+        if (comp_result.value_invalid) {
+            std.log.err("invalid value for '{s}'", .{comp.name});
+            return error.InvalidComponentValue;
+        }
+
+        if (comp_result.shorted) {
+            switch (comp.device) {
+                .voltage_source, .current_source, .cccs, .ccvs => {
+                    std.log.err("'{s}' is shorted", .{comp.name});
+                    return error.SourceShorted;
+                },
+                else => {
+                    std.log.warn("'{s}' is shorted", .{comp.name});
+                },
+            }
+        }
+    }
 
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // where v is all nodes except ground

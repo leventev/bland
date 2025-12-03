@@ -795,9 +795,6 @@ pub const GraphicCircuit = struct {
         // TODO: validate values, errors
         for (self.graphic_components.items) |*graphic_comp| {
             switch (graphic_comp.comp.device) {
-                .resistor, .capacitor, .inductor => |val| {
-                    std.debug.assert(val > 0);
-                },
                 .ccvs => |*inner| {
                     const comp_id = self.findComponentByName(
                         graphic_comp.value_buffer.ccvs.controller_name_actual,

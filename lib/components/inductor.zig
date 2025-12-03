@@ -2,6 +2,8 @@ const std = @import("std");
 const bland = @import("../bland.zig");
 const component = @import("../component.zig");
 const MNA = @import("../MNA.zig");
+const NetList = @import("../NetList.zig");
+const validator = @import("../validator.zig");
 
 const Component = component.Component;
 const Float = bland.Float;
@@ -61,4 +63,15 @@ pub fn stampMatrix(
             }
         },
     }
+}
+
+pub fn validate(
+    inductance: Float,
+    _: *const NetList,
+    terminal_node_ids: []const usize,
+) validator.ComponentValidationResult {
+    return validator.ComponentValidationResult{
+        .value_invalid = inductance <= 0,
+        .shorted = terminal_node_ids[0] == terminal_node_ids[1],
+    };
 }
