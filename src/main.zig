@@ -30,6 +30,7 @@ fn init(win: *dvui.Window) !void {
         .graphic_components = std.ArrayList(component.GraphicComponent){},
         .wires = std.ArrayList(circuit.Wire){},
         .pins = std.ArrayList(circuit.GraphicCircuit.Pin){},
+        .grounds = std.ArrayList(circuit.Ground){},
     };
 
     console_initialized = true;

@@ -6,7 +6,6 @@ const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
 const component = @import("component.zig");
 const global = @import("global.zig");
-
 const ElementRenderType = renderer.ElementRenderType;
 
 var mouse_pos: dvui.Point.Physical = undefined;
@@ -46,7 +45,7 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
     }
 
     if (ev.matchBind("ground_placement_mode") and ev.action == .down) {
-        circuit.placement_mode = .{ .new_component = .{ .device_type = .ground } };
+        circuit.placement_mode = .{ .new_ground = {} };
     }
 
     if (ev.matchBind("capacitor_placement_mode") and ev.action == .down) {
@@ -86,7 +85,6 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
     switch (circuit.placement_mode) {
         .none => |*data| {
             var hovered_comp_id: ?usize = null;
-
             for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, comp_id| {
                 const inside_comp: bool = graphic_comp.mouseInside(circuit_rect, ev.p);
 
@@ -97,7 +95,6 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
             }
 
             var hovered_wire_id: ?usize = null;
-
             for (circuit.main_circuit.wires.items, 0..) |wire, wire_id| {
                 const hovered = wire.hovered(circuit_rect, ev.p);
 
@@ -107,7 +104,6 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
             }
 
             var hovered_pin_id: ?usize = null;
-
             for (circuit.main_circuit.pins.items, 0..) |pin, pin_id| {
                 const hovered = pin.hovered(circuit_rect, ev.p);
 
@@ -116,10 +112,21 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                 break;
             }
 
+            var hovered_ground_id: ?usize = null;
+            for (circuit.main_circuit.grounds.items, 0..) |ground, ground_id| {
+                const hovered = mouseInsideGround(ground.pos, ground.rotation, circuit_rect);
+
+                if (!hovered) continue;
+                hovered_ground_id = ground_id;
+                break;
+            }
+
             // priority: comp > wire > pin
             data.hovered_element =
                 if (hovered_comp_id) |id|
                     .{ .component = id }
+                else if (hovered_ground_id) |id|
+                    .{ .ground = id }
                 else if (hovered_wire_id) |id|
                     .{ .wire = id }
                 else if (hovered_pin_id) |id|
@@ -146,6 +153,13 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
 
                                     const comp = circuit.main_circuit.graphic_components.items[comp_id];
                                     circuit.placement_rotation = comp.rotation;
+                                },
+                                .ground => |ground_id| {
+                                    circuit.placement_mode = .{
+                                        .dragging_ground = .{
+                                            .ground_id = ground_id,
+                                        },
+                                    };
                                 },
                                 .wire => |wire_id| {
                                     const wire = circuit.main_circuit.wires.items[wire_id];
@@ -271,6 +285,26 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                             },
                         };
                     },
+                    .dragging_ground => |data| {
+                        var ground = &circuit.main_circuit.grounds.items[data.ground_id];
+
+                        const grid_pos = circuit.gridPositionFromPos(circuit_rect, ev.p);
+
+                        if (circuit.main_circuit.canPlaceGround(
+                            grid_pos,
+                            circuit.placement_rotation,
+                            data.ground_id,
+                        )) {
+                            ground.pos = grid_pos;
+                            ground.rotation = circuit.placement_rotation;
+                        }
+
+                        circuit.placement_mode = .{
+                            .none = .{
+                                .hovered_element = null,
+                            },
+                        };
+                    },
                     else => {},
                 }
             }
@@ -294,6 +328,10 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                 circuit.selection_changed = true;
                                 circuit.selection = .{ .pin = pin_id };
                             },
+                            .ground => |ground_id| {
+                                circuit.selection_changed = true;
+                                circuit.selection = .{ .ground = ground_id };
+                            },
                         }
                     }
                 },
@@ -301,8 +339,22 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                     _ = data;
                     std.log.warn("unimplemented", .{});
                 },
+                .dragging_ground => {},
                 .dragging_wire => {},
                 .dragging_pin => {},
+                .new_ground => {
+                    const grid_pos = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
+
+                    if (circuit.main_circuit.canPlaceGround(grid_pos, circuit.placement_rotation, null)) {
+                        try circuit.main_circuit.grounds.append(
+                            circuit.main_circuit.allocator,
+                            circuit.Ground{
+                                .pos = grid_pos,
+                                .rotation = circuit.placement_rotation,
+                            },
+                        );
+                    }
+                },
                 .new_component => |data| {
                     const grid_pos = component.gridPositionFromScreenPos(
                         data.device_type,
@@ -401,6 +453,143 @@ const GridPositionWireConnection = struct {
     end_connection: usize,
     non_end_connection: usize,
 };
+
+const ground_triangle_side = 45;
+const ground_wire_pixel_len = 25;
+const ground_triangle_height = global.grid_size - ground_wire_pixel_len;
+
+pub fn renderGround(
+    circuit_area: dvui.Rect.Physical,
+    grid_pos: circuit.GridPosition,
+    rot: circuit.Rotation,
+    render_type: renderer.ElementRenderType,
+) void {
+    const pos = grid_pos.toCircuitPosition(circuit_area);
+    const render_colors = render_type.colors();
+    const thickness = render_type.thickness();
+
+    switch (rot) {
+        .right, .left => {
+            const wire_off: f32 = if (rot == .right) ground_wire_pixel_len else -ground_wire_pixel_len;
+            renderer.renderTerminalWire(renderer.TerminalWire{
+                .direction = .horizontal,
+                .pos = pos,
+                .pixel_length = wire_off,
+            }, render_type);
+
+            const x_off: f32 = if (rot == .right) ground_triangle_height else -ground_triangle_height;
+
+            renderer.drawLine(
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y - ground_triangle_side / 2,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y + ground_triangle_side / 2,
+                },
+                render_colors.component_color,
+                thickness,
+            );
+
+            renderer.drawLine(
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y - ground_triangle_side / 2,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off + x_off,
+                    .y = pos.y,
+                },
+                render_colors.component_color,
+                thickness,
+            );
+
+            renderer.drawLine(
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off,
+                    .y = pos.y + ground_triangle_side / 2,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + wire_off + x_off,
+                    .y = pos.y,
+                },
+                render_colors.component_color,
+                thickness,
+            );
+        },
+        .top, .bottom => {
+            const wire_off: f32 = if (rot == .bottom) ground_wire_pixel_len else -ground_wire_pixel_len;
+            renderer.renderTerminalWire(renderer.TerminalWire{
+                .direction = .vertical,
+                .pos = pos,
+                .pixel_length = wire_off,
+            }, render_type);
+
+            const y_off: f32 = if (rot == .bottom) ground_triangle_height else -ground_triangle_height;
+
+            renderer.drawLine(
+                dvui.Point.Physical{
+                    .x = pos.x - ground_triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x + ground_triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                render_colors.component_color,
+                thickness,
+            );
+
+            renderer.drawLine(
+                dvui.Point.Physical{
+                    .x = pos.x - ground_triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + wire_off + y_off,
+                },
+                render_colors.component_color,
+                thickness,
+            );
+
+            renderer.drawLine(
+                dvui.Point.Physical{
+                    .x = pos.x + ground_triangle_side / 2,
+                    .y = pos.y + wire_off,
+                },
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + wire_off + y_off,
+                },
+                render_colors.component_color,
+                thickness,
+            );
+        },
+    }
+}
+
+pub fn mouseInsideGround(
+    grid_pos: circuit.GridPosition,
+    rotation: circuit.Rotation,
+    circuit_rect: dvui.Rect.Physical,
+) bool {
+    const pos = grid_pos.toCircuitPosition(circuit_rect);
+
+    const center: dvui.Point.Physical = switch (rotation) {
+        .left, .right => .{ .x = pos.x + ground_wire_pixel_len + ground_triangle_height / 2, .y = pos.y },
+        .top, .bottom => .{ .x = pos.x, .y = pos.y + ground_wire_pixel_len + ground_triangle_height / 2 },
+    };
+
+    const xd = mouse_pos.x - center.x;
+    const yd = mouse_pos.y - center.y;
+
+    const tolerance = 6;
+    const check_radius = ground_triangle_height / 2 + tolerance;
+
+    return xd * xd + yd * yd <= check_radius * check_radius;
+}
 
 fn renderHoldingComponent(
     device_type: bland.Component.DeviceType,
@@ -605,6 +794,24 @@ fn renderPin(
     }
 }
 
+fn renderHoldingGround(circuit_rect: dvui.Rect.Physical, exclude_ground_id: ?usize) void {
+    const grid_pos = circuit.gridPositionFromPos(
+        circuit_rect,
+        mouse_pos,
+    );
+
+    const can_place = circuit.main_circuit.canPlaceGround(
+        grid_pos,
+        circuit.placement_rotation,
+        exclude_ground_id,
+    );
+    const render_type = if (can_place)
+        ElementRenderType.holding
+    else
+        ElementRenderType.unable_to_place;
+
+    renderGround(circuit_rect, grid_pos, circuit.placement_rotation, render_type);
+}
 fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
     const grid_pos = circuit.gridPositionFromPos(
         circuit_rect,
@@ -788,6 +995,23 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         };
     } else null;
 
+    const hovered_ground_id: ?usize = blk: switch (circuit.placement_mode) {
+        .none => |data| if (data.hovered_element) |element| {
+            break :blk switch (element) {
+                .ground => |ground_id| ground_id,
+                else => null,
+            };
+        } else break :blk null,
+        else => null,
+    };
+
+    const selected_ground_id: ?usize = if (circuit.selection) |element| blk: {
+        break :blk switch (element) {
+            .ground => |ground_id| ground_id,
+            else => null,
+        };
+    } else null;
+
     // TODO
     // TODO
     // TODO
@@ -820,6 +1044,32 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
 
         comp.render(circuit_rect, render_type);
+    }
+
+    for (circuit.main_circuit.grounds.items, 0..) |ground, i| {
+        switch (circuit.placement_mode) {
+            .dragging_ground => |data| {
+                if (data.ground_id == i) continue;
+            },
+            else => {},
+        }
+
+        const render_type: ElementRenderType = if (i == selected_ground_id)
+            ElementRenderType.selected
+        else if (i == hovered_ground_id)
+            ElementRenderType.hovered
+        else
+            ElementRenderType.normal;
+
+        // ensure key existsterm
+        _ = try grid_pos_wire_connections.getOrPutValue(ground.pos, .{
+            .end_connection = 0,
+            .non_end_connection = 0,
+        });
+        var ptr = grid_pos_wire_connections.getPtr(ground.pos).?;
+        ptr.end_connection += 1;
+
+        renderGround(circuit_rect, ground.pos, ground.rotation, render_type);
     }
 
     for (circuit.main_circuit.wires.items, 0..) |wire, i| {
@@ -939,6 +1189,8 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         ),
         .new_wire => |data| renderHoldingWire(data.held_wire_p1, circuit_rect),
         .new_pin => renderHoldingPin(circuit_rect),
+        .new_ground => renderHoldingGround(circuit_rect, null),
+        .dragging_ground => |data| renderHoldingGround(circuit_rect, data.ground_id),
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;
@@ -1004,9 +1256,8 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
 
     const cursor = switch (circuit.placement_mode) {
         .none => |data| if (data.hovered_element != null) Cursor.hand else Cursor.arrow,
-        .dragging_component, .dragging_wire, .dragging_pin => Cursor.arrow_all,
-        .new_component => Cursor.arrow,
-        .new_wire, .new_pin => Cursor.arrow,
+        .dragging_component, .dragging_wire, .dragging_pin, .dragging_ground => Cursor.arrow_all,
+        .new_wire, .new_pin, .new_component, .new_ground => Cursor.arrow,
     };
 
     dvui.cursorSet(cursor);

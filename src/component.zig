@@ -19,7 +19,6 @@ const voltage_source_graphics_module = @import("components/voltage_source.zig");
 const current_source_graphics_module = @import("components/current_source.zig");
 const capacitor_graphics_module = @import("components/capacitor.zig");
 const inductor_graphics_module = @import("components/inductor.zig");
-const ground_graphics_module = @import("components/ground.zig");
 const ccvs_graphics_module = @import("components/ccvs.zig");
 const cccs_graphics_module = @import("components/cccs.zig");
 const diode_graphics_module = @import("components/diode.zig");
@@ -31,7 +30,6 @@ fn graphics_module(comptime self: DeviceType) type {
         .current_source => current_source_graphics_module,
         .capacitor => capacitor_graphics_module,
         .inductor => inductor_graphics_module,
-        .ground => ground_graphics_module,
         .ccvs => ccvs_graphics_module,
         .cccs => cccs_graphics_module,
         .diode => diode_graphics_module,
@@ -63,12 +61,6 @@ pub fn renderComponentHolding(
     render_type: renderer.ElementRenderType,
 ) void {
     switch (dev_type) {
-        .ground => graphics_module(DeviceType.ground).render(
-            circuit_rect,
-            pos,
-            rot,
-            render_type,
-        ),
         inline else => |x| graphics_module(x).render(
             circuit_rect,
             pos,
@@ -145,7 +137,6 @@ pub const GraphicComponent = struct {
     value_buffer: ValueBuffer,
 
     pub const ValueBuffer = union(Component.DeviceType) {
-        ground,
         resistor: struct {
             buff: []u8,
             actual: []u8,
@@ -234,7 +225,6 @@ pub const GraphicComponent = struct {
 
         pub fn init(gpa: std.mem.Allocator, device_type: Component.DeviceType) !@This() {
             return switch (device_type) {
-                .ground => .{ .ground = {} },
                 .resistor => .{
                     .resistor = .{
                         .buff = try gpa.alloc(u8, max_float_length),
@@ -328,9 +318,8 @@ pub const GraphicComponent = struct {
         }
 
         // TODO:
-        pub fn setDeefaultValue(self: *@This(), precision: usize, dev: Device) !void {
+        pub fn setDefaultValue(self: *@This(), precision: usize, dev: Device) !void {
             switch (self.*) {
-                .ground => {},
                 .resistor => |*buf| buf.actual = try bland.units.formatPrefixBuf(
                     buf.buff,
                     dev.resistor,
@@ -466,7 +455,6 @@ pub const GraphicComponent = struct {
 
         pub fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
             switch (self.*) {
-                .ground => {},
                 .resistor => |data| {
                     gpa.free(data.buff);
                 },
@@ -527,7 +515,7 @@ pub const GraphicComponent = struct {
             .value_buffer = try .init(gpa, device_type),
         };
         try graphic_comp.setNewComponentName();
-        try graphic_comp.value_buffer.setDeefaultValue(0, graphic_comp.comp.device);
+        try graphic_comp.value_buffer.setDefaultValue(0, graphic_comp.comp.device);
 
         return graphic_comp;
     }
@@ -552,12 +540,6 @@ pub const GraphicComponent = struct {
         render_type: renderer.ElementRenderType,
     ) void {
         switch (@as(DeviceType, self.comp.device)) {
-            .ground => graphics_module(DeviceType.ground).render(
-                circuit_rect,
-                self.pos,
-                self.rotation,
-                render_type,
-            ),
             inline else => |x| graphics_module(x).render(
                 circuit_rect,
                 self.pos,
@@ -590,7 +572,6 @@ pub const GraphicComponent = struct {
 
     pub fn renderPropertyBox(self: *GraphicComponent, selected_component_changed: bool) void {
         switch (@as(DeviceType, self.comp.device)) {
-            .ground => {},
             inline else => |x| graphics_module(x).renderPropertyBox(
                 &@field(self.comp.device, @tagName(x)),
                 &self.value_buffer,

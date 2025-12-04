@@ -152,24 +152,28 @@ pub const Wire = struct {
 
 pub const PlacementModeType = enum {
     none,
+    new_ground,
     new_component,
     new_wire,
     new_pin,
     dragging_component,
     dragging_wire,
     dragging_pin,
+    dragging_ground,
 };
 
 pub const Element = union(enum) {
     component: usize,
     wire: usize,
     pin: usize,
+    ground: usize,
 };
 
 pub const PlacementMode = union(PlacementModeType) {
     none: struct {
         hovered_element: ?Element,
     },
+    new_ground,
     new_component: struct {
         device_type: bland.Component.DeviceType,
     },
@@ -186,6 +190,9 @@ pub const PlacementMode = union(PlacementModeType) {
     },
     dragging_pin: struct {
         pin_id: usize,
+    },
+    dragging_ground: struct {
+        ground_id: usize,
     },
 };
 
@@ -212,6 +219,9 @@ pub fn delete() void {
             },
             .pin => |pin_id| {
                 main_circuit.deletePin(pin_id);
+            },
+            .ground => |ground_id| {
+                main_circuit.deleteGround(ground_id);
             },
         }
         selection = null;
@@ -274,11 +284,38 @@ pub var main_circuit: GraphicCircuit = undefined;
 
 pub var pin_counter: usize = 1;
 
+pub const Ground = struct {
+    pos: GridPosition,
+    rotation: Rotation,
+};
+
+pub fn groundOtherPos(pos: GridPosition, rotation: Rotation) GridPosition {
+    return switch (rotation) {
+        Rotation.left => GridPosition{
+            .x = pos.x - 1,
+            .y = pos.y,
+        },
+        Rotation.right => GridPosition{
+            .x = pos.x + 1,
+            .y = pos.y,
+        },
+        Rotation.top => GridPosition{
+            .x = pos.x,
+            .y = pos.y - 1,
+        },
+        Rotation.bottom => GridPosition{
+            .x = pos.x,
+            .y = pos.y + 1,
+        },
+    };
+}
+
 pub const GraphicCircuit = struct {
     allocator: std.mem.Allocator,
     graphic_components: std.ArrayList(component.GraphicComponent),
     wires: std.ArrayList(Wire),
     pins: std.ArrayList(Pin),
+    grounds: std.ArrayList(Ground),
 
     const max_pin_name_lengh = bland.component.max_component_name_length;
 
@@ -490,7 +527,7 @@ pub const GraphicCircuit = struct {
             var terminals_for_node = node_terminals[pre_node_id];
             const wires_for_node = node_wires[pre_node_id];
 
-            if (self.nodeHasGround(terminals_for_node.items)) {
+            if (self.nodeHasGround(terminals_for_node.items, wires_for_node)) {
                 // the terminals are added to the ground node's list of terminals
                 // so we can deinit the list containing them
                 for (terminals_for_node.items) |term| {
@@ -527,12 +564,22 @@ pub const GraphicCircuit = struct {
         };
     }
 
-    fn nodeHasGround(self: *const GraphicCircuit, terminals: []const NetList.Terminal) bool {
+    fn nodeHasGround(self: *const GraphicCircuit, terminals: []const NetList.Terminal, wires: []const usize) bool {
         for (terminals) |term| {
             const graphic_comp = self.graphic_components.items[term.component_id];
-            const comp_type = @as(bland.Component.DeviceType, graphic_comp.comp.device);
-            if (comp_type == bland.Component.DeviceType.ground) {
-                return true;
+            var term_buff: [100]GridPosition = undefined;
+            const positions = graphic_comp.terminals(&term_buff);
+            for (self.grounds.items) |ground| {
+                if (ground.pos.eql(positions[term.terminal_id])) return true;
+            }
+        }
+
+        for (wires) |wire| {
+            var it = self.wires.items[wire].iterator();
+            while (it.next()) |pos| {
+                for (self.grounds.items) |ground| {
+                    if (ground.pos.eql(pos)) return true;
+                }
             }
         }
 
@@ -610,19 +657,23 @@ pub const GraphicCircuit = struct {
             .terminal = false,
         }};
 
-        for (self.graphic_components.items) |comp| {
-            if (comp.intersects(positions)) return false;
-        }
-
-        var buffer: [100]component.OccupiedGridPosition = undefined;
-        for (self.wires.items) |wire| {
-            const wire_positions = getOccupiedGridPositions(wire, buffer[0..]);
-            if (component.occupiedPointsIntersect(positions, wire_positions)) return false;
-        }
-
-        return true;
+        return self.canPlace(positions, null, null, exclude_pin_id, null);
     }
 
+    pub fn canPlaceGround(
+        self: *const GraphicCircuit,
+        pos: GridPosition,
+        rotation: Rotation,
+        exclude_ground_id: ?usize,
+    ) bool {
+        const other_pos = groundOtherPos(pos, rotation);
+        const ground_positions: []const component.OccupiedGridPosition = &.{
+            .{ .pos = pos, .terminal = true },
+            .{ .pos = other_pos, .terminal = false },
+        };
+
+        return self.canPlace(ground_positions, null, null, null, exclude_ground_id);
+    }
     pub fn canPlaceComponent(
         self: *const GraphicCircuit,
         comp_type: bland.Component.DeviceType,
@@ -637,15 +688,56 @@ pub const GraphicCircuit = struct {
             rotation,
             buffer[0..],
         );
+
+        return self.canPlace(positions, exclude_comp_id, null, null, null);
+    }
+    // TODO: be able to exclude more from each type of element
+    // TODO: generate the list of grid positions where you cant place once intead of per function call
+    pub fn canPlace(
+        self: *const GraphicCircuit,
+        positions: []const component.OccupiedGridPosition,
+        excluded_comp_id: ?usize,
+        excluded_wire_id: ?usize,
+        excluded_pin_id: ?usize,
+        excluded_ground_id: ?usize,
+    ) bool {
         for (self.graphic_components.items, 0..) |comp, i| {
-            if (i == exclude_comp_id) continue;
+            if (i == excluded_comp_id) continue;
             if (comp.intersects(positions)) return false;
         }
 
         var buffer2: [100]component.OccupiedGridPosition = undefined;
-        for (self.wires.items) |wire| {
+        for (self.wires.items, 0..) |wire, i| {
+            if (i == excluded_wire_id) continue;
             const wire_positions = getOccupiedGridPositions(wire, buffer2[0..]);
             if (component.occupiedPointsIntersect(positions, wire_positions)) return false;
+        }
+
+        _ = excluded_pin_id;
+
+        for (self.grounds.items, 0..) |ground, i| {
+            if (i == excluded_ground_id) continue;
+            const other_pos = switch (ground.rotation) {
+                Rotation.left => GridPosition{
+                    .x = ground.pos.x - 1,
+                    .y = ground.pos.y,
+                },
+                Rotation.right => GridPosition{
+                    .x = ground.pos.x + 1,
+                    .y = ground.pos.y,
+                },
+                Rotation.top => GridPosition{
+                    .x = ground.pos.x,
+                    .y = ground.pos.y - 1,
+                },
+                Rotation.bottom => GridPosition{ .x = ground.pos.x, .y = ground.pos.y + 1 },
+            };
+
+            const ground_positions: []const component.OccupiedGridPosition = &.{
+                .{ .pos = ground.pos, .terminal = true },
+                .{ .pos = other_pos, .terminal = false },
+            };
+            if (component.occupiedPointsIntersect(positions, ground_positions)) return false;
         }
 
         return true;
@@ -849,11 +941,7 @@ pub const GraphicCircuit = struct {
 
         while (idx < comps.len) : (idx += 1) {
             const comp = comps[idx];
-            if (comp.comp.device == .ground) {
-                names[idx] = null;
-            } else {
-                names[idx] = try self.allocator.dupe(u8, comp.comp.name);
-            }
+            names[idx] = try self.allocator.dupe(u8, comp.comp.name);
         }
 
         return names;
@@ -1014,6 +1102,11 @@ pub const GraphicCircuit = struct {
         std.debug.assert(self.pins.items.len > pin_id);
         var pin = self.pins.orderedRemove(pin_id);
         pin.deinit(self.allocator);
+    }
+
+    pub fn deleteGround(self: *GraphicCircuit, ground_id: usize) void {
+        std.debug.assert(self.grounds.items.len > ground_id);
+        _ = self.grounds.orderedRemove(ground_id);
     }
 };
 

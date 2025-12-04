@@ -358,7 +358,7 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
         }
 
         if (dvui.menuItemLabel(@src(), "Ground", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.placement_mode = .{ .new_component = .{ .device_type = .ground } };
+            circuit.placement_mode = .{ .new_ground = {} };
             fw.close();
             close = true;
         }
