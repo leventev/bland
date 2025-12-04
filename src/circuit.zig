@@ -802,6 +802,9 @@ pub const GraphicCircuit = struct {
     };
 
     pub fn createSimulationParams(self: *const GraphicCircuit) !SimulationParams {
+        if (self.grounds.items.len == 0) {
+            return error.NoGroundPlaced;
+        }
         var node_terminals = std.ArrayList(
             std.ArrayList(NetList.Terminal),
         ){};
