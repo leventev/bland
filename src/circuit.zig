@@ -413,8 +413,8 @@ pub const GraphicCircuit = struct {
             for (comp_terminals, 0..) |pos, term_id| {
                 try terminals.append(TerminalWithPos{
                     .term = NetList.Terminal{
-                        .component_id = comp_id,
-                        .terminal_id = term_id,
+                        .component_id = @enumFromInt(comp_id),
+                        .terminal_id = @enumFromInt(term_id),
                     },
                     .pos = pos,
                 });
@@ -516,7 +516,7 @@ pub const GraphicCircuit = struct {
 
         // add ground node
         try nodes.append(self.allocator, NetList.Node{
-            .id = 0,
+            .id = .ground,
             .connected_terminals = std.ArrayList(NetList.Terminal){},
             .voltage = null,
         });
@@ -531,8 +531,9 @@ pub const GraphicCircuit = struct {
                 // the terminals are added to the ground node's list of terminals
                 // so we can deinit the list containing them
                 for (terminals_for_node.items) |term| {
-                    const graphic_comp = self.graphic_components.items[term.component_id];
-                    graphic_comp.comp.terminal_node_ids[term.terminal_id] = 0;
+                    const term_id_int = @intFromEnum(term.component_id);
+                    const graphic_comp = self.graphic_components.items[term_id_int];
+                    graphic_comp.comp.terminal_node_ids[@intFromEnum(term.terminal_id)] = .ground;
                     try nodes.items[0].connected_terminals.append(self.allocator, term);
                 }
                 terminals_for_node.deinit(self.allocator);
@@ -541,15 +542,16 @@ pub const GraphicCircuit = struct {
             } else {
                 // if the node doesnt have a GND component connected to it
                 // then create its own node
-                const node_id = nodes.items.len;
+                const node_id: NetList.Node.Id = @enumFromInt(nodes.items.len);
                 try nodes.append(self.allocator, NetList.Node{
                     .id = node_id,
                     .connected_terminals = terminals_for_node,
                     .voltage = null,
                 });
                 for (terminals_for_node.items) |term| {
-                    const graphic_comp = self.graphic_components.items[term.component_id];
-                    graphic_comp.comp.terminal_node_ids[term.terminal_id] = node_id;
+                    const comp_id_int = @intFromEnum(term.component_id);
+                    const graphic_comp = self.graphic_components.items[comp_id_int];
+                    graphic_comp.comp.terminal_node_ids[@intFromEnum(term.terminal_id)] = node_id;
                 }
 
                 var wire_buffer = std.ArrayList(usize){};
@@ -564,13 +566,17 @@ pub const GraphicCircuit = struct {
         };
     }
 
-    fn nodeHasGround(self: *const GraphicCircuit, terminals: []const NetList.Terminal, wires: []const usize) bool {
+    fn nodeHasGround(
+        self: *const GraphicCircuit,
+        terminals: []const NetList.Terminal,
+        wires: []const usize,
+    ) bool {
         for (terminals) |term| {
-            const graphic_comp = self.graphic_components.items[term.component_id];
+            const graphic_comp = self.graphic_components.items[@intFromEnum(term.component_id)];
             var term_buff: [100]GridPosition = undefined;
             const positions = graphic_comp.terminals(&term_buff);
             for (self.grounds.items) |ground| {
-                if (ground.pos.eql(positions[term.terminal_id])) return true;
+                if (ground.pos.eql(positions[@intFromEnum(term.terminal_id)])) return true;
             }
         }
 
@@ -747,11 +753,11 @@ pub const GraphicCircuit = struct {
         self: *const GraphicCircuit,
         nodes: []const NetList.Node,
         node_wires: []const std.ArrayList(usize),
-    ) ![]?usize {
+    ) ![]?NetList.Node.Id {
         std.debug.assert(nodes.len == node_wires.len);
         const node_count = nodes.len;
         const pin_to_node_assignments = try self.allocator.alloc(
-            ?usize,
+            ?NetList.Node.Id,
             self.pins.items.len,
         );
 
@@ -772,10 +778,11 @@ pub const GraphicCircuit = struct {
                     const terminals = nodes[node_id].connected_terminals.items;
                     for (terminals) |terminal| {
                         // TODO: dont get all the terminals every iteration
-                        const comp = self.graphic_components.items[terminal.component_id];
+                        const comp_id_int = @intFromEnum(terminal.component_id);
+                        const comp = self.graphic_components.items[comp_id_int];
                         var buffer: [16]GridPosition = undefined;
                         const terms_for_comp = comp.terminals(&buffer);
-                        const pos = terms_for_comp[terminal.terminal_id];
+                        const pos = terms_for_comp[@intFromEnum(terminal.terminal_id)];
                         if (pin.pos.eql(pos)) {
                             break :blk node_id;
                         }
@@ -784,7 +791,7 @@ pub const GraphicCircuit = struct {
                 break :blk null;
             };
 
-            pin_to_node_assignments[pin_id] = node_id_found;
+            pin_to_node_assignments[pin_id] = if (node_id_found) |id| @enumFromInt(id) else null;
         }
 
         return pin_to_node_assignments;
@@ -792,7 +799,7 @@ pub const GraphicCircuit = struct {
 
     const PinnedNode = struct {
         name: []const u8,
-        node_id: usize,
+        node_id: NetList.Node.Id,
     };
 
     const SimulationParams = struct {
@@ -921,10 +928,10 @@ pub const GraphicCircuit = struct {
         };
     }
 
-    fn findComponentByName(self: *const GraphicCircuit, name: []const u8) ?usize {
-        for (self.graphic_components.items, 0..) |graphic_comp, i| {
-            if (std.mem.eql(u8, graphic_comp.comp.name, name)) return i;
-        }
+    fn findComponentByName(self: *const GraphicCircuit, name: []const u8) ?bland.Component.Id {
+        for (self.graphic_components.items, 0..) |graphic_comp, i|
+            if (std.mem.eql(u8, graphic_comp.comp.name, name))
+                return @enumFromInt(i);
 
         return null;
     }

@@ -510,7 +510,7 @@ pub const GraphicComponent = struct {
             .comp = bland.Component{
                 .name = &.{},
                 .device = try device_type.defaultValue(gpa),
-                .terminal_node_ids = try gpa.alloc(usize, 2),
+                .terminal_node_ids = try gpa.alloc(bland.NetList.Node.Id, 2),
             },
             .value_buffer = try .init(gpa, device_type),
         };

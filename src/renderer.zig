@@ -539,7 +539,7 @@ pub fn renderDCReport(
     );
 
     for (report.pinned_nodes) |pinned_node| {
-        const voltage = voltages[pinned_node.node_id];
+        const voltage = voltages[@intFromEnum(pinned_node.node_id)];
         try values.append(gpa, .{
             .display_name = try std.fmt.allocPrint(arena, "V({s})", .{pinned_node.name}),
             .value = try bland.units.formatUnitAlloc(arena, .voltage, voltage, 3),
@@ -723,7 +723,7 @@ pub fn renderFWReport(
 
     if (S.var_choice >= report.pinned_nodes.len) {
         const comp_entry_idx = S.var_choice - report.pinned_nodes.len;
-        const comp_idx = comp_idxs[comp_entry_idx];
+        const comp_idx: bland.Component.Id = @enumFromInt(comp_idxs[comp_entry_idx]);
         const current = fw_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
             if (c) |c_val| {
@@ -847,7 +847,7 @@ pub fn renderTransientReport(
 
     if (S.var_choice >= report.pinned_nodes.len) {
         const comp_entry_idx = S.var_choice - report.pinned_nodes.len;
-        const comp_idx = comp_idxs[comp_entry_idx];
+        const comp_idx: bland.Component.Id = @enumFromInt(comp_idxs[comp_entry_idx]);
         const current = trans_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
             if (c) |c_val| {
