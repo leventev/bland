@@ -11,14 +11,15 @@ const expectComplex = main.expectComplex;
 
 pub fn checkCurrentDC(
     report: *const NetList.RealAnalysisResult,
-    current_id: usize,
+    current_id: bland.Component.Id,
     expected: Float,
 ) !void {
     // TODO: check polarity???
-    try std.testing.expect(current_id < report.currents.len);
-    try std.testing.expect(report.currents[current_id] != null);
+    const current_id_int = @intFromEnum(current_id);
+    try std.testing.expect(current_id_int < report.currents.len);
+    try std.testing.expect(report.currents[current_id_int] != null);
 
-    const actual = report.currents[current_id].?;
+    const actual = report.currents[current_id_int].?;
 
     const expected_abs = @abs(expected);
     const expected_actual = @abs(actual);
@@ -27,57 +28,64 @@ pub fn checkCurrentDC(
 
 pub fn checkVoltageDC(
     report: *const NetList.RealAnalysisResult,
-    node_id: usize,
+    node_id: NetList.Node.Id,
     expected: Float,
 ) !void {
-    try std.testing.expect(node_id < report.voltages.len);
-    const actual = report.voltages[node_id];
+    const node_id_int = @intFromEnum(node_id);
+    try std.testing.expect(node_id_int < report.voltages.len);
+    const actual = report.voltages[node_id_int];
     try expectFloat(Float, expected, actual);
 }
 
 pub fn checkVoltage2DC(
     report: *const NetList.RealAnalysisResult,
-    node1_id: usize,
-    node2_id: usize,
+    node1_id: NetList.Node.Id,
+    node2_id: NetList.Node.Id,
     expected: Float,
 ) !void {
-    try std.testing.expect(node1_id < report.voltages.len);
-    try std.testing.expect(node2_id < report.voltages.len);
-    const actual = report.voltages[node1_id] - report.voltages[node2_id];
+    const node1_id_int = @intFromEnum(node1_id);
+    const node2_id_int = @intFromEnum(node2_id);
+    try std.testing.expect(node1_id_int < report.voltages.len);
+    try std.testing.expect(node2_id_int < report.voltages.len);
+    const actual = report.voltages[node1_id_int] - report.voltages[node2_id_int];
     try expectFloat(Float, expected, actual);
 }
 
 pub fn checkVoltageAC(
     report: *const NetList.ComplexAnalysisReport,
-    node_id: usize,
+    node_id: NetList.Node.Id,
     expected: Complex,
 ) !void {
-    try std.testing.expect(node_id < report.voltages.len);
-    const actual = report.voltages[node_id];
+    const node_id_int = @intFromEnum(node_id);
+    try std.testing.expect(node_id_int < report.voltages.len);
+    const actual = report.voltages[node_id_int];
     try expectComplex(expected, actual);
 }
 
 pub fn checkVoltage2AC(
     report: *const NetList.ComplexAnalysisReport,
-    node1_id: usize,
-    node2_id: usize,
+    node1_id: NetList.Node.Id,
+    node2_id: NetList.Node.Id,
     expected: Complex,
 ) !void {
-    try std.testing.expect(node1_id < report.voltages.len);
-    try std.testing.expect(node2_id < report.voltages.len);
-    const actual = report.voltages[node1_id].sub(report.voltages[node2_id]);
+    const node1_id_int = @intFromEnum(node1_id);
+    const node2_id_int = @intFromEnum(node2_id);
+    try std.testing.expect(node1_id_int < report.voltages.len);
+    try std.testing.expect(node2_id_int < report.voltages.len);
+    const actual = report.voltages[node1_id_int].sub(report.voltages[node2_id_int]);
     try expectComplex(expected, actual);
 }
 
 pub fn checkCurrentAC(
     report: *const NetList.ComplexAnalysisReport,
-    current_id: usize,
+    current_id: bland.Component.Id,
     expected: Complex,
 ) !void {
-    try std.testing.expect(current_id < report.currents.len);
-    try std.testing.expect(report.currents[current_id] != null);
+    const current_id_int = @intFromEnum(current_id);
+    try std.testing.expect(current_id_int < report.currents.len);
+    try std.testing.expect(report.currents[current_id_int] != null);
 
-    const actual = report.currents[current_id].?;
+    const actual = report.currents[current_id_int].?;
     try expectComplex(expected, actual);
 }
 

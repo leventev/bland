@@ -21,9 +21,9 @@ pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
 
 pub fn stampMatrix(
     inductance: Float,
-    terminal_node_ids: []const usize,
+    terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?usize,
+    current_group_2_idx: ?NetList.Group2Id,
     stamp_opts: StampOptions,
 ) StampError!void {
     const v_plus = terminal_node_ids[0];
@@ -68,7 +68,7 @@ pub fn stampMatrix(
 pub fn validate(
     inductance: Float,
     _: *const NetList,
-    terminal_node_ids: []const usize,
+    terminal_node_ids: []const NetList.Node.Id,
 ) validator.ComponentValidationResult {
     return validator.ComponentValidationResult{
         .value_invalid = inductance <= 0,

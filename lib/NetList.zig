@@ -13,21 +13,24 @@ const Component = component.Component;
 nodes: std.ArrayListUnmanaged(Node),
 components: std.ArrayListUnmanaged(Component),
 
-pub const ground_node_id = 0;
 pub const RealAnalysisResult = MNA.RealAnalysisReport;
 pub const ComplexAnalysisReport = MNA.ComplexAnalysisReport;
 
 const NetList = @This();
 
 pub const Terminal = struct {
-    component_id: usize,
-    terminal_id: usize,
+    component_id: Component.Id,
+    terminal_id: Id,
+
+    pub const Id = enum(u64) { _ };
 };
 
 pub const Node = struct {
-    id: usize,
+    id: Id,
     connected_terminals: std.ArrayListUnmanaged(Terminal),
     voltage: ?Float,
+
+    pub const Id = enum(usize) { ground = 0, _ };
 };
 
 pub const Error = error{
@@ -44,7 +47,7 @@ pub const Error = error{
 pub fn init(allocator: std.mem.Allocator) Error!NetList {
     var nodes = std.ArrayListUnmanaged(Node){};
     try nodes.append(allocator, .{
-        .id = ground_node_id,
+        .id = .ground,
         .connected_terminals = std.ArrayListUnmanaged(Terminal){},
         .voltage = 0,
     });
@@ -55,8 +58,8 @@ pub fn init(allocator: std.mem.Allocator) Error!NetList {
     };
 }
 
-pub fn allocateNode(self: *NetList, allocator: std.mem.Allocator) Error!usize {
-    const next_id = self.nodes.items.len;
+pub fn allocateNode(self: *NetList, allocator: std.mem.Allocator) Error!Node.Id {
+    const next_id: Node.Id = @enumFromInt(self.nodes.items.len);
     try self.nodes.append(allocator, .{
         .id = next_id,
         .connected_terminals = std.ArrayListUnmanaged(Terminal){},
@@ -71,31 +74,32 @@ pub fn addComponent(
     allocator: std.mem.Allocator,
     device: Component.Device,
     name: []const u8,
-    node_ids: []const usize,
-) Error!usize {
-    const id = self.components.items.len;
+    node_ids: []const Node.Id,
+) Error!Component.Id {
+    const comp_id: Component.Id = @enumFromInt(self.components.items.len);
     try self.components.append(allocator, Component{
         .device = device,
         .name = name,
-        .terminal_node_ids = try allocator.dupe(usize, node_ids),
+        .terminal_node_ids = try allocator.dupe(Node.Id, node_ids),
     });
-    for (node_ids, 0..) |node_id, term_id| {
-        try self.addComponentConnection(allocator, node_id, id, term_id);
+    for (node_ids, 0..) |node_id, term_id_int| {
+        const term_id: Terminal.Id = @enumFromInt(term_id_int);
+        try self.addComponentConnection(allocator, node_id, comp_id, term_id);
     }
-    return id;
+    return comp_id;
 }
 
 pub fn addComponentConnection(
     self: *NetList,
     allocator: std.mem.Allocator,
-    node_id: usize,
-    comp_id: usize,
-    term_id: usize,
+    node_id: Node.Id,
+    comp_id: Component.Id,
+    term_id: Terminal.Id,
 ) Error!void {
-    if (node_id >= self.nodes.items.len) return error.InvalidNodeID;
-    if (comp_id >= self.components.items.len) return error.InvalidComponentID;
+    if (@intFromEnum(node_id) >= self.nodes.items.len) return error.InvalidNodeID;
+    if (@intFromEnum(comp_id) >= self.components.items.len) return error.InvalidComponentID;
 
-    try self.nodes.items[node_id].connected_terminals.append(
+    try self.nodes.items[@intFromEnum(node_id)].connected_terminals.append(
         allocator,
         NetList.Terminal{
             .component_id = comp_id,
@@ -118,7 +122,7 @@ pub fn deinit(self: *NetList, allocator: std.mem.Allocator) void {
 fn createMNAMatrix(
     self: *NetList,
     allocator: std.mem.Allocator,
-    group_2: []const usize,
+    group_2: []const Component.Id,
     angular_frequency: Float,
     ac_analysis: bool,
 ) Error!MNA {
@@ -127,8 +131,8 @@ fn createMNAMatrix(
     if (self.components.items.len < 2) return error.NotEnoughComponents;
 
     const validation_result = try validator.validate(allocator, self);
-    for (validation_result.comps, 0..) |comp_result, comp_id| {
-        const comp = self.components.items[comp_id];
+    for (validation_result.comps, 0..) |comp_result, comp_id_int| {
+        const comp = self.components.items[comp_id_int];
         if (comp_result.value_invalid) {
             std.log.err("invalid value for '{s}'", .{comp.name});
             return error.InvalidComponentValue;
@@ -174,37 +178,39 @@ fn createMNAMatrix(
     return mna;
 }
 
+pub const Group2Id = enum(usize) { _ };
+
 const Group2 = struct {
-    arr: std.ArrayList(usize),
+    arr: std.ArrayList(Component.Id),
 
     fn addComponents(
         self: *Group2,
         allocator: std.mem.Allocator,
-        comp_indices: []const usize,
+        comp_ids: []const Component.Id,
     ) !void {
-        for (comp_indices) |comp_idx| {
-            _ = try self.addComponent(allocator, comp_idx);
+        for (comp_ids) |comp_id| {
+            _ = try self.addComponent(allocator, comp_id);
         }
     }
 
     fn addComponent(
         self: *Group2,
         allocator: std.mem.Allocator,
-        comp_idx: usize,
-    ) !usize {
-        const idx = std.mem.indexOf(usize, self.arr.items, &.{comp_idx});
+        comp_id: Component.Id,
+    ) !Group2Id {
+        const idx = std.mem.indexOf(Component.Id, self.arr.items, &.{comp_id});
         if (idx) |i| {
-            return i;
+            return @enumFromInt(i);
         }
 
         const group_2_id = self.arr.items.len;
-        try self.arr.append(allocator, comp_idx);
+        try self.arr.append(allocator, comp_id);
 
-        return group_2_id;
+        return @enumFromInt(group_2_id);
     }
 
     fn init() Group2 {
-        return Group2{ .arr = std.ArrayList(usize){} };
+        return Group2{ .arr = std.ArrayList(Component.Id){} };
     }
 
     fn deinit(self: *Group2, allocator: std.mem.Allocator) void {
@@ -215,7 +221,7 @@ const Group2 = struct {
 fn createGroup2(
     self: *NetList,
     allocator: std.mem.Allocator,
-    currents_watched: ?[]const usize,
+    currents_watched: ?[]const Component.Id,
 ) !Group2 {
     // group edges:
     // - group 1(i1): all elements whose current will be eliminated
@@ -226,38 +232,34 @@ fn createGroup2(
     if (currents_watched) |currs| {
         try group_2.addComponents(allocator, currs);
 
-        for (0.., self.components.items) |idx, *comp| {
+        for (0.., self.components.items) |comp_id_int, *comp| {
+            const comp_id: Component.Id = @enumFromInt(comp_id_int);
             switch (comp.device) {
                 .voltage_source, .inductor => {
-                    _ = try group_2.addComponent(allocator, idx);
+                    _ = try group_2.addComponent(allocator, comp_id);
                 },
                 .ccvs => |*inner| {
                     // controller's current
-                    inner.controller_comp_id = try group_2.addComponent(
-                        allocator,
-                        inner.controller_comp_id,
-                    );
+                    _ = try group_2.addComponent(allocator, inner.controller_comp_id);
 
                     // ccvs's current
-                    _ = try group_2.addComponent(allocator, idx);
+                    _ = try group_2.addComponent(allocator, comp_id);
                 },
                 .cccs => |*inner| {
                     // controller's current
-                    inner.controller_comp_id = try group_2.addComponent(
-                        allocator,
-                        inner.controller_comp_id,
-                    );
+                    _ = try group_2.addComponent(allocator, inner.controller_comp_id);
 
                     // ccvs's current
-                    _ = try group_2.addComponent(allocator, idx);
+                    _ = try group_2.addComponent(allocator, comp_id);
                 },
                 else => {},
             }
         }
     } else {
-        for (0..self.components.items.len) |i| {
+        for (0..self.components.items.len) |comp_id_int| {
+            const comp_id: Component.Id = @enumFromInt(comp_id_int);
             // TODO: optimize
-            _ = try group_2.addComponent(allocator, i);
+            _ = try group_2.addComponent(allocator, comp_id);
         }
     }
 
@@ -267,7 +269,7 @@ fn createGroup2(
 pub fn analyseDC(
     self: *NetList,
     allocator: std.mem.Allocator,
-    currents_watched: ?[]const usize,
+    currents_watched: ?[]const Component.Id,
 ) Error!MNA.RealAnalysisReport {
     const start_time: i64 = std.time.microTimestamp();
 
@@ -279,12 +281,21 @@ pub fn analyseDC(
     var mna = try self.createMNAMatrix(allocator, group_2.arr.items, 0, false);
     defer mna.deinit(allocator);
 
-    for (0.., self.components.items) |idx, comp| {
-        const current_group_2_idx = std.mem.indexOf(usize, group_2.arr.items, &.{idx});
+    for (0.., self.components.items) |comp_id_int, comp| {
+        const comp_id: Component.Id = @enumFromInt(comp_id_int);
+        const current_group_2_id: ?NetList.Group2Id = if (std.mem.indexOf(
+            Component.Id,
+            group_2.arr.items,
+            &.{comp_id},
+        )) |id|
+            @enumFromInt(id)
+        else
+            null;
+
         comp.device.stampMatrix(
             comp.terminal_node_ids,
             &mna,
-            current_group_2_idx,
+            current_group_2_id,
             .dc,
         ) catch |err| {
             switch (err) {
@@ -319,7 +330,7 @@ pub fn analyseDC(
 pub fn analyseTransient(
     self: *NetList,
     allocator: std.mem.Allocator,
-    currents_watched: ?[]const usize,
+    currents_watched: ?[]const Component.Id,
     duration: Float,
 ) TransientResult.Error!TransientResult {
     const start_time: i64 = std.time.microTimestamp();
@@ -339,16 +350,9 @@ pub fn analyseTransient(
         time_point_count,
     );
 
-    // create matrix (|v| + |i2| X |v| + |i2| + 1)
-    // iterate over all elements and stamp them onto the matrix
-    // get values at t=0
-    //var dc_res = try self.analyseDC(allocator, currents_watched);
-
     for (0..self.nodes.items.len) |node_idx| {
         const idx = node_idx * time_point_count;
         transient_report.all_voltages[idx] = 0;
-        //transient_report.all_voltages[idx] = dc_res.voltages[node_idx];
-        //std.debug.print("dc_res: {} = {}", .{ node_idx, dc_res.voltages[node_idx] });
     }
 
     for (0..self.components.items.len) |comp_idx| {
@@ -369,15 +373,24 @@ pub fn analyseTransient(
 
         mna.zero();
 
-        for (0.., self.components.items) |comp_id, comp| {
-            const current_group_2_idx = std.mem.indexOf(usize, group_2.arr.items, &.{comp_id});
+        for (0.., self.components.items) |comp_id_int, comp| {
+            const comp_id: Component.Id = @enumFromInt(comp_id_int);
+            const current_group_2_id: ?NetList.Group2Id = if (std.mem.indexOf(
+                Component.Id,
+                group_2.arr.items,
+                &.{comp_id},
+            )) |id|
+                @enumFromInt(id)
+            else
+                null;
+
             // TODO:
             const voltage_pos = (try transient_report.voltage(comp.terminal_node_ids[0]))[time_idx - 1];
             const voltage_neg = (try transient_report.voltage(comp.terminal_node_ids[1]))[time_idx - 1];
             const voltage_prev = voltage_pos - voltage_neg;
             const current_prev = (try transient_report.current(comp_id))[time_idx - 1];
 
-            comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_idx, .{
+            comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_id, .{
                 .transient = .{
                     .time = time,
                     .time_step = time_step,
@@ -403,8 +416,9 @@ pub fn analyseTransient(
             transient_report.all_voltages[idx] = step_res.voltages[node_idx];
         }
 
-        for (0.., self.components.items) |comp_idx, comp| {
-            const idx = comp_idx * time_point_count + time_idx;
+        for (0.., self.components.items) |comp_id_int, comp| {
+            const idx = comp_id_int * time_point_count + time_idx;
+            const comp_id: Component.Id = @enumFromInt(comp_id_int);
 
             const current_now = switch (comp.device) {
                 .capacitor => |c| blk: {
@@ -412,7 +426,7 @@ pub fn analyseTransient(
                     const node_minus_id = comp.terminal_node_ids[1];
                     const voltages_plus = transient_report.voltage(node_plus_id) catch unreachable;
                     const voltages_minus = transient_report.voltage(node_minus_id) catch unreachable;
-                    const currents = transient_report.current(comp_idx) catch unreachable;
+                    const currents = transient_report.current(comp_id) catch unreachable;
                     const voltage_now = voltages_plus[time_idx] - voltages_minus[time_idx];
                     const voltage_prev = voltages_plus[time_idx - 1] - voltages_minus[time_idx - 1];
                     const current_prev = currents[time_idx - 1].?;
@@ -423,13 +437,13 @@ pub fn analyseTransient(
                     const node_minus_id = comp.terminal_node_ids[1];
                     const voltages_plus = transient_report.voltage(node_plus_id) catch unreachable;
                     const voltages_minus = transient_report.voltage(node_minus_id) catch unreachable;
-                    const currents = transient_report.current(comp_idx) catch unreachable;
+                    const currents = transient_report.current(comp_id) catch unreachable;
                     const voltage_now = voltages_plus[time_idx] - voltages_minus[time_idx];
                     const voltage_prev = voltages_plus[time_idx - 1] - voltages_minus[time_idx - 1];
                     const current_prev = currents[time_idx - 1].?;
                     break :blk time_step / (2 * l) * (voltage_now + voltage_prev) + current_prev;
                 },
-                else => step_res.currents[comp_idx],
+                else => step_res.currents[comp_id_int],
             };
 
             transient_report.all_currents[idx] = current_now;
@@ -456,7 +470,7 @@ pub fn analyseTransient(
 pub fn analyseSinusoidalSteadyState(
     self: *NetList,
     allocator: std.mem.Allocator,
-    currents_watched: ?[]const usize,
+    currents_watched: ?[]const Component.Id,
     frequency: Float,
 ) Error!MNA.ComplexAnalysisReport {
     std.debug.assert(frequency >= 0);
@@ -470,12 +484,20 @@ pub fn analyseSinusoidalSteadyState(
     var mna = try self.createMNAMatrix(allocator, group_2.arr.items, angular_frequency, true);
     defer mna.deinit(allocator);
 
-    for (0.., self.components.items) |idx, comp| {
-        const current_group_2_idx = std.mem.indexOf(usize, group_2.arr.items, &.{idx});
+    for (0.., self.components.items) |comp_id_int, comp| {
+        const comp_id: Component.Id = @enumFromInt(comp_id_int);
+        const current_group_2_id: ?NetList.Group2Id = if (std.mem.indexOf(
+            Component.Id,
+            group_2.arr.items,
+            &.{comp_id},
+        )) |id|
+            @enumFromInt(id)
+        else
+            null;
         comp.device.stampMatrix(
             comp.terminal_node_ids,
             &mna,
-            current_group_2_idx,
+            current_group_2_id,
             .{
                 .sin_steady_state = angular_frequency,
             },
@@ -570,21 +592,23 @@ pub const FrequencySweepResult = struct {
 
     pub fn voltage(
         self: *const FrequencySweepResult,
-        node_idx: usize,
+        node_id: Node.Id,
     ) FrequencySweepResult.Error![]const Complex {
-        if (node_idx >= self.node_count) return error.InvalidNodeID;
-        const start_idx = node_idx * self.frequency_values.len;
-        const end_idx = (node_idx + 1) * self.frequency_values.len;
+        const node_id_int = @intFromEnum(node_id);
+        if (node_id_int >= self.node_count) return error.InvalidNodeID;
+        const start_idx = node_id_int * self.frequency_values.len;
+        const end_idx = (node_id_int + 1) * self.frequency_values.len;
         return self.all_voltages[start_idx..end_idx];
     }
 
     pub fn current(
         self: *const FrequencySweepResult,
-        comp_idx: usize,
+        comp_id: Component.Id,
     ) FrequencySweepResult.Error![]const ?Complex {
-        if (comp_idx >= self.component_count) return error.InvalidComponentID;
-        const start_idx = comp_idx * self.frequency_values.len;
-        const end_idx = (comp_idx + 1) * self.frequency_values.len;
+        const comp_id_int = @intFromEnum(comp_id);
+        if (comp_id_int >= self.component_count) return error.InvalidComponentID;
+        const start_idx = comp_id_int * self.frequency_values.len;
+        const end_idx = (comp_id_int + 1) * self.frequency_values.len;
         return self.all_currents[start_idx..end_idx];
     }
 
@@ -594,14 +618,16 @@ pub const FrequencySweepResult = struct {
         report_buff: *ComplexAnalysisReport,
     ) FrequencySweepResult.Error!void {
         if (freq_idx >= self.frequency_values.len) return error.InvalidFequencyIdx;
-        for (0..report_buff.voltages.len) |idx| {
-            const voltage_for_freqs = self.voltage(idx) catch unreachable;
-            report_buff.voltages[idx] = voltage_for_freqs[freq_idx];
+        for (0..report_buff.voltages.len) |node_id_int| {
+            const node_id: Node.Id = @enumFromInt(node_id_int);
+            const voltage_for_freqs = self.voltage(node_id) catch unreachable;
+            report_buff.voltages[node_id_int] = voltage_for_freqs[freq_idx];
         }
 
-        for (0..report_buff.currents.len) |idx| {
-            const current_for_freqs = self.current(idx) catch unreachable;
-            report_buff.currents[idx] = current_for_freqs[freq_idx];
+        for (0..report_buff.currents.len) |comp_id_int| {
+            const comp_id: Component.Id = @enumFromInt(comp_id_int);
+            const current_for_freqs = self.current(comp_id) catch unreachable;
+            report_buff.currents[comp_id_int] = current_for_freqs[freq_idx];
         }
     }
 };
@@ -667,21 +693,23 @@ pub const TransientResult = struct {
 
     pub fn voltage(
         self: *const TransientResult,
-        node_idx: usize,
+        node_id: Node.Id,
     ) TransientResult.Error![]const Float {
-        if (node_idx >= self.node_count) return error.InvalidNodeID;
-        const start_idx = node_idx * self.time_values.len;
-        const end_idx = (node_idx + 1) * self.time_values.len;
+        const node_id_int = @intFromEnum(node_id);
+        if (node_id_int >= self.node_count) return error.InvalidNodeID;
+        const start_idx = node_id_int * self.time_values.len;
+        const end_idx = (node_id_int + 1) * self.time_values.len;
         return self.all_voltages[start_idx..end_idx];
     }
 
     pub fn current(
         self: *const TransientResult,
-        comp_idx: usize,
+        comp_id: Component.Id,
     ) TransientResult.Error![]const ?Float {
-        if (comp_idx >= self.component_count) return error.InvalidComponentID;
-        const start_idx = comp_idx * self.time_values.len;
-        const end_idx = (comp_idx + 1) * self.time_values.len;
+        const comp_id_int = @intFromEnum(comp_id);
+        if (comp_id_int >= self.component_count) return error.InvalidComponentID;
+        const start_idx = comp_id_int * self.time_values.len;
+        const end_idx = (comp_id_int + 1) * self.time_values.len;
         return self.all_currents[start_idx..end_idx];
     }
 
@@ -691,33 +719,18 @@ pub const TransientResult = struct {
         report_buff: *RealAnalysisResult,
     ) TransientResult.Error!void {
         if (time_idx >= self.time_values.len) return error.InvalidTimeIdx;
-        for (0..report_buff.voltages.len) |idx| {
-            const voltage_for_times = self.voltage(idx) catch unreachable;
-            report_buff.voltages[idx] = voltage_for_times[time_idx];
+        for (0..report_buff.voltages.len) |node_id_int| {
+            const node_id: Node.Id = @enumFromInt(node_id_int);
+            const voltage_for_times = self.voltage(node_id) catch unreachable;
+            report_buff.voltages[node_id_int] = voltage_for_times[time_idx];
         }
 
-        for (0..report_buff.currents.len) |idx| {
-            const current_for_times = self.current(idx) catch unreachable;
-            report_buff.currents[idx] = current_for_times[time_idx];
+        for (0..report_buff.currents.len) |comp_id_int| {
+            const comp_id: Component.Id = @enumFromInt(comp_id_int);
+            const current_for_times = self.current(comp_id) catch unreachable;
+            report_buff.currents[comp_id_int] = current_for_times[time_idx];
         }
     }
-
-    //pub fn analysisReportForTime(
-    //    self: *const TransientReport,
-    //    freq_idx: usize,
-    //    report_buff: *ACAnalysisReport,
-    //) FrequencySweepReport.Error!void {
-    //    if (freq_idx >= self.frequency_values.len) return error.InvalidFequencyIdx;
-    //    for (0..report_buff.voltages.len) |idx| {
-    //        const voltage_for_freqs = self.voltage(idx) catch unreachable;
-    //        report_buff.voltages[idx] = voltage_for_freqs[freq_idx];
-    //    }
-    //
-    //    for (0..report_buff.currents.len) |idx| {
-    //        const current_for_freqs = self.current(idx) catch unreachable;
-    //        report_buff.currents[idx] = current_for_freqs[freq_idx];
-    //    }
-    //}
 };
 
 pub fn analyseFrequencySweep(
@@ -726,7 +739,7 @@ pub fn analyseFrequencySweep(
     start_freq: Float,
     end_freq: Float,
     freq_count: usize,
-    currents_watched: ?[]const usize,
+    currents_watched: ?[]const Component.Id,
 ) FrequencySweepResult.Error!FrequencySweepResult {
     const start_time: i64 = std.time.microTimestamp();
 

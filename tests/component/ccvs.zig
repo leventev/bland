@@ -14,7 +14,7 @@ test "isolated current controlled voltage source" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
 
     // controller circuit
     const vs1_plus_id = try netlist.allocateNode(gpa);
@@ -101,7 +101,7 @@ test "coupled current controlled voltage source" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
     const ccvs_plus_id = try netlist.allocateNode(gpa);
 

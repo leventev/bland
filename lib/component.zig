@@ -20,9 +20,11 @@ pub const max_component_name_length = 20;
 
 pub const Component = struct {
     device: Device,
-    terminal_node_ids: []usize,
+    terminal_node_ids: []NetList.Node.Id,
 
     name: []const u8,
+
+    pub const Id = enum(usize) { _ };
 
     pub fn validate(
         self: *const Component,
@@ -74,7 +76,7 @@ pub const Component = struct {
         pub fn validate(
             self: *const Device,
             netlist: *const bland.NetList,
-            terminal_node_ids: []const usize,
+            terminal_node_ids: []const NetList.Node.Id,
         ) validator.ComponentValidationResult {
             return switch (@as(DeviceType, self.*)) {
                 inline else => |x| x.module().validate(
@@ -101,9 +103,9 @@ pub const Component = struct {
 
         pub fn stampMatrix(
             self: *const Device,
-            terminal_node_ids: []const usize,
+            terminal_node_ids: []const NetList.Node.Id,
             mna: *MNA,
-            current_group_2_idx: ?usize,
+            current_group_2_idx: ?NetList.Group2Id,
             stamp_opts: StampOptions,
         ) StampError!void {
             return switch (@as(DeviceType, self.*)) {

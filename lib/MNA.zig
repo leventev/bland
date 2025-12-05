@@ -6,6 +6,7 @@ const NetList = @import("NetList.zig");
 
 const Float = bland.Float;
 const Complex = bland.Complex;
+const Component = bland.component.Component;
 
 const MNA = @This();
 
@@ -15,12 +16,12 @@ mat: union(enum) {
 },
 nodes: []const NetList.Node,
 component_count: usize,
-group_2: []const usize,
+group_2: []const Component.Id,
 
 pub fn init(
     allocator: std.mem.Allocator,
     nodes: []const NetList.Node,
-    group_2: []const usize,
+    group_2: []const Component.Id,
     component_count: usize,
     complex: bool,
 ) !MNA {
@@ -121,150 +122,150 @@ fn addComplexToMatrixCell(
 
 pub fn stampVoltageVoltage(
     self: *MNA,
-    row_voltage_id: usize,
-    col_voltage_id: usize,
+    row_voltage_id: NetList.Node.Id,
+    col_voltage_id: NetList.Node.Id,
     val: Float,
 ) void {
     // ignore grounds
-    if (row_voltage_id == 0 or col_voltage_id == 0) return;
-    const row = row_voltage_id - 1;
-    const col = col_voltage_id - 1;
+    if (row_voltage_id == .ground or col_voltage_id == .ground) return;
+    const row = @intFromEnum(row_voltage_id) - 1;
+    const col = @intFromEnum(col_voltage_id) - 1;
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampVoltageCurrent(
     self: *MNA,
-    row_voltage_id: usize,
-    col_current_id: usize,
+    row_voltage_id: NetList.Node.Id,
+    col_current_id: NetList.Group2Id,
     val: Float,
 ) void {
     // ignore grounds
-    if (row_voltage_id == 0) return;
+    if (row_voltage_id == .ground) return;
 
-    const row = row_voltage_id - 1;
-    const col = self.nodes.len - 1 + col_current_id;
+    const row = @intFromEnum(row_voltage_id) - 1;
+    const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentCurrent(
     self: *MNA,
-    row_current_id: usize,
-    col_current_id: usize,
+    row_current_id: NetList.Group2Id,
+    col_current_id: NetList.Group2Id,
     val: Float,
 ) void {
-    const row = self.nodes.len - 1 + row_current_id;
-    const col = self.nodes.len - 1 + col_current_id;
+    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
+    const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentVoltage(
     self: *MNA,
-    row_current_id: usize,
-    col_voltage_id: usize,
+    row_current_id: NetList.Group2Id,
+    col_voltage_id: NetList.Node.Id,
     val: Float,
 ) void {
     // ignore ground
-    if (col_voltage_id == 0) return;
+    if (col_voltage_id == .ground) return;
 
-    const row = self.nodes.len - 1 + row_current_id;
-    const col = col_voltage_id - 1;
+    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
+    const col = @intFromEnum(col_voltage_id) - 1;
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampVoltageRHS(
     self: *MNA,
-    row_voltage_id: usize,
+    row_voltage_id: NetList.Node.Id,
     val: Float,
 ) void {
     // ignore ground
-    if (row_voltage_id == 0) return;
+    if (row_voltage_id == .ground) return;
 
-    const row = row_voltage_id - 1;
+    const row = @intFromEnum(row_voltage_id) - 1;
     const col = self.nodes.len + self.group_2.len - 1;
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentRHS(
     self: *MNA,
-    row_current_id: usize,
+    row_current_id: NetList.Group2Id,
     val: Float,
 ) void {
-    const row = self.nodes.len - 1 + row_current_id;
+    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
     const col = self.nodes.len + self.group_2.len - 1;
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampVoltageVoltageComplex(
     self: *MNA,
-    row_voltage_id: usize,
-    col_voltage_id: usize,
+    row_voltage_id: NetList.Node.Id,
+    col_voltage_id: NetList.Node.Id,
     val: Complex,
 ) void {
     // ignore grounds
-    if (row_voltage_id == 0 or col_voltage_id == 0) return;
-    const row = row_voltage_id - 1;
-    const col = col_voltage_id - 1;
+    if (row_voltage_id == .ground or col_voltage_id == .ground) return;
+    const row = @intFromEnum(row_voltage_id) - 1;
+    const col = @intFromEnum(col_voltage_id) - 1;
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampVoltageCurrentComplex(
     self: *MNA,
-    row_voltage_id: usize,
-    col_current_id: usize,
+    row_voltage_id: NetList.Node.Id,
+    col_current_id: NetList.Group2Id,
     val: Complex,
 ) void {
     // ignore grounds
-    if (row_voltage_id == 0) return;
+    if (row_voltage_id == .ground) return;
 
-    const row = row_voltage_id - 1;
-    const col = self.nodes.len - 1 + col_current_id;
+    const row = @intFromEnum(row_voltage_id) - 1;
+    const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentCurrentComplex(
     self: *MNA,
-    row_current_id: usize,
-    col_current_id: usize,
+    row_current_id: NetList.Group2Id,
+    col_current_id: NetList.Group2Id,
     val: Complex,
 ) void {
-    const row = self.nodes.len - 1 + row_current_id;
-    const col = self.nodes.len - 1 + col_current_id;
+    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
+    const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentVoltageComplex(
     self: *MNA,
-    row_current_id: usize,
-    col_voltage_id: usize,
+    row_current_id: NetList.Group2Id,
+    col_voltage_id: NetList.Node.Id,
     val: Complex,
 ) void {
     // ignore ground
-    if (col_voltage_id == 0) return;
+    if (col_voltage_id == .ground) return;
 
-    const row = self.nodes.len - 1 + row_current_id;
-    const col = col_voltage_id - 1;
+    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
+    const col = @intFromEnum(col_voltage_id) - 1;
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampVoltageRHSComplex(
     self: *MNA,
-    row_voltage_id: usize,
+    row_voltage_id: NetList.Node.Id,
     val: Complex,
 ) void {
     // ignore ground
-    if (row_voltage_id == 0) return;
+    if (row_voltage_id == .ground) return;
 
-    const row = row_voltage_id - 1;
+    const row = @intFromEnum(row_voltage_id) - 1;
     const col = self.nodes.len + self.group_2.len - 1;
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentRHSComplex(
     self: *MNA,
-    row_current_id: usize,
+    row_current_id: NetList.Group2Id,
     val: Complex,
 ) void {
-    const row = self.nodes.len - 1 + row_current_id;
+    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
     const col = self.nodes.len + self.group_2.len - 1;
     self.addComplexToMatrixCell(row, col, val);
 }
@@ -326,8 +327,9 @@ pub fn solveReal(self: *MNA, allocator: std.mem.Allocator) !RealAnalysisReport {
         dc_results.currents[i] = null;
     }
 
-    for (self.group_2, 0..) |current_idx, i| {
-        dc_results.currents[current_idx] = mat.data[(self.nodes.len + i - 1) * mat.col_count + mat.col_count - 1];
+    for (self.group_2, 0..) |comp_id, i| {
+        const val = mat.data[(self.nodes.len + i - 1) * mat.col_count + mat.col_count - 1];
+        dc_results.currents[@intFromEnum(comp_id)] = val;
     }
 
     return dc_results;
@@ -354,8 +356,9 @@ pub fn solveComplex(self: *MNA, allocator: std.mem.Allocator) !ComplexAnalysisRe
         ac_results.currents[i] = null;
     }
 
-    for (self.group_2, 0..) |current_idx, i| {
-        ac_results.currents[current_idx] = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
+    for (self.group_2, 0..) |comp_id, i| {
+        const val = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
+        ac_results.currents[@intFromEnum(comp_id)] = val;
     }
 
     return ac_results;

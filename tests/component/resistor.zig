@@ -14,7 +14,7 @@ test "ohm's law" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: Float = 11.46;
@@ -52,7 +52,7 @@ test "voltage divider" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
     const middle_id = try netlist.allocateNode(gpa);
 
@@ -109,7 +109,7 @@ test "voltage divider many" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: Float = 137.53;
@@ -123,11 +123,11 @@ test "voltage divider many" {
         4.5,
         800,
     };
-    var r_comp_idxs: [r_list.len]usize = undefined;
+    var r_comp_idxs: [r_list.len]Component.Id = undefined;
 
     // there are N-1 nodes between N resistors but we append
     // the ground node at the end so its easier to add resistors
-    var node_ids: [r_list.len]usize = undefined;
+    var node_ids: [r_list.len]NetList.Node.Id = undefined;
     for (0..node_ids.len - 1) |i| {
         node_ids[i] = try netlist.allocateNode(gpa);
     }
@@ -186,7 +186,7 @@ test "current divider" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: Float = 678.666;
@@ -235,7 +235,7 @@ test "current divider many" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1: Float = 678.666;
@@ -256,7 +256,7 @@ test "current divider many" {
         10987.00123,
         0.005,
     };
-    var r_comp_idxs: [r_list.len]usize = undefined;
+    var r_comp_idxs: [r_list.len]Component.Id = undefined;
     inline for (r_list, 0..) |resistance, i| {
         r_comp_idxs[i] = try netlist.addComponent(
             gpa,

@@ -26,9 +26,9 @@ pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
 
 pub fn stampMatrix(
     model: Model,
-    terminal_node_ids: []const usize,
+    terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?usize,
+    current_group_2_idx: ?NetList.Group2Id,
     stamp_opts: StampOptions,
 ) StampError!void {
     const v_plus = terminal_node_ids[0];
@@ -45,7 +45,7 @@ pub fn stampMatrix(
 pub fn validate(
     model: Model,
     _: *const NetList,
-    terminal_node_ids: []const usize,
+    terminal_node_ids: []const NetList.Node.Id,
 ) validator.ComponentValidationResult {
     _ = model;
     return validator.ComponentValidationResult{

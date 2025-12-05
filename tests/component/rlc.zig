@@ -19,7 +19,7 @@ test "RLC series" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
     const l_plus_id = try netlist.allocateNode(gpa);
     const c_plus_id = try netlist.allocateNode(gpa);
@@ -129,7 +129,7 @@ test "RLC parallel" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
     const lc_plus_id = try netlist.allocateNode(gpa);
 

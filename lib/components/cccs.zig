@@ -12,25 +12,31 @@ const StampError = Component.Device.StampError;
 
 pub const Inner = struct {
     multiplier: Float,
-    controller_comp_id: usize,
+    controller_comp_id: Component.Id,
 };
 
 pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .cccs = .{
         .multiplier = 0,
-        .controller_comp_id = 0,
+        .controller_comp_id = @enumFromInt(0),
     } };
 }
 
 pub fn stampMatrix(
     inner: Inner,
-    terminal_node_ids: []const usize,
+    terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?usize,
+    current_group_2_idx: ?NetList.Group2Id,
     stamp_opts: StampOptions,
 ) StampError!void {
     // stamping is the same for every kind of analysis
     _ = stamp_opts;
+
+    const controller_curr_id: NetList.Group2Id = @enumFromInt(std.mem.indexOfScalar(
+        Component.Id,
+        mna.group_2,
+        inner.controller_comp_id,
+    ) orelse unreachable);
 
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
@@ -39,20 +45,20 @@ pub fn stampMatrix(
         mna.stampVoltageCurrent(v_plus, curr_idx, 1);
         mna.stampVoltageCurrent(v_minus, curr_idx, -1);
         mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
-        mna.stampCurrentCurrent(curr_idx, inner.controller_comp_id, -inner.multiplier);
+        mna.stampCurrentCurrent(curr_idx, controller_curr_id, -inner.multiplier);
     } else {
-        mna.stampVoltageCurrent(v_plus, inner.controller_comp_id, -inner.multiplier);
-        mna.stampVoltageCurrent(v_minus, inner.controller_comp_id, inner.multiplier);
+        mna.stampVoltageCurrent(v_plus, controller_curr_id, -inner.multiplier);
+        mna.stampVoltageCurrent(v_minus, controller_curr_id, inner.multiplier);
     }
 }
 
 pub fn validate(
     value: Inner,
     netlist: *const NetList,
-    terminal_node_ids: []const usize,
+    terminal_node_ids: []const NetList.Node.Id,
 ) validator.ComponentValidationResult {
     return validator.ComponentValidationResult{
-        .value_invalid = netlist.components.items.len <= value.controller_comp_id,
+        .value_invalid = netlist.components.items.len <= @intFromEnum(value.controller_comp_id),
         .shorted = terminal_node_ids[0] == terminal_node_ids[1],
     };
 }

@@ -19,7 +19,7 @@ test "RC series low-pass  sinusoidal steady state" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
     const c1_plus_id = try netlist.allocateNode(gpa);
     const c234_plus_id = try netlist.allocateNode(gpa);
@@ -155,7 +155,7 @@ test "RC series high-pass sinusoidal steady state" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
     const c234_plus_id = try netlist.allocateNode(gpa);
     const r1_plus_id = try netlist.allocateNode(gpa);
@@ -291,7 +291,7 @@ test "RC parallel sinusoidal steady state" {
     var netlist = try NetList.init(gpa);
     defer netlist.deinit(gpa);
 
-    const gnd_id: usize = NetList.ground_node_id;
+    const gnd_id = NetList.Node.Id.ground;
     const vs_plus_id = try netlist.allocateNode(gpa);
 
     const v1_amplitude: Float = 100;
