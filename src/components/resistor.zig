@@ -215,15 +215,23 @@ pub fn mouseInside(
 }
 
 const total_width = 2.0;
-const resistor_length = 1.5;
-const resistor_width = 0.6;
+const resistor_length = 1.3;
+const resistor_width = 0.5;
 const wire_len_per_side = (total_width - resistor_length) / 2.0;
 
-pub const brushInstructions: []const VectorRenderer.BrushInstruction = &.{
+pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .place = .{ .x = wire_len_per_side, .y = -resistor_width / 2.0 } },
     .{ .move_rel = .{ .x = resistor_length, .y = 0 } },
     .{ .move_rel = .{ .x = 0, .y = resistor_width } },
     .{ .move_rel = .{ .x = -resistor_length, .y = 0 } },
     .{ .move_rel = .{ .x = 0, .y = -resistor_width } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};
+
+pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+    .{ .place = .{ .x = wire_len_per_side + resistor_length, .y = 0 } },
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
     .{ .stroke = .{ .base_thickness = 1 } },
 };

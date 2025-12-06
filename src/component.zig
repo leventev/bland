@@ -62,13 +62,19 @@ pub fn renderComponent(
     render_type: renderer.ElementRenderType,
     zoom_scale: f32,
 ) !void {
-    const instructions = switch (dev_type) {
-        .resistor => resistor_graphics_module.brushInstructions,
+    const bodyInstructions = switch (dev_type) {
+        .resistor => resistor_graphics_module.bodyInstructions,
         inline else => @panic("TODO"),
         //inline else => |x| graphics_module(x).brushInstructions,
     };
 
-    const color = render_type.colors().component_color;
+    const terminalWireInstructions = switch (dev_type) {
+        .resistor => resistor_graphics_module.terminalWireBrushInstructions,
+        inline else => @panic("TODO"),
+        //inline else => |x| graphics_module(x).brushInstructions,
+    };
+
+    const colors = render_type.colors();
     const thickness = render_type.thickness();
 
     const rotation: f32 = switch (rot) {
@@ -77,8 +83,9 @@ pub fn renderComponent(
         .left => std.math.pi,
         .top => -std.math.pi / 2.0,
     };
+
     try vector_renderer.render(
-        instructions,
+        bodyInstructions,
         .{
             .translate = .{
                 .x = @floatFromInt(pos.x),
@@ -88,7 +95,21 @@ pub fn renderComponent(
             .scale = 1,
             .rotate = @as(f32, @floatCast(rotation)),
         },
-        color,
+        colors.component_color,
+    );
+
+    try vector_renderer.render(
+        terminalWireInstructions,
+        .{
+            .translate = .{
+                .x = @floatFromInt(pos.x),
+                .y = @floatFromInt(pos.y),
+            },
+            .line_scale = thickness * zoom_scale,
+            .scale = 1,
+            .rotate = @as(f32, @floatCast(rotation)),
+        },
+        colors.terminal_wire_color,
     );
 }
 
