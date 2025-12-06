@@ -8,13 +8,11 @@ const Float = bland.Float;
 const Complex = bland.Complex;
 const Component = component.Component;
 
-// TODO: use u32 instead of usize for IDs?
+pub const RealAnalysisResult = MNA.RealAnalysisReport;
+pub const ComplexAnalysisReport = MNA.ComplexAnalysisReport;
 
 nodes: std.ArrayListUnmanaged(Node),
 components: std.ArrayListUnmanaged(Component),
-
-pub const RealAnalysisResult = MNA.RealAnalysisReport;
-pub const ComplexAnalysisReport = MNA.ComplexAnalysisReport;
 
 const NetList = @This();
 

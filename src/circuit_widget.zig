@@ -6,6 +6,8 @@ const renderer = @import("renderer.zig");
 const circuit = @import("circuit.zig");
 const component = @import("component.zig");
 const global = @import("global.zig");
+const VectorRenderer = @import("VectorRenderer.zig");
+
 const ElementRenderType = renderer.ElementRenderType;
 
 var mouse_pos: dvui.Point.Physical = undefined;
@@ -812,6 +814,7 @@ fn renderHoldingGround(circuit_rect: dvui.Rect.Physical, exclude_ground_id: ?usi
 
     renderGround(circuit_rect, grid_pos, circuit.placement_rotation, render_type);
 }
+
 fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
     const grid_pos = circuit.gridPositionFromPos(
         circuit_rect,
@@ -1015,6 +1018,19 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     // TODO
     // TODO
     // TODO
+
+    const brush_instructions = [_]VectorRenderer.BrushInstruction{
+        .{ .move = .{ .x = 2, .y = 4 } },
+        .{ .stroke = .{ .color = dvui.Color.white, .base_thickness = 1 } },
+        .{ .move = .{ .x = -1, .y = -4 } },
+        .{ .stroke = .{ .color = dvui.Color.blue, .base_thickness = 3 } },
+    };
+    const vector_renderer = VectorRenderer.init(circuit_rect);
+    try vector_renderer.render(&brush_instructions, .{
+        .rotate = std.math.pi,
+        .scale = 1,
+        .translate = VectorRenderer.Vector{ .x = 4, .y = 3 },
+    });
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
         switch (circuit.placement_mode) {
