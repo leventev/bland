@@ -255,26 +255,6 @@ fn getOccupiedGridPositions(
     return occupied[0..point_count];
 }
 
-pub fn gridPositionFromPos(
-    circuit_rect: dvui.Rect.Physical,
-    pos: dvui.Point.Physical,
-) GridPosition {
-    const rel_pos = pos.diff(circuit_rect.topLeft());
-
-    var grid_pos = GridPosition{
-        .x = @intFromFloat(@divTrunc(rel_pos.x, global.grid_size)),
-        .y = @intFromFloat(@divTrunc(rel_pos.y, global.grid_size)),
-    };
-
-    if (@mod(rel_pos.x, global.grid_size) > global.grid_size / 2)
-        grid_pos.x += 1;
-
-    if (@mod(rel_pos.y, global.grid_size) > global.grid_size / 2)
-        grid_pos.y += 1;
-
-    return grid_pos;
-}
-
 const TerminalWithPos = struct {
     term: NetList.Terminal,
     pos: GridPosition,

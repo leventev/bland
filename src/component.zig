@@ -5,6 +5,7 @@ const circuit = @import("circuit.zig");
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const VectorRenderer = @import("VectorRenderer.zig");
+const circuit_widget = @import("circuit_widget.zig");
 
 const Float = bland.Float;
 const GridPosition = circuit.GridPosition;
@@ -158,7 +159,7 @@ pub fn gridPositionFromScreenPos(
     pos: dvui.Point.Physical,
     rotation: Rotation,
 ) GridPosition {
-    const grid_pos = circuit.gridPositionFromPos(circuit_rect, pos);
+    const grid_pos = circuit_widget.gridPositionFromPos(circuit_rect, pos);
     return deviceCenterForMouse(dev_type, grid_pos, rotation);
 }
 

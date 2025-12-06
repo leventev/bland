@@ -252,7 +252,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                 .y = ev.p.y,
                             },
                         };
-                        const grid_pos = circuit.gridPositionFromPos(
+                        const grid_pos = gridPositionFromPos(
                             circuit_rect,
                             adjusted_pos,
                         );
@@ -277,7 +277,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                     .dragging_pin => |data| {
                         var pin = &circuit.main_circuit.pins.items[data.pin_id];
 
-                        const grid_pos = circuit.gridPositionFromPos(
+                        const grid_pos = gridPositionFromPos(
                             circuit_rect,
                             ev.p,
                         );
@@ -300,7 +300,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                     .dragging_ground => |data| {
                         var ground = &circuit.main_circuit.grounds.items[data.ground_id];
 
-                        const grid_pos = circuit.gridPositionFromPos(circuit_rect, ev.p);
+                        const grid_pos = gridPositionFromPos(circuit_rect, ev.p);
 
                         if (circuit.main_circuit.canPlaceGround(
                             grid_pos,
@@ -355,7 +355,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                 .dragging_wire => {},
                 .dragging_pin => {},
                 .new_ground => {
-                    const grid_pos = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
+                    const grid_pos = gridPositionFromPos(circuit_rect, mouse_pos);
 
                     if (circuit.main_circuit.canPlaceGround(grid_pos, circuit.placement_rotation, null)) {
                         try circuit.main_circuit.grounds.append(
@@ -390,7 +390,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                 },
                 .new_wire => |*data| {
                     if (data.held_wire_p1) |p1| {
-                        const p2 = circuit.gridPositionFromPos(
+                        const p2 = gridPositionFromPos(
                             circuit_rect,
                             mouse_pos,
                         );
@@ -415,14 +415,14 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                             data.held_wire_p1 = null;
                         }
                     } else {
-                        data.held_wire_p1 = circuit.gridPositionFromPos(
+                        data.held_wire_p1 = gridPositionFromPos(
                             circuit_rect,
                             mouse_pos,
                         );
                     }
                 },
                 .new_pin => {
-                    const grid_pos = circuit.gridPositionFromPos(
+                    const grid_pos = gridPositionFromPos(
                         circuit_rect,
                         mouse_pos,
                     );
@@ -647,7 +647,7 @@ fn renderHoldingWire(
     circuit_rect: dvui.Rect.Physical,
 ) void {
     const p1 = held_wire_p1 orelse return;
-    const p2 = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
+    const p2 = gridPositionFromPos(circuit_rect, mouse_pos);
     const xlen = @abs(p2.x - p1.x);
     const ylen = @abs(p2.y - p1.y);
 
@@ -814,7 +814,7 @@ fn renderPin(
 }
 
 fn renderHoldingGround(circuit_rect: dvui.Rect.Physical, exclude_ground_id: ?usize) void {
-    const grid_pos = circuit.gridPositionFromPos(
+    const grid_pos = gridPositionFromPos(
         circuit_rect,
         mouse_pos,
     );
@@ -833,7 +833,7 @@ fn renderHoldingGround(circuit_rect: dvui.Rect.Physical, exclude_ground_id: ?usi
 }
 
 fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
-    const grid_pos = circuit.gridPositionFromPos(
+    const grid_pos = gridPositionFromPos(
         circuit_rect,
         mouse_pos,
     );
@@ -858,7 +858,23 @@ fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
     renderPin(circuit_rect, grid_pos, circuit.placement_rotation, label, render_type);
 }
 
+pub fn gridPositionFromPos(
+    circuit_rect: dvui.Rect.Physical,
+    pos: dvui.Point.Physical,
+) circuit.GridPosition {
+    const rel_pos = pos.diff(circuit_rect.topLeft()).diff(.{ .x = -camera_x, .y = -camera_y });
+    const grid_size = VectorRenderer.grid_cell_px_size * zoom_scale;
+
+    const grid_pos = circuit.GridPosition{
+        .x = @intFromFloat(@floor(rel_pos.x / grid_size + 0.5)),
+        .y = @intFromFloat(@floor(rel_pos.y / grid_size + 0.5)),
+    };
+
+    return grid_pos;
+}
+
 pub fn renderCircuit(allocator: std.mem.Allocator) !void {
+
     // to decide where to render lumps we count all wire connections per node
     // it would be better to visualize this with a drawing on paper
     // if end_connection > 0 and non_end_connection > 0 then we put a lump there
@@ -1267,7 +1283,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 },
             };
 
-            const pos = circuit.gridPositionFromPos(circuit_rect, adjusted_pos);
+            const pos = gridPositionFromPos(circuit_rect, adjusted_pos);
 
             const new_wire = circuit.Wire{
                 .direction = wire.direction,
@@ -1285,7 +1301,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         },
         .dragging_pin => |data| {
             const pin = circuit.main_circuit.pins.items[data.pin_id];
-            const pos = circuit.gridPositionFromPos(circuit_rect, mouse_pos);
+            const pos = gridPositionFromPos(circuit_rect, mouse_pos);
             const can_place = circuit.main_circuit.canPlacePin(
                 pos,
                 circuit.placement_rotation,
