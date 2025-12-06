@@ -12,6 +12,9 @@ const ElementRenderType = renderer.ElementRenderType;
 
 var mouse_pos: dvui.Point.Physical = undefined;
 
+var camera_x: f32 = 0;
+var camera_y: f32 = 0;
+
 pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     const win = dvui.currentWindow();
     try win.keybinds.putNoClobber(allocator, "normal_mode", .{ .key = .escape });
@@ -192,6 +195,9 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                     circuit.placement_rotation = pin.rotation;
                                 },
                             }
+                        } else {
+                            camera_x -= ev.action.motion.x;
+                            camera_y -= ev.action.motion.y;
                         }
                     },
                     else => {},
@@ -1025,12 +1031,24 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         .{ .move = .{ .x = -1, .y = -4 } },
         .{ .stroke = .{ .color = dvui.Color.blue, .base_thickness = 3 } },
     };
+
+    const grid_size = @as(f32, VectorRenderer.grid_cell_px_size);
+    const world_left = camera_x / grid_size;
+    const world_top = camera_y / grid_size;
+    const world_right = world_left + circuit_rect.w / grid_size;
+    const world_bottom = world_top + circuit_rect.h / grid_size;
+
     const vector_renderer = VectorRenderer.init(circuit_rect);
-    try vector_renderer.render(&brush_instructions, .{
-        .rotate = std.math.pi,
-        .scale = 1,
-        .translate = VectorRenderer.Vector{ .x = 4, .y = 3 },
-    });
+    try vector_renderer.render(
+        &brush_instructions,
+        .{
+            .rotate = std.math.pi,
+            .scale = 1,
+            .translate = VectorRenderer.Vector{ .x = 4, .y = 3 },
+        },
+        .{ .x = world_left, .y = world_top },
+        .{ .x = world_right, .y = world_bottom },
+    );
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
         switch (circuit.placement_mode) {

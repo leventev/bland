@@ -49,7 +49,7 @@ pub const Transform = struct {
 };
 
 /// The default size of a grid cell with Transform.scale = 1 in pixels
-const grid_cell_px_size = 64;
+pub const grid_cell_px_size = 64;
 
 /// Execute a sequency of brush instructions and apply a transformation on the points.
 /// Move instructions move the brush and add the new brush position to the path buffer.
@@ -59,6 +59,8 @@ pub fn render(
     self: *const VectorRenderer,
     comptime instructions: []const BrushInstruction,
     transform: Transform,
+    world_left_top: Vector,
+    world_right_bottom: Vector,
 ) !void {
     comptime var brush_pos = Vector{ .x = 0, .y = 0 };
     comptime var path_buffer: [100]Vector = undefined;
@@ -107,15 +109,14 @@ pub fn render(
                     };
 
                     // from world to viewport
-                    const scaled_cell_size = (grid_cell_px_size * transform.scale);
-                    const world_width = self.viewport.w / scaled_cell_size;
-                    const world_height = self.viewport.h / scaled_cell_size;
+                    const world_width = world_right_bottom.x - world_left_top.x;
+                    const world_height = world_right_bottom.y - world_left_top.y;
 
                     const xscale = self.viewport.w / world_width;
                     const yscale = self.viewport.h / world_height;
                     const viewport_pos = dvui.Point.Physical{
-                        .x = translated.x * xscale,
-                        .y = translated.y * yscale,
+                        .x = (translated.x - world_left_top.x) * xscale,
+                        .y = (translated.y - world_left_top.y) * yscale,
                     };
 
                     // from viewport to screen
