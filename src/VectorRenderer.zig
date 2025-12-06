@@ -46,6 +46,9 @@ pub const Transform = struct {
     /// Scale factor, the coordinates of the points are multiplied by it
     /// Scaling by zero or negative numbers is not allowed
     scale: f32,
+
+    /// Scale factor for line thicknesses
+    line_scale: f32,
 };
 
 /// The default size of a grid cell with Transform.scale = 1 in pixels
@@ -100,7 +103,7 @@ pub fn render(
 
                     const rotated = Vector{
                         .x = scaled.x * rot_cos - scaled.y * rot_sin,
-                        .y = scaled.y * rot_sin + scaled.y * rot_cos,
+                        .y = scaled.x * rot_sin + scaled.y * rot_cos,
                     };
 
                     const translated = Vector{
@@ -131,7 +134,7 @@ pub fn render(
                 const path = dvui.Path{ .points = &transformed_points };
                 path.stroke(dvui.Path.StrokeOptions{
                     .color = opts.color,
-                    .thickness = opts.base_thickness * transform.scale,
+                    .thickness = opts.base_thickness * transform.line_scale,
                 });
 
                 // reset path buffer

@@ -16,8 +16,8 @@ var camera_x: f32 = 0;
 var camera_y: f32 = 0;
 var zoom_scale: f32 = 1;
 
-const max_zoom = 5.0;
-const min_zoom = 0.2;
+const max_zoom = 3.0;
+const min_zoom = 0.75;
 
 pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     const win = dvui.currentWindow();
@@ -917,47 +917,6 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
     }
 
-    const count_x: usize = @intFromFloat(@divTrunc(circuit_rect.w, global.grid_size) + 1);
-    const count_y: usize = @intFromFloat(@divTrunc(circuit_rect.h, global.grid_size) + 1);
-
-    for (0..count_x) |i| {
-        for (0..count_y) |j| {
-            var dont_render = false;
-            for (grid_positions.items) |grid_pos| {
-                if (grid_pos.eql(circuit.GridPosition{
-                    .x = @as(i32, @intCast(i)),
-                    .y = @as(i32, @intCast(j)),
-                })) {
-                    dont_render = true;
-                    break;
-                }
-            }
-
-            if (dont_render) continue;
-
-            const x = circuit_rect.x + @as(f32, @floatFromInt(i)) * global.grid_size;
-            const y = circuit_rect.y + @as(f32, @floatFromInt(j)) * global.grid_size;
-
-            const rect1 = dvui.Rect.Physical{
-                .x = x - 1,
-                .y = y - 2,
-                .w = 2,
-                .h = 4,
-            };
-
-            const rect2 = dvui.Rect.Physical{
-                .x = x - 2,
-                .y = y - 1,
-                .w = 4,
-                .h = 2,
-            };
-
-            const col = dvui.Color{ .r = 100, .g = 100, .b = 100, .a = 255 };
-            dvui.Rect.fill(rect1, dvui.Rect.Physical.all(0), .{ .color = col });
-            dvui.Rect.fill(rect2, dvui.Rect.Physical.all(0), .{ .color = col });
-        }
-    }
-
     // TODO
     // TODO
     // TODO
@@ -1041,22 +1000,69 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         .{ .stroke = .{ .color = dvui.Color.blue, .base_thickness = 3 } },
     };
 
-    const grid_size = @as(f32, VectorRenderer.grid_cell_px_size);
+    const grid_size = @as(f32, VectorRenderer.grid_cell_px_size) * zoom_scale;
     const world_left = camera_x / grid_size;
     const world_top = camera_y / grid_size;
     const world_right = world_left + circuit_rect.w / grid_size;
     const world_bottom = world_top + circuit_rect.h / grid_size;
 
+    const world_top_left = VectorRenderer.Vector{ .x = world_left, .y = world_top };
+    const world_bottom_right = VectorRenderer.Vector{ .x = world_right, .y = world_bottom };
     const vector_renderer = VectorRenderer.init(circuit_rect);
+
+    const grid_color = comptime dvui.Color.fromHSLuv(200, 5, 30, 50);
+    const grid_horizontal_instructions = [_]VectorRenderer.BrushInstruction{
+        .{ .move = .{ .x = 0, .y = 1 } },
+        .{ .stroke = .{ .color = grid_color, .base_thickness = 1 } },
+    };
+    const first_grid_col = @ceil(world_left);
+    const last_grid_col = @floor(world_right);
+    var col = first_grid_col;
+    while (col <= last_grid_col) : (col += 1) {
+        try vector_renderer.render(
+            &grid_horizontal_instructions,
+            .{
+                .rotate = 0,
+                .scale = world_bottom - world_top,
+                .translate = .{ .x = col, .y = world_top },
+                .line_scale = 1,
+            },
+            world_top_left,
+            world_bottom_right,
+        );
+    }
+
+    const grid_vertical_instructions = [_]VectorRenderer.BrushInstruction{
+        .{ .move = .{ .x = 1, .y = 0 } },
+        .{ .stroke = .{ .color = grid_color, .base_thickness = 1 } },
+    };
+    const first_grid_row = @ceil(world_top);
+    const last_grid_row = @floor(world_bottom);
+    var row = first_grid_row;
+    while (row <= last_grid_row) : (row += 1) {
+        try vector_renderer.render(
+            &grid_vertical_instructions,
+            .{
+                .rotate = 0,
+                .scale = world_right - world_left,
+                .translate = .{ .x = world_left, .y = row },
+                .line_scale = 1,
+            },
+            world_top_left,
+            world_bottom_right,
+        );
+    }
+
     try vector_renderer.render(
         &brush_instructions,
         .{
             .rotate = std.math.pi,
-            .scale = zoom_scale,
+            .scale = 1,
             .translate = VectorRenderer.Vector{ .x = 4, .y = 3 },
+            .line_scale = zoom_scale,
         },
-        .{ .x = world_left, .y = world_top },
-        .{ .x = world_right, .y = world_bottom },
+        world_top_left,
+        world_bottom_right,
     );
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
