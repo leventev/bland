@@ -5,10 +5,27 @@ const VectorRenderer = @This();
 
 viewport: dvui.Rect.Physical,
 
+world_top: f32,
+world_bottom: f32,
+world_right: f32,
+world_left: f32,
+
 /// This is called only once per frame, since the viewport rect is
 /// provided by dvui at the start of each frame
-pub fn init(viewport: dvui.Rect.Physical) VectorRenderer {
-    return VectorRenderer{ .viewport = viewport };
+pub fn init(
+    viewport: dvui.Rect.Physical,
+    world_top: f32,
+    world_bottom: f32,
+    world_left: f32,
+    world_right: f32,
+) VectorRenderer {
+    return VectorRenderer{
+        .viewport = viewport,
+        .world_top = world_top,
+        .world_bottom = world_bottom,
+        .world_left = world_left,
+        .world_right = world_right,
+    };
 }
 
 /// One unit is equal to one cell's side length in the grid
@@ -21,16 +38,16 @@ pub const BrushInstruction = union(enum) {
     place: Vector,
 
     /// Move brush relative to the current position
-    move: Vector,
+    move_rel: Vector,
+
+    /// Move brush to an absolute position
+    move_abs: Vector,
 
     /// Stroke the path currently in the path buffer then reset the buffer
     /// and add the current brush position.
     stroke: struct {
         /// Base thickness, this is scaled by the transformation provided
         base_thickness: f32,
-
-        /// Color of the stroke
-        color: dvui.Color,
     },
 };
 
@@ -62,8 +79,7 @@ pub fn render(
     self: *const VectorRenderer,
     comptime instructions: []const BrushInstruction,
     transform: Transform,
-    world_left_top: Vector,
-    world_right_bottom: Vector,
+    color: dvui.Color,
 ) !void {
     comptime var brush_pos = Vector{ .x = 0, .y = 0 };
     comptime var path_buffer: [100]Vector = undefined;
@@ -80,12 +96,16 @@ pub fn render(
                 path_buffer_len = 1;
                 path_buffer[0] = brush_pos;
             },
-            .move => |rel_pos| {
+            .move_rel => |rel_pos| {
                 brush_pos = .{
                     .x = brush_pos.x + rel_pos.x,
                     .y = brush_pos.y + rel_pos.y,
                 };
                 path_buffer[path_buffer_len] = brush_pos;
+                path_buffer_len += 1;
+            },
+            .move_abs => |abs_pos| {
+                path_buffer[path_buffer_len] = abs_pos;
                 path_buffer_len += 1;
             },
             .stroke => |opts| {
@@ -100,7 +120,6 @@ pub fn render(
 
                     const rot_cos = @cos(transform.rotate);
                     const rot_sin = @sin(transform.rotate);
-
                     const rotated = Vector{
                         .x = scaled.x * rot_cos - scaled.y * rot_sin,
                         .y = scaled.x * rot_sin + scaled.y * rot_cos,
@@ -112,14 +131,14 @@ pub fn render(
                     };
 
                     // from world to viewport
-                    const world_width = world_right_bottom.x - world_left_top.x;
-                    const world_height = world_right_bottom.y - world_left_top.y;
+                    const world_width = self.world_right - self.world_left;
+                    const world_height = self.world_bottom - self.world_top;
 
                     const xscale = self.viewport.w / world_width;
                     const yscale = self.viewport.h / world_height;
                     const viewport_pos = dvui.Point.Physical{
-                        .x = (translated.x - world_left_top.x) * xscale,
-                        .y = (translated.y - world_left_top.y) * yscale,
+                        .x = (translated.x - self.world_left) * xscale,
+                        .y = (translated.y - self.world_top) * yscale,
                     };
 
                     // from viewport to screen
@@ -133,7 +152,7 @@ pub fn render(
 
                 const path = dvui.Path{ .points = &transformed_points };
                 path.stroke(dvui.Path.StrokeOptions{
-                    .color = opts.color,
+                    .color = color,
                     .thickness = opts.base_thickness * transform.line_scale,
                 });
 

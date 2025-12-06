@@ -4,6 +4,7 @@ const bland = @import("bland");
 const circuit = @import("circuit.zig");
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
+const VectorRenderer = @import("VectorRenderer.zig");
 
 const Float = bland.Float;
 const GridPosition = circuit.GridPosition;
@@ -53,23 +54,42 @@ pub fn occupiedPointsIntersect(
     return false;
 }
 
-pub fn renderComponentHolding(
+pub fn renderComponent(
     dev_type: DeviceType,
-    circuit_rect: dvui.Rect.Physical,
+    vector_renderer: *const VectorRenderer,
     pos: GridPosition,
     rot: Rotation,
     render_type: renderer.ElementRenderType,
-) void {
-    switch (dev_type) {
-        inline else => |x| graphics_module(x).render(
-            circuit_rect,
-            pos,
-            rot,
-            null,
-            null,
-            render_type,
-        ),
-    }
+    zoom_scale: f32,
+) !void {
+    const instructions = switch (dev_type) {
+        .resistor => resistor_graphics_module.brushInstructions,
+        inline else => @panic("TODO"),
+        //inline else => |x| graphics_module(x).brushInstructions,
+    };
+
+    const color = render_type.colors().component_color;
+    const thickness = render_type.thickness();
+
+    const rotation: f32 = switch (rot) {
+        .right => 0,
+        .bottom => std.math.pi / 2.0,
+        .left => std.math.pi,
+        .top => -std.math.pi / 2.0,
+    };
+    try vector_renderer.render(
+        instructions,
+        .{
+            .translate = .{
+                .x = @floatFromInt(pos.x),
+                .y = @floatFromInt(pos.y),
+            },
+            .line_scale = thickness * zoom_scale,
+            .scale = 1,
+            .rotate = @as(f32, @floatCast(rotation)),
+        },
+        color,
+    );
 }
 
 pub fn deviceOccupiedGridPositions(
@@ -534,23 +554,6 @@ pub const GraphicComponent = struct {
         );
     }
 
-    pub fn render(
-        self: *const GraphicComponent,
-        circuit_rect: dvui.Rect.Physical,
-        render_type: renderer.ElementRenderType,
-    ) void {
-        switch (@as(DeviceType, self.comp.device)) {
-            inline else => |x| graphics_module(x).render(
-                circuit_rect,
-                self.pos,
-                self.rotation,
-                self.comp.name,
-                self.value_buffer,
-                render_type,
-            ),
-        }
-    }
-
     pub fn intersects(self: *const GraphicComponent, positions: []const OccupiedGridPosition) bool {
         var buffer: [100]OccupiedGridPosition = undefined;
 
@@ -601,5 +604,22 @@ pub const GraphicComponent = struct {
                 mouse_pos,
             ),
         };
+    }
+
+    pub fn render(
+        self: *const GraphicComponent,
+        vector_renderer: *const VectorRenderer,
+        render_type: renderer.ElementRenderType,
+        zoom_scale: f32,
+    ) !void {
+        const dev_type = @as(DeviceType, self.comp.device);
+        try renderComponent(
+            dev_type,
+            vector_renderer,
+            self.pos,
+            self.rotation,
+            render_type,
+            zoom_scale,
+        );
     }
 };

@@ -7,6 +7,7 @@ const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const dvui = @import("dvui");
 const GraphicComponent = @import("../component.zig").GraphicComponent;
+const VectorRenderer = @import("../VectorRenderer.zig");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
@@ -43,8 +44,8 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
 }
 
 const wire_pixel_len = 25;
-const resistor_length = 2 * global.grid_size - 2 * wire_pixel_len;
-const resistor_width = 28;
+// const resistor_length = 2 * global.grid_size - 2 * wire_pixel_len;
+// const resistor_width = 28;
 
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
@@ -54,112 +55,118 @@ pub fn render(
     value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ElementRenderType,
 ) void {
-    const pos = grid_pos.toCircuitPosition(circuit_rect);
-
-    const resistor_color = render_type.colors().component_color;
-    const thickness = render_type.thickness();
-
-    var buff: [256]u8 = undefined;
-    const value_str = if (value) |val|
-        std.fmt.bufPrint(&buff, "{s}{s}", .{
-            val.resistor.actual,
-            bland.units.Unit.resistance.symbol(),
-        }) catch unreachable
-    else
-        null;
-
-    switch (rot) {
-        .left, .right => {
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = pos,
-                .direction = .horizontal,
-                .pixel_length = wire_pixel_len,
-            }, render_type);
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = dvui.Point{
-                    .x = pos.x + global.grid_size * 2,
-                    .y = pos.y,
-                },
-                .direction = .horizontal,
-                .pixel_length = -wire_pixel_len,
-            }, render_type);
-
-            const rect = dvui.Rect.Physical{
-                .x = pos.x + wire_pixel_len,
-                .y = pos.y - resistor_width / 2,
-                .w = resistor_length,
-                .h = resistor_width,
-            };
-
-            renderer.drawRect(rect, resistor_color, thickness);
-            if (name) |str| {
-                renderer.renderCenteredText(
-                    dvui.Point.Physical{
-                        .x = pos.x + global.grid_size,
-                        .y = pos.y - (resistor_width / 2 + global.circuit_font_size / 2 + 2),
-                    },
-                    dvui.themeGet().color(.content, .text),
-                    str,
-                );
-            }
-
-            if (value_str) |str| {
-                renderer.renderCenteredText(
-                    dvui.Point.Physical{
-                        .x = pos.x + global.grid_size,
-                        .y = pos.y + resistor_width / 2 + global.circuit_font_size / 2 + 2,
-                    },
-                    dvui.themeGet().color(.content, .text),
-                    str,
-                );
-            }
-        },
-        .bottom, .top => {
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = pos,
-                .direction = .vertical,
-                .pixel_length = wire_pixel_len,
-            }, render_type);
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = dvui.Point{
-                    .x = pos.x,
-                    .y = pos.y + global.grid_size * 2,
-                },
-                .direction = .vertical,
-                .pixel_length = -wire_pixel_len,
-            }, render_type);
-
-            const rect = dvui.Rect.Physical{
-                .x = pos.x - resistor_width / 2,
-                .y = pos.y + wire_pixel_len,
-                .w = resistor_width,
-                .h = resistor_length,
-            };
-
-            renderer.drawRect(rect, resistor_color, thickness);
-            if (name) |str| {
-                renderer.renderCenteredText(
-                    dvui.Point.Physical{
-                        .x = pos.x + global.grid_size / 2,
-                        .y = pos.y + global.grid_size - (global.circuit_font_size / 2 + 8),
-                    },
-                    dvui.themeGet().color(.content, .text),
-                    str,
-                );
-            }
-
-            if (value_str) |str| {
-                renderer.renderCenteredText(
-                    dvui.Point.Physical{
-                        .x = pos.x + global.grid_size / 2,
-                        .y = pos.y + global.grid_size + (global.circuit_font_size / 2 + 8),
-                    },
-                    dvui.themeGet().color(.content, .text),
-                    str,
-                );
-            }
-        },
-    }
+    _ = circuit_rect;
+    _ = grid_pos;
+    _ = rot;
+    _ = name;
+    _ = value;
+    _ = render_type;
+    // const pos = grid_pos.toCircuitPosition(circuit_rect);
+    //
+    // const resistor_color = render_type.colors().component_color;
+    // const thickness = render_type.thickness();
+    //
+    // var buff: [256]u8 = undefined;
+    // const value_str = if (value) |val|
+    //     std.fmt.bufPrint(&buff, "{s}{s}", .{
+    //         val.resistor.actual,
+    //         bland.units.Unit.resistance.symbol(),
+    //     }) catch unreachable
+    // else
+    //     null;
+    //
+    // switch (rot) {
+    //     .left, .right => {
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = pos,
+    //             .direction = .horizontal,
+    //             .pixel_length = wire_pixel_len,
+    //         }, render_type);
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = dvui.Point{
+    //                 .x = pos.x + global.grid_size * 2,
+    //                 .y = pos.y,
+    //             },
+    //             .direction = .horizontal,
+    //             .pixel_length = -wire_pixel_len,
+    //         }, render_type);
+    //
+    //         const rect = dvui.Rect.Physical{
+    //             .x = pos.x + wire_pixel_len,
+    //             .y = pos.y - resistor_width / 2,
+    //             .w = resistor_length,
+    //             .h = resistor_width,
+    //         };
+    //
+    //         renderer.drawRect(rect, resistor_color, thickness);
+    //         if (name) |str| {
+    //             renderer.renderCenteredText(
+    //                 dvui.Point.Physical{
+    //                     .x = pos.x + global.grid_size,
+    //                     .y = pos.y - (resistor_width / 2 + global.circuit_font_size / 2 + 2),
+    //                 },
+    //                 dvui.themeGet().color(.content, .text),
+    //                 str,
+    //             );
+    //         }
+    //
+    //         if (value_str) |str| {
+    //             renderer.renderCenteredText(
+    //                 dvui.Point.Physical{
+    //                     .x = pos.x + global.grid_size,
+    //                     .y = pos.y + resistor_width / 2 + global.circuit_font_size / 2 + 2,
+    //                 },
+    //                 dvui.themeGet().color(.content, .text),
+    //                 str,
+    //             );
+    //         }
+    //     },
+    //     .bottom, .top => {
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = pos,
+    //             .direction = .vertical,
+    //             .pixel_length = wire_pixel_len,
+    //         }, render_type);
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = dvui.Point{
+    //                 .x = pos.x,
+    //                 .y = pos.y + global.grid_size * 2,
+    //             },
+    //             .direction = .vertical,
+    //             .pixel_length = -wire_pixel_len,
+    //         }, render_type);
+    //
+    //         const rect = dvui.Rect.Physical{
+    //             .x = pos.x - resistor_width / 2,
+    //             .y = pos.y + wire_pixel_len,
+    //             .w = resistor_width,
+    //             .h = resistor_length,
+    //         };
+    //
+    //         renderer.drawRect(rect, resistor_color, thickness);
+    //         if (name) |str| {
+    //             renderer.renderCenteredText(
+    //                 dvui.Point.Physical{
+    //                     .x = pos.x + global.grid_size / 2,
+    //                     .y = pos.y + global.grid_size - (global.circuit_font_size / 2 + 8),
+    //                 },
+    //                 dvui.themeGet().color(.content, .text),
+    //                 str,
+    //             );
+    //         }
+    //
+    //         if (value_str) |str| {
+    //             renderer.renderCenteredText(
+    //                 dvui.Point.Physical{
+    //                     .x = pos.x + global.grid_size / 2,
+    //                     .y = pos.y + global.grid_size + (global.circuit_font_size / 2 + 8),
+    //                 },
+    //                 dvui.themeGet().color(.content, .text),
+    //                 str,
+    //             );
+    //         }
+    //     },
+    // }
 }
 
 pub fn renderPropertyBox(r: *Float, value_buffer: *GraphicComponent.ValueBuffer, selected_component_changed: bool) void {
@@ -180,24 +187,43 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    const pos = grid_pos.toCircuitPosition(circuit_rect);
-
-    const tolerance = 3;
-
-    const rect: dvui.Rect.Physical = switch (rotation) {
-        .left, .right => dvui.Rect.Physical{
-            .x = pos.x + wire_pixel_len - tolerance,
-            .y = pos.y - resistor_width / 2 - tolerance,
-            .w = resistor_length + 2 * tolerance,
-            .h = resistor_width + 2 * tolerance,
-        },
-        .bottom, .top => dvui.Rect.Physical{
-            .x = pos.x - resistor_width / 2 - tolerance,
-            .y = pos.y + wire_pixel_len - tolerance,
-            .w = resistor_width + 2 * tolerance,
-            .h = resistor_length + 2 * tolerance,
-        },
-    };
-
-    return rect.contains(mouse_pos);
+    _ = grid_pos;
+    _ = rotation;
+    _ = circuit_rect;
+    _ = mouse_pos;
+    return false;
+    // const pos = grid_pos.toCircuitPosition(circuit_rect);
+    //
+    // const tolerance = 3;
+    //
+    // const rect: dvui.Rect.Physical = switch (rotation) {
+    //     .left, .right => dvui.Rect.Physical{
+    //         .x = pos.x + wire_pixel_len - tolerance,
+    //         .y = pos.y - resistor_width / 2 - tolerance,
+    //         .w = resistor_length + 2 * tolerance,
+    //         .h = resistor_width + 2 * tolerance,
+    //     },
+    //     .bottom, .top => dvui.Rect.Physical{
+    //         .x = pos.x - resistor_width / 2 - tolerance,
+    //         .y = pos.y + wire_pixel_len - tolerance,
+    //         .w = resistor_width + 2 * tolerance,
+    //         .h = resistor_length + 2 * tolerance,
+    //     },
+    // };
+    //
+    // return rect.contains(mouse_pos);
 }
+
+const total_width = 2.0;
+const resistor_length = 1.5;
+const resistor_width = 0.6;
+const wire_len_per_side = (total_width - resistor_length) / 2.0;
+
+pub const brushInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .place = .{ .x = wire_len_per_side, .y = -resistor_width / 2.0 } },
+    .{ .move_rel = .{ .x = resistor_length, .y = 0 } },
+    .{ .move_rel = .{ .x = 0, .y = resistor_width } },
+    .{ .move_rel = .{ .x = -resistor_length, .y = 0 } },
+    .{ .move_rel = .{ .x = 0, .y = -resistor_width } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};

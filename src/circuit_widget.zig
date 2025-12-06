@@ -611,6 +611,7 @@ pub fn mouseInsideGround(
 fn renderHoldingComponent(
     device_type: bland.Component.DeviceType,
     circuit_rect: dvui.Rect.Physical,
+    vector_renderer: *const VectorRenderer,
     exclude_comp_id: ?usize,
 ) void {
     const grid_pos = component.gridPositionFromScreenPos(
@@ -631,12 +632,13 @@ fn renderHoldingComponent(
     else
         ElementRenderType.unable_to_place;
 
-    component.renderComponentHolding(
+    try component.renderComponent(
         device_type,
-        circuit_rect,
+        vector_renderer,
         grid_pos,
         circuit.placement_rotation,
         render_type,
+        zoom_scale,
     );
 }
 
@@ -994,10 +996,10 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     // TODO
 
     const brush_instructions = [_]VectorRenderer.BrushInstruction{
-        .{ .move = .{ .x = 2, .y = 4 } },
-        .{ .stroke = .{ .color = dvui.Color.white, .base_thickness = 1 } },
-        .{ .move = .{ .x = -1, .y = -4 } },
-        .{ .stroke = .{ .color = dvui.Color.blue, .base_thickness = 3 } },
+        .{ .move_rel = .{ .x = 2, .y = 4 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+        .{ .move_rel = .{ .x = -1, .y = -4 } },
+        .{ .stroke = .{ .base_thickness = 3 } },
     };
 
     const grid_size = @as(f32, VectorRenderer.grid_cell_px_size) * zoom_scale;
@@ -1006,14 +1008,18 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     const world_right = world_left + circuit_rect.w / grid_size;
     const world_bottom = world_top + circuit_rect.h / grid_size;
 
-    const world_top_left = VectorRenderer.Vector{ .x = world_left, .y = world_top };
-    const world_bottom_right = VectorRenderer.Vector{ .x = world_right, .y = world_bottom };
-    const vector_renderer = VectorRenderer.init(circuit_rect);
+    const vector_renderer = VectorRenderer.init(
+        circuit_rect,
+        world_top,
+        world_bottom,
+        world_left,
+        world_right,
+    );
 
     const grid_color = comptime dvui.Color.fromHSLuv(200, 5, 30, 50);
     const grid_horizontal_instructions = [_]VectorRenderer.BrushInstruction{
-        .{ .move = .{ .x = 0, .y = 1 } },
-        .{ .stroke = .{ .color = grid_color, .base_thickness = 1 } },
+        .{ .move_rel = .{ .x = 0, .y = 1 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
     };
     const first_grid_col = @ceil(world_left);
     const last_grid_col = @floor(world_right);
@@ -1027,14 +1033,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .translate = .{ .x = col, .y = world_top },
                 .line_scale = 1,
             },
-            world_top_left,
-            world_bottom_right,
+            grid_color,
         );
     }
 
     const grid_vertical_instructions = [_]VectorRenderer.BrushInstruction{
-        .{ .move = .{ .x = 1, .y = 0 } },
-        .{ .stroke = .{ .color = grid_color, .base_thickness = 1 } },
+        .{ .move_rel = .{ .x = 1, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
     };
     const first_grid_row = @ceil(world_top);
     const last_grid_row = @floor(world_bottom);
@@ -1048,8 +1053,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .translate = .{ .x = world_left, .y = row },
                 .line_scale = 1,
             },
-            world_top_left,
-            world_bottom_right,
+            grid_color,
         );
     }
 
@@ -1061,8 +1065,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             .translate = VectorRenderer.Vector{ .x = 4, .y = 3 },
             .line_scale = zoom_scale,
         },
-        world_top_left,
-        world_bottom_right,
+        grid_color,
     );
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
@@ -1092,7 +1095,11 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             ptr.end_connection += 1;
         }
 
-        comp.render(circuit_rect, render_type);
+        try comp.render(
+            &vector_renderer,
+            render_type,
+            zoom_scale,
+        );
     }
 
     for (circuit.main_circuit.grounds.items, 0..) |ground, i| {
@@ -1234,6 +1241,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         .new_component => |data| renderHoldingComponent(
             data.device_type,
             circuit_rect,
+            &vector_renderer,
             null,
         ),
         .new_wire => |data| renderHoldingWire(data.held_wire_p1, circuit_rect),
@@ -1243,7 +1251,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;
-            renderHoldingComponent(dev_type, circuit_rect, data.comp_id);
+            renderHoldingComponent(dev_type, circuit_rect, &vector_renderer, data.comp_id);
         },
         .dragging_wire => |data| {
             const wire = circuit.main_circuit.wires.items[data.wire_id];

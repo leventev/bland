@@ -65,11 +65,9 @@ pub fn twoTerminalCenterForMouse(
     rotation: Rotation,
 ) GridPosition {
     switch (rotation) {
-        .top, .bottom => {
-            return GridPosition{ .x = pos.x, .y = pos.y - 1 };
-        },
-        .left, .right => {
-            return GridPosition{ .x = pos.x - 1, .y = pos.y };
-        },
+        .top => return GridPosition{ .x = pos.x, .y = pos.y + 1 },
+        .bottom => return GridPosition{ .x = pos.x, .y = pos.y - 1 },
+        .left => return GridPosition{ .x = pos.x + 1, .y = pos.y },
+        .right => return GridPosition{ .x = pos.x - 1, .y = pos.y },
     }
 }
