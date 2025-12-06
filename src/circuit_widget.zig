@@ -14,6 +14,10 @@ var mouse_pos: dvui.Point.Physical = undefined;
 
 var camera_x: f32 = 0;
 var camera_y: f32 = 0;
+var zoom_scale: f32 = 1;
+
+const max_zoom = 5.0;
+const min_zoom = 0.2;
 
 pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     const win = dvui.currentWindow();
@@ -433,6 +437,11 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                     }
                 },
             }
+        },
+        .wheel_y => |scroll_y| {
+            const factor = std.math.exp(scroll_y * 0.01);
+            const new_zoom = std.math.clamp(zoom_scale * factor, min_zoom, max_zoom);
+            zoom_scale = new_zoom;
         },
         else => {},
     }
@@ -1043,7 +1052,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         &brush_instructions,
         .{
             .rotate = std.math.pi,
-            .scale = 1,
+            .scale = zoom_scale,
             .translate = VectorRenderer.Vector{ .x = 4, .y = 3 },
         },
         .{ .x = world_left, .y = world_top },
