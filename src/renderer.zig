@@ -204,96 +204,11 @@ fn renderTerminalWires(
     wires: []TerminalWire,
     render_type: ElementRenderType,
 ) void {
-    for (wires) |wire| {
-        renderTerminalWire(wire, render_type);
-    }
-}
-
-pub fn renderWire(
-    circuit_rect: dvui.Rect.Physical,
-    wire: circuit.Wire,
-    render_type: ElementRenderType,
-) void {
-    const pos = wire.pos.toCircuitPosition(circuit_rect);
-    const length: f32 = @floatFromInt(wire.length * global.grid_size);
-
-    const wire_color = render_type.colors().wire_color;
-    const thickness = render_type.wireThickness();
-
-    if (render_type == .holding) {
-        const rect1 = dvui.Rect.Physical{
-            .x = pos.x - 3,
-            .y = pos.y - 3,
-            .w = 6,
-            .h = 6,
-        };
-        drawRect(rect1, wire_color, thickness);
-
-        const pos2 = wire.end().toCircuitPosition(circuit_rect);
-
-        const rect2 = dvui.Rect.Physical{
-            .x = pos2.x - 3,
-            .y = pos2.y - 3,
-            .w = 6,
-            .h = 6,
-        };
-        drawRect(rect2, wire_color, thickness);
-    }
-
-    switch (wire.direction) {
-        .horizontal => {
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y - 1,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + length,
-                    .y = pos.y - 1,
-                },
-                wire_color,
-                thickness,
-            );
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + length,
-                    .y = pos.y,
-                },
-                wire_color,
-                thickness,
-            );
-        },
-        .vertical => {
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x - 1,
-                    .y = pos.y,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x - 1,
-                    .y = pos.y + length,
-                },
-                wire_color,
-                thickness,
-            );
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y + length,
-                },
-                wire_color,
-                thickness,
-            );
-        },
-    }
+    // for (wires) |wire| {
+    //     renderTerminalWire(wire, render_type);
+    // }
+    _ = wires;
+    _ = render_type;
 }
 
 fn renderToolbox(parentSubwindowId: dvui.Id) bool {

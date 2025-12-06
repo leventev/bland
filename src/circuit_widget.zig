@@ -610,13 +610,12 @@ pub fn mouseInsideGround(
 
 fn renderHoldingComponent(
     device_type: bland.Component.DeviceType,
-    circuit_rect: dvui.Rect.Physical,
     vector_renderer: *const VectorRenderer,
     exclude_comp_id: ?usize,
-) void {
+) !void {
     const grid_pos = component.gridPositionFromScreenPos(
         device_type,
-        circuit_rect,
+        vector_renderer.viewport,
         mouse_pos,
         circuit.placement_rotation,
     );
@@ -643,11 +642,11 @@ fn renderHoldingComponent(
 }
 
 fn renderHoldingWire(
+    vector_renderer: *const VectorRenderer,
     held_wire_p1: ?circuit.GridPosition,
-    circuit_rect: dvui.Rect.Physical,
-) void {
+) !void {
     const p1 = held_wire_p1 orelse return;
-    const p2 = gridPositionFromPos(circuit_rect, mouse_pos);
+    const p2 = gridPositionFromPos(vector_renderer.viewport, mouse_pos);
     const xlen = @abs(p2.x - p1.x);
     const ylen = @abs(p2.y - p1.y);
 
@@ -667,7 +666,35 @@ fn renderHoldingWire(
     else
         ElementRenderType.unable_to_place;
 
-    renderer.renderWire(circuit_rect, wire, render_type);
+    try renderWire(vector_renderer, wire, render_type);
+}
+
+pub fn renderWire(
+    vector_renderer: *const VectorRenderer,
+    wire: circuit.Wire,
+    render_type: ElementRenderType,
+) !void {
+    const instructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .move_rel = .{ .x = 1, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+
+    const colors = render_type.colors();
+    const thickness = render_type.wireThickness();
+    const rotation: f32 = if (wire.direction == .vertical) std.math.pi / 2.0 else 0.0;
+    try vector_renderer.render(
+        instructions,
+        .{
+            .translate = .{
+                .x = @floatFromInt(wire.pos.x),
+                .y = @floatFromInt(wire.pos.y),
+            },
+            .scale = @floatFromInt(wire.length),
+            .line_scale = thickness * zoom_scale,
+            .rotate = rotation,
+        },
+        colors.wire_color,
+    );
 }
 
 fn renderPin(
@@ -1174,7 +1201,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 ptr.non_end_connection += 1;
             }
         }
-        renderer.renderWire(circuit_rect, wire, render_type);
+        try renderWire(&vector_renderer, wire, render_type);
     }
 
     var it = grid_pos_wire_connections.iterator();
@@ -1254,20 +1281,19 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
 
     switch (circuit.placement_mode) {
         .none => {},
-        .new_component => |data| renderHoldingComponent(
+        .new_component => |data| try renderHoldingComponent(
             data.device_type,
-            circuit_rect,
             &vector_renderer,
             null,
         ),
-        .new_wire => |data| renderHoldingWire(data.held_wire_p1, circuit_rect),
+        .new_wire => |data| try renderHoldingWire(&vector_renderer, data.held_wire_p1),
         .new_pin => renderHoldingPin(circuit_rect),
         .new_ground => renderHoldingGround(circuit_rect, null),
         .dragging_ground => |data| renderHoldingGround(circuit_rect, data.ground_id),
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;
-            renderHoldingComponent(dev_type, circuit_rect, &vector_renderer, data.comp_id);
+            try renderHoldingComponent(dev_type, &vector_renderer, data.comp_id);
         },
         .dragging_wire => |data| {
             const wire = circuit.main_circuit.wires.items[data.wire_id];
@@ -1297,7 +1323,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             else
                 ElementRenderType.unable_to_place;
 
-            renderer.renderWire(circuit_rect, new_wire, render_type);
+            try renderWire(&vector_renderer, new_wire, render_type);
         },
         .dragging_pin => |data| {
             const pin = circuit.main_circuit.pins.items[data.pin_id];
