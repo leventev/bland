@@ -34,21 +34,45 @@ pub const Vector = struct { x: f32, y: f32 };
 /// Instructions for the brush, they are chained together and executed sequentially
 /// to draw shapes
 pub const BrushInstruction = union(enum) {
+    /// Reset the path buffer
+    reset,
+
     /// Pick up the brush and place it at an absolute position
+    /// This resets the path buffer and adds the position provided to it
     place: Vector,
 
-    /// Move brush relative to the current position
+    /// Move brush relative to the current brush position
     move_rel: Vector,
 
     /// Move brush to an absolute position
     move_abs: Vector,
 
-    /// Stroke the path currently in the path buffer then reset the buffer
-    /// and add the current brush position.
+    /// Draw an arc around center, the points are added to the path buffer
+    /// Depending on the situation using .reset before .arc might be required to avoid
+    /// unwanted lines
+    /// start_angle + sweep_angle must be less than 2*pi
+    arc: struct {
+        /// Absolute position of the center
+        center: Vector,
+
+        /// Radius of the arc
+        radius: f32,
+
+        /// Start angle, can be negative
+        start_angle: f32,
+
+        /// Sweep angle, can be negative
+        sweep_angle: f32,
+    },
+
+    /// Stroke the path currently in the path buffer
     stroke: struct {
         /// Base thickness, this is scaled by the transformation provided
         base_thickness: f32,
     },
+
+    /// Fill the path currently in the path buffer
+    fill,
 };
 
 /// Transformation used on the points described by a sequency of BrushInstructions
@@ -79,11 +103,12 @@ pub fn render(
     self: *const VectorRenderer,
     comptime instructions: []const BrushInstruction,
     transform: Transform,
-    color: dvui.Color,
+    stroke_color: ?dvui.Color,
+    fill_color: ?dvui.Color,
 ) !void {
     comptime var brush_pos = Vector{ .x = 0, .y = 0 };
-    comptime var path_buffer: [100]Vector = undefined;
-    comptime var path_buffer_len = 0;
+    comptime var path_buffer: [1000]Vector = undefined;
+    comptime var path_buffer_len: usize = 0;
 
     // add initial position
     path_buffer[0] = brush_pos;
@@ -91,6 +116,9 @@ pub fn render(
 
     inline for (instructions) |instruction| {
         switch (instruction) {
+            .reset => {
+                path_buffer_len = 0;
+            },
             .place => |abs_pos| {
                 brush_pos = abs_pos;
                 path_buffer_len = 1;
@@ -108,58 +136,89 @@ pub fn render(
                 path_buffer[path_buffer_len] = abs_pos;
                 path_buffer_len += 1;
             },
-            .stroke => |opts| {
-                var transformed_points: [path_buffer_len]dvui.Point.Physical = undefined;
-                inline for (0..path_buffer_len) |i| {
-                    const point = path_buffer[i];
+            .arc => |opts| {
+                const perimeter = opts.sweep_angle * opts.radius;
+                const max_diff = opts.radius / 50;
+                const point_count: usize = @intFromFloat(@round(perimeter / max_diff));
+                const angle_increment = opts.sweep_angle / point_count;
 
-                    const scaled = Vector{
-                        .x = point.x * transform.scale,
-                        .y = point.y * transform.scale,
+                inline for (0..point_count) |i| {
+                    const angle = opts.start_angle + angle_increment * @as(f32, @floatFromInt(i));
+                    brush_pos = .{
+                        .x = opts.center.x + opts.radius * @cos(angle),
+                        .y = opts.center.y + opts.radius * @sin(angle),
                     };
-
-                    const rot_cos = @cos(transform.rotate);
-                    const rot_sin = @sin(transform.rotate);
-                    const rotated = Vector{
-                        .x = scaled.x * rot_cos - scaled.y * rot_sin,
-                        .y = scaled.x * rot_sin + scaled.y * rot_cos,
-                    };
-
-                    const translated = Vector{
-                        .x = rotated.x + transform.translate.x,
-                        .y = rotated.y + transform.translate.y,
-                    };
-
-                    // from world to viewport
-                    const world_width = self.world_right - self.world_left;
-                    const world_height = self.world_bottom - self.world_top;
-
-                    const xscale = self.viewport.w / world_width;
-                    const yscale = self.viewport.h / world_height;
-                    const viewport_pos = dvui.Point.Physical{
-                        .x = (translated.x - self.world_left) * xscale,
-                        .y = (translated.y - self.world_top) * yscale,
-                    };
-
-                    // from viewport to screen
-                    const screen_pos = dvui.Point.Physical{
-                        .x = viewport_pos.x + self.viewport.x,
-                        .y = viewport_pos.y + self.viewport.y,
-                    };
-
-                    transformed_points[i] = screen_pos;
+                    path_buffer[path_buffer_len] = brush_pos;
+                    path_buffer_len += 1;
                 }
-
-                const path = dvui.Path{ .points = &transformed_points };
+            },
+            .stroke => |opts| {
+                const transformed_points = self.transformPoints(
+                    path_buffer[0..path_buffer_len],
+                    transform,
+                );
+                const path = dvui.Path{ .points = transformed_points };
                 path.stroke(dvui.Path.StrokeOptions{
-                    .color = color,
+                    .color = stroke_color.?,
                     .thickness = opts.base_thickness * transform.line_scale,
                 });
-
-                // reset path buffer
-                path_buffer_len = 1;
-                path_buffer[0] = brush_pos;
+            },
+            .fill => {
+                const transformed_points = self.transformPoints(
+                    path_buffer[0..path_buffer_len],
+                    transform,
+                );
+                const path = dvui.Path{ .points = transformed_points };
+                path.fillConvex(dvui.Path.FillConvexOptions{ .color = fill_color.? });
             },
         }
     }
+}
+inline fn transformPoints(
+    self: *const VectorRenderer,
+    points: []const Vector,
+    transform: Transform,
+) []dvui.Point.Physical {
+    var transformed_points: [points.len]dvui.Point.Physical = undefined;
+    inline for (0..points.len) |i| {
+        const point = points[i];
+
+        const scaled = Vector{
+            .x = point.x * transform.scale,
+            .y = point.y * transform.scale,
+        };
+
+        const rot_cos = @cos(transform.rotate);
+        const rot_sin = @sin(transform.rotate);
+        const rotated = Vector{
+            .x = scaled.x * rot_cos - scaled.y * rot_sin,
+            .y = scaled.x * rot_sin + scaled.y * rot_cos,
+        };
+
+        const translated = Vector{
+            .x = rotated.x + transform.translate.x,
+            .y = rotated.y + transform.translate.y,
+        };
+
+        // from world to viewport
+        const world_width = self.world_right - self.world_left;
+        const world_height = self.world_bottom - self.world_top;
+
+        const xscale = self.viewport.w / world_width;
+        const yscale = self.viewport.h / world_height;
+        const viewport_pos = dvui.Point.Physical{
+            .x = (translated.x - self.world_left) * xscale,
+            .y = (translated.y - self.world_top) * yscale,
+        };
+
+        // from viewport to screen
+        const screen_pos = dvui.Point.Physical{
+            .x = viewport_pos.x + self.viewport.x,
+            .y = viewport_pos.y + self.viewport.y,
+        };
+
+        transformed_points[i] = screen_pos;
+    }
+
+    return &transformed_points;
 }

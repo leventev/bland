@@ -694,6 +694,7 @@ pub fn renderWire(
             .rotate = rotation,
         },
         colors.wire_color,
+        null,
     );
 }
 
@@ -1077,6 +1078,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .line_scale = 1,
             },
             grid_color,
+            null,
         );
     }
 
@@ -1097,6 +1099,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .line_scale = 1,
             },
             grid_color,
+            null,
         );
     }
 
@@ -1109,6 +1112,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             .line_scale = zoom_scale,
         },
         grid_color,
+        null,
     );
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
@@ -1204,6 +1208,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         try renderWire(&vector_renderer, wire, render_type);
     }
 
+    const junction_radius = 0.11;
     var it = grid_pos_wire_connections.iterator();
     while (it.next()) |entry| {
         const gpos = entry.key_ptr.*;
@@ -1215,49 +1220,58 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         const is_end = wire_connections.end_connection == 1 and wire_connections.non_end_connection == 0;
 
         if (is_junction) {
-            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
-            defer path.deinit();
+            const insts: []const VectorRenderer.BrushInstruction = &.{
+                .{ .reset = {} },
+                .{ .arc = .{
+                    .center = .{ .x = 0, .y = 0 },
+                    .start_angle = 0,
+                    .sweep_angle = 2 * std.math.pi,
+                    .radius = junction_radius,
+                } },
+                .{ .fill = {} },
+            };
 
-            const pos = gpos.toCircuitPosition(circuit_rect);
-
-            path.addArc(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y,
+            try vector_renderer.render(
+                insts,
+                .{
+                    .line_scale = zoom_scale,
+                    .rotate = 0,
+                    .scale = 1,
+                    .translate = .{
+                        .x = @floatFromInt(gpos.x),
+                        .y = @floatFromInt(gpos.y),
+                    },
                 },
-                7,
-                dvui.math.pi * 2,
-                0,
-                false,
+                null,
+                ElementRenderType.normal.colors().terminal_wire_color,
             );
-
-            path.build().fillConvex(.{
-                .color = ElementRenderType.normal.colors().terminal_wire_color,
-            });
         } else if (is_end) {
-            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
-            defer path.deinit();
+            const insts: []const VectorRenderer.BrushInstruction = &.{
+                .{ .reset = {} },
+                .{ .arc = .{
+                    .center = .{ .x = 0, .y = 0 },
+                    .start_angle = 0,
+                    .sweep_angle = 2 * std.math.pi,
+                    .radius = junction_radius,
+                } },
+                .{ .stroke = .{ .base_thickness = 2 } },
+                .{ .fill = {} },
+            };
 
-            const pos = gpos.toCircuitPosition(circuit_rect);
-
-            path.addArc(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y,
+            try vector_renderer.render(
+                insts,
+                .{
+                    .line_scale = zoom_scale,
+                    .rotate = 0,
+                    .scale = 1,
+                    .translate = .{
+                        .x = @floatFromInt(gpos.x),
+                        .y = @floatFromInt(gpos.y),
+                    },
                 },
-                7,
-                dvui.math.pi * 2,
-                0,
-                false,
+                ElementRenderType.normal.colors().terminal_wire_color,
+                dvui.themeGet().fill,
             );
-
-            path.build().fillConvex(.{
-                .color = dvui.themeGet().fill,
-            });
-            path.build().stroke(.{
-                .color = ElementRenderType.normal.colors().terminal_wire_color,
-                .thickness = 2,
-            });
         }
     }
 

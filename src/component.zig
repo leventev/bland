@@ -97,6 +97,7 @@ pub fn renderComponent(
             .rotate = @as(f32, @floatCast(rotation)),
         },
         colors.component_color,
+        null,
     );
 
     try vector_renderer.render(
@@ -111,6 +112,7 @@ pub fn renderComponent(
             .rotate = @as(f32, @floatCast(rotation)),
         },
         colors.terminal_wire_color,
+        null,
     );
 }
 
