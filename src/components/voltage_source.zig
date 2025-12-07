@@ -433,6 +433,7 @@ pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
         .start_angle = 0,
         .sweep_angle = 2.0 * std.math.pi,
     } },
+    .{ .stroke = .{ .base_thickness = 1 } },
     // plus
     .{ .stroke = .{ .base_thickness = 1 } },
     .{ .place = .{ .x = wire_len_per_side + radius / 2.0 - line_len / 2.0, .y = 0 } },
