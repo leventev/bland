@@ -220,6 +220,7 @@ const resistor_width = 0.5;
 const wire_len_per_side = (total_width - resistor_length) / 2.0;
 
 pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .snap_pixel_set = true },
     .{ .place = .{ .x = wire_len_per_side, .y = -resistor_width / 2.0 } },
     .{ .move_rel = .{ .x = resistor_length, .y = 0 } },
     .{ .move_rel = .{ .x = 0, .y = resistor_width } },
@@ -229,6 +230,7 @@ pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
 };
 
 pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .snap_pixel_set = true },
     .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
     .{ .stroke = .{ .base_thickness = 1 } },
     .{ .place = .{ .x = wire_len_per_side + resistor_length, .y = 0 } },

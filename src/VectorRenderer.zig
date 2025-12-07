@@ -73,6 +73,10 @@ pub const BrushInstruction = union(enum) {
 
     /// Fill the path currently in the path buffer
     fill,
+
+    /// Snap points to the nearest whole pixel
+    /// Useful for straight lines, not recommended for arcs
+    snap_pixel_set: bool,
 };
 
 /// Transformation used on the points described by a sequency of BrushInstructions
@@ -106,13 +110,17 @@ pub fn render(
     stroke_color: ?dvui.Color,
     fill_color: ?dvui.Color,
 ) !void {
+    const path_buffer_cap = 1000;
     comptime var brush_pos = Vector{ .x = 0, .y = 0 };
-    comptime var path_buffer: [1000]Vector = undefined;
+    comptime var path_buffer: [path_buffer_cap]Vector = undefined;
+    comptime var snap_points: [path_buffer_cap]bool = undefined;
     comptime var path_buffer_len: usize = 0;
+    comptime var snap_enabled = false;
 
     // add initial position
     path_buffer[0] = brush_pos;
     path_buffer_len += 1;
+    snap_points[0] = snap_enabled;
 
     inline for (instructions) |instruction| {
         switch (instruction) {
@@ -123,6 +131,7 @@ pub fn render(
                 brush_pos = abs_pos;
                 path_buffer_len = 1;
                 path_buffer[0] = brush_pos;
+                snap_points[0] = snap_enabled;
             },
             .move_rel => |rel_pos| {
                 brush_pos = .{
@@ -130,10 +139,12 @@ pub fn render(
                     .y = brush_pos.y + rel_pos.y,
                 };
                 path_buffer[path_buffer_len] = brush_pos;
+                snap_points[path_buffer_len] = snap_enabled;
                 path_buffer_len += 1;
             },
             .move_abs => |abs_pos| {
                 path_buffer[path_buffer_len] = abs_pos;
+                snap_points[path_buffer_len] = snap_enabled;
                 path_buffer_len += 1;
             },
             .arc => |opts| {
@@ -149,12 +160,14 @@ pub fn render(
                         .y = opts.center.y + opts.radius * @sin(angle),
                     };
                     path_buffer[path_buffer_len] = brush_pos;
+                    snap_points[path_buffer_len] = snap_enabled;
                     path_buffer_len += 1;
                 }
             },
             .stroke => |opts| {
                 const transformed_points = self.transformPoints(
                     path_buffer[0..path_buffer_len],
+                    snap_points[0..path_buffer_len],
                     transform,
                 );
                 const path = dvui.Path{ .points = transformed_points };
@@ -166,17 +179,20 @@ pub fn render(
             .fill => {
                 const transformed_points = self.transformPoints(
                     path_buffer[0..path_buffer_len],
+                    snap_points[0..path_buffer_len],
                     transform,
                 );
                 const path = dvui.Path{ .points = transformed_points };
                 path.fillConvex(dvui.Path.FillConvexOptions{ .color = fill_color.? });
             },
+            .snap_pixel_set => |enabled| snap_enabled = enabled,
         }
     }
 }
 inline fn transformPoints(
     self: *const VectorRenderer,
     points: []const Vector,
+    snap_points: []const bool,
     transform: Transform,
 ) []dvui.Point.Physical {
     var transformed_points: [points.len]dvui.Point.Physical = undefined;
@@ -217,7 +233,15 @@ inline fn transformPoints(
             .y = viewport_pos.y + self.viewport.y,
         };
 
-        transformed_points[i] = screen_pos;
+        const final_screen_pos = if (snap_points[i])
+            dvui.Point.Physical{
+                .x = @round(screen_pos.x),
+                .y = @round(screen_pos.y),
+            }
+        else
+            screen_pos;
+
+        transformed_points[i] = final_screen_pos;
     }
 
     return &transformed_points;

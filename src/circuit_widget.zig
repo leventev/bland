@@ -467,12 +467,11 @@ const ground_triangle_side = 45;
 const ground_wire_pixel_len = 25;
 const ground_triangle_height = global.grid_size - ground_wire_pixel_len;
 
-const ground_full_length = 1;
-const ground_pyramide_length = 0.4;
-const ground_wire_len = ground_full_length - ground_pyramide_length;
+const ground_pyramide_length = 0.3;
+const ground_wire_len = 0.6;
 const ground_level_1_len = 0.7;
-const ground_level_2_len = 0.5;
-const ground_level_3_len = 0.3;
+const ground_level_2_len = 0.45;
+const ground_level_3_len = 0.2;
 const ground_level_gap = ground_pyramide_length / 2.0;
 
 pub fn renderGround(
@@ -485,6 +484,7 @@ pub fn renderGround(
     const thickness = render_type.thickness();
 
     const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .snap_pixel_set = true },
         .{ .place = .{ .x = ground_wire_len, .y = -ground_level_1_len / 2.0 } },
         .{ .move_rel = .{ .x = 0, .y = ground_level_1_len } },
         .{ .stroke = .{ .base_thickness = 1 } },
@@ -499,6 +499,7 @@ pub fn renderGround(
     };
 
     const terminalWireInstructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .snap_pixel_set = true },
         .{ .move_rel = .{ .x = ground_wire_len, .y = 0 } },
         .{ .stroke = .{ .base_thickness = 1 } },
     };
@@ -629,6 +630,7 @@ pub fn renderWire(
     render_type: ElementRenderType,
 ) !void {
     const instructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .snap_pixel_set = true },
         .{ .move_rel = .{ .x = 1, .y = 0 } },
         .{ .stroke = .{ .base_thickness = 1 } },
     };
