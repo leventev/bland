@@ -467,116 +467,78 @@ const ground_triangle_side = 45;
 const ground_wire_pixel_len = 25;
 const ground_triangle_height = global.grid_size - ground_wire_pixel_len;
 
+const ground_full_length = 1;
+const ground_pyramide_length = 0.4;
+const ground_wire_len = ground_full_length - ground_pyramide_length;
+const ground_level_1_len = 0.7;
+const ground_level_2_len = 0.5;
+const ground_level_3_len = 0.3;
+const ground_level_gap = ground_pyramide_length / 2.0;
+
 pub fn renderGround(
-    circuit_area: dvui.Rect.Physical,
+    vector_renderer: *const VectorRenderer,
     grid_pos: circuit.GridPosition,
     rot: circuit.Rotation,
     render_type: renderer.ElementRenderType,
 ) void {
-    const pos = grid_pos.toCircuitPosition(circuit_area);
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
 
-    switch (rot) {
-        .right, .left => {
-            const wire_off: f32 = if (rot == .right) ground_wire_pixel_len else -ground_wire_pixel_len;
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .direction = .horizontal,
-                .pos = pos,
-                .pixel_length = wire_off,
-            }, render_type);
+    const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .place = .{ .x = ground_wire_len, .y = -ground_level_1_len / 2.0 } },
+        .{ .move_rel = .{ .x = 0, .y = ground_level_1_len } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+        .{ .reset = {} },
+        .{ .place = .{ .x = ground_wire_len + ground_level_gap, .y = -ground_level_2_len / 2.0 } },
+        .{ .move_rel = .{ .x = 0, .y = ground_level_2_len } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+        .{ .reset = {} },
+        .{ .place = .{ .x = ground_wire_len + 2.0 * ground_level_gap, .y = -ground_level_3_len / 2.0 } },
+        .{ .move_rel = .{ .x = 0, .y = ground_level_3_len } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
 
-            const x_off: f32 = if (rot == .right) ground_triangle_height else -ground_triangle_height;
+    const terminalWireInstructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .move_rel = .{ .x = ground_wire_len, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
 
-            renderer.drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x + wire_off,
-                    .y = pos.y - ground_triangle_side / 2,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + wire_off,
-                    .y = pos.y + ground_triangle_side / 2,
-                },
-                render_colors.component_color,
-                thickness,
-            );
+    const rotation: f32 = switch (rot) {
+        .right => 0,
+        .bottom => std.math.pi / 2.0,
+        .left => std.math.pi,
+        .top => -std.math.pi / 2.0,
+    };
 
-            renderer.drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x + wire_off,
-                    .y = pos.y - ground_triangle_side / 2,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + wire_off + x_off,
-                    .y = pos.y,
-                },
-                render_colors.component_color,
-                thickness,
-            );
-
-            renderer.drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x + wire_off,
-                    .y = pos.y + ground_triangle_side / 2,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + wire_off + x_off,
-                    .y = pos.y,
-                },
-                render_colors.component_color,
-                thickness,
-            );
+    try vector_renderer.render(
+        bodyInstructions,
+        .{
+            .line_scale = thickness,
+            .scale = 1,
+            .rotate = rotation,
+            .translate = .{
+                .x = @floatFromInt(grid_pos.x),
+                .y = @floatFromInt(grid_pos.y),
+            },
         },
-        .top, .bottom => {
-            const wire_off: f32 = if (rot == .bottom) ground_wire_pixel_len else -ground_wire_pixel_len;
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .direction = .vertical,
-                .pos = pos,
-                .pixel_length = wire_off,
-            }, render_type);
+        render_colors.component_color,
+        null,
+    );
 
-            const y_off: f32 = if (rot == .bottom) ground_triangle_height else -ground_triangle_height;
-
-            renderer.drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x - ground_triangle_side / 2,
-                    .y = pos.y + wire_off,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + ground_triangle_side / 2,
-                    .y = pos.y + wire_off,
-                },
-                render_colors.component_color,
-                thickness,
-            );
-
-            renderer.drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x - ground_triangle_side / 2,
-                    .y = pos.y + wire_off,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y + wire_off + y_off,
-                },
-                render_colors.component_color,
-                thickness,
-            );
-
-            renderer.drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x + ground_triangle_side / 2,
-                    .y = pos.y + wire_off,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y + wire_off + y_off,
-                },
-                render_colors.component_color,
-                thickness,
-            );
+    try vector_renderer.render(
+        terminalWireInstructions,
+        .{
+            .line_scale = thickness,
+            .scale = 1,
+            .rotate = rotation,
+            .translate = .{
+                .x = @floatFromInt(grid_pos.x),
+                .y = @floatFromInt(grid_pos.y),
+            },
         },
-    }
+        render_colors.terminal_wire_color,
+        null,
+    );
 }
 
 pub fn mouseInsideGround(
@@ -833,9 +795,9 @@ fn renderPin(
     }
 }
 
-fn renderHoldingGround(circuit_rect: dvui.Rect.Physical, exclude_ground_id: ?usize) void {
+fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id: ?usize) void {
     const grid_pos = nearestGridPosition(
-        circuit_rect,
+        vector_renderer.viewport,
         mouse_pos,
     );
 
@@ -849,7 +811,7 @@ fn renderHoldingGround(circuit_rect: dvui.Rect.Physical, exclude_ground_id: ?usi
     else
         ElementRenderType.unable_to_place;
 
-    renderGround(circuit_rect, grid_pos, circuit.placement_rotation, render_type);
+    renderGround(vector_renderer, grid_pos, circuit.placement_rotation, render_type);
 }
 
 fn renderHoldingPin(circuit_rect: dvui.Rect.Physical) void {
@@ -1186,7 +1148,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         var ptr = grid_pos_wire_connections.getPtr(ground.pos).?;
         ptr.end_connection += 1;
 
-        renderGround(circuit_rect, ground.pos, ground.rotation, render_type);
+        renderGround(&vector_renderer, ground.pos, ground.rotation, render_type);
     }
 
     for (circuit.main_circuit.wires.items, 0..) |wire, i| {
@@ -1316,8 +1278,8 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         ),
         .new_wire => |data| try renderHoldingWire(&vector_renderer, data.held_wire_p1),
         .new_pin => renderHoldingPin(circuit_rect),
-        .new_ground => renderHoldingGround(circuit_rect, null),
-        .dragging_ground => |data| renderHoldingGround(circuit_rect, data.ground_id),
+        .new_ground => renderHoldingGround(&vector_renderer, null),
+        .dragging_ground => |data| renderHoldingGround(&vector_renderer, data.ground_id),
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;
