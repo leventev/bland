@@ -66,6 +66,7 @@ fn renderDevice(
     const bodyInstructions = switch (dev_type) {
         .resistor => resistor_graphics_module.bodyInstructions,
         .capacitor => capacitor_graphics_module.bodyInstructions,
+        .voltage_source => voltage_source_graphics_module.bodyInstructions,
         inline else => @panic("TODO"),
         //inline else => |x| graphics_module(x).brushInstructions,
     };
@@ -73,6 +74,7 @@ fn renderDevice(
     const terminalWireInstructions = switch (dev_type) {
         .resistor => resistor_graphics_module.terminalWireBrushInstructions,
         .capacitor => capacitor_graphics_module.terminalWireBrushInstructions,
+        .voltage_source => voltage_source_graphics_module.terminalWireBrushInstructions,
         inline else => @panic("TODO"),
         //inline else => |x| graphics_module(x).brushInstructions,
     };
