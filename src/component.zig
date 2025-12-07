@@ -55,8 +55,8 @@ pub fn occupiedPointsIntersect(
     return false;
 }
 
-pub fn renderComponent(
-    dev_type: DeviceType,
+fn renderDevice(
+    comptime dev_type: DeviceType,
     vector_renderer: *const VectorRenderer,
     pos: GridPosition,
     rot: Rotation,
@@ -65,12 +65,14 @@ pub fn renderComponent(
 ) !void {
     const bodyInstructions = switch (dev_type) {
         .resistor => resistor_graphics_module.bodyInstructions,
+        .capacitor => capacitor_graphics_module.bodyInstructions,
         inline else => @panic("TODO"),
         //inline else => |x| graphics_module(x).brushInstructions,
     };
 
     const terminalWireInstructions = switch (dev_type) {
         .resistor => resistor_graphics_module.terminalWireBrushInstructions,
+        .capacitor => capacitor_graphics_module.terminalWireBrushInstructions,
         inline else => @panic("TODO"),
         //inline else => |x| graphics_module(x).brushInstructions,
     };
@@ -114,6 +116,26 @@ pub fn renderComponent(
         colors.terminal_wire_color,
         null,
     );
+}
+
+pub fn renderComponent(
+    dev_type: DeviceType,
+    vector_renderer: *const VectorRenderer,
+    pos: GridPosition,
+    rot: Rotation,
+    render_type: renderer.ElementRenderType,
+    zoom_scale: f32,
+) !void {
+    switch (dev_type) {
+        inline else => |x| try renderDevice(
+            x,
+            vector_renderer,
+            pos,
+            rot,
+            render_type,
+            zoom_scale,
+        ),
+    }
 }
 
 pub fn deviceOccupiedGridPositions(
