@@ -161,7 +161,7 @@ pub fn gridPositionFromScreenPos(
     pos: dvui.Point.Physical,
     rotation: Rotation,
 ) GridPosition {
-    const grid_pos = circuit_widget.gridPositionFromPos(circuit_rect, pos);
+    const grid_pos = circuit_widget.nearestGridPosition(circuit_rect, pos);
     return deviceCenterForMouse(dev_type, grid_pos, rotation);
 }
 
