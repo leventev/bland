@@ -110,6 +110,8 @@ pub fn render(
     stroke_color: ?dvui.Color,
     fill_color: ?dvui.Color,
 ) !void {
+    @setEvalBranchQuota(10_000);
+
     const path_buffer_cap = 1000;
     comptime var brush_pos = Vector{ .x = 0, .y = 0 };
     comptime var path_buffer: [path_buffer_cap]Vector = undefined;
@@ -148,7 +150,7 @@ pub fn render(
                 path_buffer_len += 1;
             },
             .arc => |opts| {
-                const perimeter = opts.sweep_angle * opts.radius;
+                const perimeter = @abs(opts.sweep_angle) * opts.radius;
                 const max_diff = opts.radius / 50;
                 const point_count: usize = @intFromFloat(@round(perimeter / max_diff));
                 const angle_increment = opts.sweep_angle / point_count;

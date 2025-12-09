@@ -7,6 +7,7 @@ const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const dvui = @import("dvui");
 const GraphicComponent = @import("../component.zig").GraphicComponent;
+const VectorRenderer = @import("../VectorRenderer.zig");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
@@ -234,3 +235,45 @@ pub fn mouseInside(
 
     return rect.contains(mouse_pos);
 }
+
+const total_width = 2.0;
+const radius = 0.15;
+const wire_len_per_side = (total_width - 4 * 2 * radius) / 2.0;
+
+pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .reset = {} },
+    .{ .arc = .{
+        .center = .{ .x = wire_len_per_side + radius, .y = 0 },
+        .radius = radius,
+        .start_angle = -std.math.pi,
+        .sweep_angle = std.math.pi,
+    } },
+    .{ .arc = .{
+        .center = .{ .x = wire_len_per_side + radius + 2.0 * radius, .y = 0 },
+        .radius = radius,
+        .start_angle = -std.math.pi,
+        .sweep_angle = std.math.pi,
+    } },
+    .{ .arc = .{
+        .center = .{ .x = wire_len_per_side + radius + 4.0 * radius, .y = 0 },
+        .radius = radius,
+        .start_angle = -std.math.pi,
+        .sweep_angle = std.math.pi,
+    } },
+    .{ .arc = .{
+        .center = .{ .x = wire_len_per_side + radius + 6.0 * radius, .y = 0 },
+        .radius = radius,
+        .start_angle = -std.math.pi,
+        .sweep_angle = std.math.pi,
+    } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};
+
+pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .snap_pixel_set = true },
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+    .{ .place = .{ .x = total_width - wire_len_per_side, .y = 0 } },
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};
