@@ -69,6 +69,7 @@ fn renderDevice(
         .voltage_source => voltage_source_graphics_module.bodyInstructions,
         .current_source => current_source_graphics_module.bodyInstructions,
         .inductor => inductor_graphics_module.bodyInstructions,
+        .diode => diode_graphics_module.bodyInstructions,
         inline else => @panic("TODO"),
         //inline else => |x| graphics_module(x).brushInstructions,
     };
@@ -79,6 +80,7 @@ fn renderDevice(
         .voltage_source => voltage_source_graphics_module.terminalWireBrushInstructions,
         .current_source => current_source_graphics_module.terminalWireBrushInstructions,
         .inductor => inductor_graphics_module.terminalWireBrushInstructions,
+        .diode => diode_graphics_module.terminalWireBrushInstructions,
         inline else => @panic("TODO"),
         //inline else => |x| graphics_module(x).brushInstructions,
     };

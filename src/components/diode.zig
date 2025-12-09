@@ -7,6 +7,7 @@ const renderer = @import("../renderer.zig");
 const global = @import("../global.zig");
 const dvui = @import("dvui");
 const GraphicComponent = @import("../component.zig").GraphicComponent;
+const VectorRenderer = @import("../VectorRenderer.zig");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
@@ -42,11 +43,6 @@ pub fn centerForMouse(pos: GridPosition, rotation: Rotation) GridPosition {
     return common.twoTerminalCenterForMouse(pos, rotation);
 }
 
-const diode_width = 40;
-const diode_length = 40;
-
-const wire_pixel_len = global.grid_size - diode_length / 2;
-
 pub fn render(
     circuit_rect: dvui.Rect.Physical,
     grid_pos: GridPosition,
@@ -55,97 +51,103 @@ pub fn render(
     value: ?GraphicComponent.ValueBuffer,
     render_type: renderer.ElementRenderType,
 ) void {
+    _ = circuit_rect;
+    _ = grid_pos;
+    _ = rot;
+    _ = name;
     _ = value;
-
-    const pos = grid_pos.toCircuitPosition(circuit_rect);
-
-    const diode_color = render_type.colors().component_color;
-    const thickness = render_type.thickness();
-
-    switch (rot) {
-        .left, .right => {
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = pos,
-                .direction = .horizontal,
-                .pixel_length = wire_pixel_len,
-            }, render_type);
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = dvui.Point{
-                    .x = pos.x + global.grid_size * 2,
-                    .y = pos.y,
-                },
-                .direction = .horizontal,
-                .pixel_length = -wire_pixel_len,
-            }, render_type);
-
-            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
-            defer path.deinit();
-
-            const off_x_1: f32 = if (rot == .right) diode_length else 0;
-            const off_x_2: f32 = if (rot == .right) 0 else diode_length;
-
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y - diode_width / 2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_2, .y = pos.y - diode_width / 2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_2, .y = pos.y + diode_width / 2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y + diode_width / 2 });
-
-            path.build().stroke(.{ .color = diode_color, .thickness = thickness });
-
-            if (name) |str| {
-                renderer.renderCenteredText(
-                    dvui.Point.Physical{
-                        .x = pos.x + global.grid_size,
-                        .y = pos.y - (diode_width / 2 + global.circuit_font_size / 2 + 2),
-                    },
-                    dvui.themeGet().color(.content, .text),
-                    str,
-                );
-            }
-        },
-        .bottom, .top => {
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = pos,
-                .direction = .vertical,
-                .pixel_length = wire_pixel_len,
-            }, render_type);
-            renderer.renderTerminalWire(renderer.TerminalWire{
-                .pos = dvui.Point{
-                    .x = pos.x,
-                    .y = pos.y + global.grid_size * 2,
-                },
-                .direction = .vertical,
-                .pixel_length = -wire_pixel_len,
-            }, render_type);
-
-            var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
-            defer path.deinit();
-
-            const off_y_1: f32 = if (rot == .bottom) diode_length else 0;
-            const off_y_2: f32 = if (rot == .bottom) 0 else diode_length;
-
-            path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + off_y_1 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + off_y_1 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + off_y_2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len + off_y_2 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + off_y_1 });
-            path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len + off_y_1 });
-
-            path.build().stroke(.{ .color = diode_color, .thickness = thickness });
-
-            if (name) |str| {
-                renderer.renderCenteredText(
-                    dvui.Point.Physical{
-                        .x = pos.x + global.grid_size / 2,
-                        .y = pos.y + global.grid_size - (global.circuit_font_size / 2 + 8),
-                    },
-                    dvui.themeGet().color(.content, .text),
-                    str,
-                );
-            }
-        },
-    }
+    _ = render_type;
+    // _ = value;
+    //
+    // const pos = grid_pos.toCircuitPosition(circuit_rect);
+    //
+    // const diode_color = render_type.colors().component_color;
+    // const thickness = render_type.thickness();
+    //
+    // switch (rot) {
+    //     .left, .right => {
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = pos,
+    //             .direction = .horizontal,
+    //             .pixel_length = wire_pixel_len,
+    //         }, render_type);
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = dvui.Point{
+    //                 .x = pos.x + global.grid_size * 2,
+    //                 .y = pos.y,
+    //             },
+    //             .direction = .horizontal,
+    //             .pixel_length = -wire_pixel_len,
+    //         }, render_type);
+    //
+    //         var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+    //         defer path.deinit();
+    //
+    //         const off_x_1: f32 = if (rot == .right) diode_length else 0;
+    //         const off_x_2: f32 = if (rot == .right) 0 else diode_length;
+    //
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y - diode_width / 2 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_2, .y = pos.y - diode_width / 2 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_2, .y = pos.y + diode_width / 2 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + wire_pixel_len + off_x_1, .y = pos.y + diode_width / 2 });
+    //
+    //         path.build().stroke(.{ .color = diode_color, .thickness = thickness });
+    //
+    //         if (name) |str| {
+    //             renderer.renderCenteredText(
+    //                 dvui.Point.Physical{
+    //                     .x = pos.x + global.grid_size,
+    //                     .y = pos.y - (diode_width / 2 + global.circuit_font_size / 2 + 2),
+    //                 },
+    //                 dvui.themeGet().color(.content, .text),
+    //                 str,
+    //             );
+    //         }
+    //     },
+    //     .bottom, .top => {
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = pos,
+    //             .direction = .vertical,
+    //             .pixel_length = wire_pixel_len,
+    //         }, render_type);
+    //         renderer.renderTerminalWire(renderer.TerminalWire{
+    //             .pos = dvui.Point{
+    //                 .x = pos.x,
+    //                 .y = pos.y + global.grid_size * 2,
+    //             },
+    //             .direction = .vertical,
+    //             .pixel_length = -wire_pixel_len,
+    //         }, render_type);
+    //
+    //         var path = dvui.Path.Builder.init(dvui.currentWindow().lifo());
+    //         defer path.deinit();
+    //
+    //         const off_y_1: f32 = if (rot == .bottom) diode_length else 0;
+    //         const off_y_2: f32 = if (rot == .bottom) 0 else diode_length;
+    //
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + off_y_1 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + off_y_1 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x - diode_width / 2, .y = pos.y + wire_pixel_len + off_y_2 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len + off_y_2 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x, .y = pos.y + wire_pixel_len + off_y_1 });
+    //         path.addPoint(dvui.Point.Physical{ .x = pos.x + diode_width / 2, .y = pos.y + wire_pixel_len + off_y_1 });
+    //
+    //         path.build().stroke(.{ .color = diode_color, .thickness = thickness });
+    //
+    //         if (name) |str| {
+    //             renderer.renderCenteredText(
+    //                 dvui.Point.Physical{
+    //                     .x = pos.x + global.grid_size / 2,
+    //                     .y = pos.y + global.grid_size - (global.circuit_font_size / 2 + 8),
+    //                 },
+    //                 dvui.themeGet().color(.content, .text),
+    //                 str,
+    //             );
+    //         }
+    //     },
+    // }
 }
 
 pub fn renderPropertyBox(model: *diode_module.Model, value_buffer: *GraphicComponent.ValueBuffer, selected_component_changed: bool) void {
@@ -160,18 +162,48 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    const pos = grid_pos.toCircuitPosition(circuit_rect);
-
-    const center: dvui.Point.Physical = switch (rotation) {
-        .left, .right => .{ .x = pos.x + wire_pixel_len + diode_length / 2, .y = pos.y },
-        .top, .bottom => .{ .x = pos.x, .y = pos.y + wire_pixel_len + diode_length / 2 },
-    };
-
-    const xd = mouse_pos.x - center.x;
-    const yd = mouse_pos.y - center.y;
-
-    const tolerance = 6;
-    const check_radius = diode_length / 2 + tolerance;
-
-    return xd * xd + yd * yd <= check_radius * check_radius;
+    _ = grid_pos;
+    _ = rotation;
+    _ = circuit_rect;
+    _ = mouse_pos;
+    return false;
+    // const pos = grid_pos.toCircuitPosition(circuit_rect);
+    //
+    // const center: dvui.Point.Physical = switch (rotation) {
+    //     .left, .right => .{ .x = pos.x + wire_pixel_len + diode_length / 2, .y = pos.y },
+    //     .top, .bottom => .{ .x = pos.x, .y = pos.y + wire_pixel_len + diode_length / 2 },
+    // };
+    //
+    // const xd = mouse_pos.x - center.x;
+    // const yd = mouse_pos.y - center.y;
+    //
+    // const tolerance = 6;
+    // const check_radius = diode_length / 2 + tolerance;
+    //
+    // return xd * xd + yd * yd <= check_radius * check_radius;
 }
+
+const total_width = 2.0;
+const diode_side_len = 0.4;
+const diode_length = 0.7;
+const wire_len_per_side = (total_width - diode_length) / 2.0;
+
+pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .snap_pixel_set = true },
+    .{ .place = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .move_rel = .{ .x = 0, .y = diode_side_len } },
+    .{ .move_rel = .{ .x = diode_length, .y = -diode_side_len } },
+    .{ .move_rel = .{ .x = -diode_length, .y = 0 } },
+    .{ .move_rel = .{ .x = 0, .y = -diode_side_len } },
+    .{ .move_rel = .{ .x = diode_length, .y = diode_side_len } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};
+
+pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .snap_pixel_set = true },
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+    .{ .place = .{ .x = total_width - wire_len_per_side, .y = 0 } },
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};
