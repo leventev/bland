@@ -197,6 +197,9 @@ pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .move_rel = .{ .x = 0, .y = -diode_side_len } },
     .{ .move_rel = .{ .x = diode_length, .y = diode_side_len } },
     .{ .stroke = .{ .base_thickness = 1 } },
+    .{ .place = .{ .x = wire_len_per_side + diode_length, .y = -diode_side_len } },
+    .{ .move_rel = .{ .x = 0, .y = 2 * diode_side_len } },
+    .{ .stroke = .{ .base_thickness = 1 } },
 };
 
 pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
