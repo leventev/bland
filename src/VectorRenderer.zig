@@ -90,10 +90,23 @@ pub const Transform = struct {
 
     /// Scale factor, the coordinates of the points are multiplied by it
     /// Scaling by zero or negative numbers is not allowed
-    scale: f32,
+    scale: Scale,
 
     /// Scale factor for line thicknesses
     line_scale: f32,
+
+    /// Scaling factor for both axis
+    pub const Scale = struct {
+        x: f32,
+        y: f32,
+
+        pub fn both(s: f32) Scale {
+            return Scale{
+                .x = s,
+                .y = s,
+            };
+        }
+    };
 };
 
 /// The default size of a grid cell with Transform.scale = 1 in pixels
@@ -202,8 +215,8 @@ inline fn transformPoints(
         const point = points[i];
 
         const scaled = Vector{
-            .x = point.x * transform.scale,
-            .y = point.y * transform.scale,
+            .x = point.x * transform.scale.x,
+            .y = point.y * transform.scale.y,
         };
 
         const rot_cos = @cos(transform.rotate);
