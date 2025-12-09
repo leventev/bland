@@ -8,6 +8,7 @@ const global = @import("../global.zig");
 const sidebar = @import("../sidebar.zig");
 const dvui = @import("dvui");
 const GraphicComponent = @import("../component.zig").GraphicComponent;
+const VectorRenderer = @import("../VectorRenderer.zig");
 
 const Component = component.Component;
 const GridPosition = circuit.GridPosition;
@@ -57,8 +58,6 @@ pub fn render(
 
     const total_len = 2 * global.grid_size;
     const diameter = 2 * radius;
-    const arrow_len = 20;
-    const arrowhead_len = 5;
     const wire_len = (total_len - diameter) / 2;
 
     const diamond_off = diameter / 2;
@@ -316,3 +315,36 @@ pub fn mouseInside(
 
     return xd * xd + yd * yd <= check_radius * check_radius;
 }
+
+const total_width = 2.0;
+const side_length = 0.4;
+const wire_len_per_side = (total_width - 2 * side_length) / 2.0;
+const arrow_len = 0.4;
+const arrowhead_len = 0.1;
+
+pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+    // diamond
+    .{ .place = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .move_rel = .{ .x = side_length, .y = -side_length } },
+    .{ .move_rel = .{ .x = side_length, .y = side_length } },
+    .{ .move_rel = .{ .x = -side_length, .y = side_length } },
+    .{ .move_rel = .{ .x = -side_length, .y = -side_length } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+    // arrow
+    .{ .place = .{ .x = wire_len_per_side + side_length - arrow_len / 2.0, .y = 0 } },
+    .{ .move_rel = .{ .x = arrow_len, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+    .{ .place = .{ .x = wire_len_per_side + side_length + arrow_len / 2.0 - arrowhead_len, .y = -arrowhead_len } },
+    .{ .move_rel = .{ .x = arrowhead_len, .y = arrowhead_len } },
+    .{ .move_rel = .{ .x = -arrowhead_len, .y = arrowhead_len } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};
+
+pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
+    .{ .snap_pixel_set = true },
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+    .{ .place = .{ .x = wire_len_per_side + 2.0 * side_length, .y = 0 } },
+    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
+    .{ .stroke = .{ .base_thickness = 1 } },
+};

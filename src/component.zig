@@ -64,27 +64,27 @@ fn renderDevice(
     zoom_scale: f32,
 ) !void {
     const bodyInstructions = switch (dev_type) {
-        .resistor => resistor_graphics_module.bodyInstructions,
-        .capacitor => capacitor_graphics_module.bodyInstructions,
-        .voltage_source => voltage_source_graphics_module.bodyInstructions,
-        .current_source => current_source_graphics_module.bodyInstructions,
-        .inductor => inductor_graphics_module.bodyInstructions,
-        .diode => diode_graphics_module.bodyInstructions,
-        .ccvs => ccvs_graphics_module.bodyInstructions,
-        inline else => @panic("TODO"),
-        //inline else => |x| graphics_module(x).brushInstructions,
+        // .resistor => resistor_graphics_module.bodyInstructions,
+        // .capacitor => capacitor_graphics_module.bodyInstructions,
+        // .voltage_source => voltage_source_graphics_module.bodyInstructions,
+        // .current_source => current_source_graphics_module.bodyInstructions,
+        // .inductor => inductor_graphics_module.bodyInstructions,
+        // .diode => diode_graphics_module.bodyInstructions,
+        // .ccvs => ccvs_graphics_module.bodyInstructions,
+        // inline else => @panic("TODO"),
+        inline else => |x| graphics_module(x).bodyInstructions,
     };
 
     const terminalWireInstructions = switch (dev_type) {
-        .resistor => resistor_graphics_module.terminalWireBrushInstructions,
-        .capacitor => capacitor_graphics_module.terminalWireBrushInstructions,
-        .voltage_source => voltage_source_graphics_module.terminalWireBrushInstructions,
-        .current_source => current_source_graphics_module.terminalWireBrushInstructions,
-        .inductor => inductor_graphics_module.terminalWireBrushInstructions,
-        .diode => diode_graphics_module.terminalWireBrushInstructions,
-        .ccvs => ccvs_graphics_module.terminalWireBrushInstructions,
-        inline else => @panic("TODO"),
-        //inline else => |x| graphics_module(x).brushInstructions,
+        // .resistor => resistor_graphics_module.terminalWireBrushInstructions,
+        // .capacitor => capacitor_graphics_module.terminalWireBrushInstructions,
+        // .voltage_source => voltage_source_graphics_module.terminalWireBrushInstructions,
+        // .current_source => current_source_graphics_module.terminalWireBrushInstructions,
+        // .inductor => inductor_graphics_module.terminalWireBrushInstructions,
+        // .diode => diode_graphics_module.terminalWireBrushInstructions,
+        // .ccvs => ccvs_graphics_module.terminalWireBrushInstructions,
+        // inline else => @panic("TODO"),
+        inline else => |x| graphics_module(x).terminalWireBrushInstructions,
     };
 
     const colors = render_type.colors();

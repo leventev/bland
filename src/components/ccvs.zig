@@ -282,7 +282,7 @@ const wire_len_per_side = (total_width - 2 * side_length) / 2.0;
 const line_len = 0.15;
 
 pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
-    // circle
+    // diamond
     .{ .place = .{ .x = wire_len_per_side, .y = 0 } },
     .{ .move_rel = .{ .x = side_length, .y = -side_length } },
     .{ .move_rel = .{ .x = side_length, .y = side_length } },
