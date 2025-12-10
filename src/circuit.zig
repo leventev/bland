@@ -5,6 +5,7 @@ const renderer = @import("renderer.zig");
 const global = @import("global.zig");
 const dvui = @import("dvui");
 const VectorRenderer = @import("VectorRenderer.zig");
+const circuit_widget = @import("circuit_widget.zig");
 
 const NetList = bland.NetList;
 
@@ -1119,6 +1120,15 @@ pub const GraphicCircuit = struct {
             }
         }
 
+        for (self.wires.items) |wire| {
+            const end = wire.end();
+
+            x_min = @min(x_min, wire.pos.x, end.x);
+            y_min = @min(y_min, wire.pos.y, end.y);
+            x_max = @max(x_max, wire.pos.x, end.x);
+            y_max = @max(y_max, wire.pos.y, end.y);
+        }
+
         // make the bounds 1 larger so all elements will fit
         x_min -= 1;
         y_min -= 1;
@@ -1155,6 +1165,11 @@ pub const GraphicCircuit = struct {
         );
         for (self.graphic_components.items) |comp| {
             try comp.render(&vector_renderer, .normal);
+            try writer.flush();
+        }
+
+        for (self.wires.items) |wire| {
+            try circuit_widget.renderWire(&vector_renderer, wire, .normal);
             try writer.flush();
         }
         _ = try writer.write("</svg>");
