@@ -4,6 +4,7 @@ const component = @import("component.zig");
 const renderer = @import("renderer.zig");
 const global = @import("global.zig");
 const dvui = @import("dvui");
+const VectorRenderer = @import("VectorRenderer.zig");
 
 const NetList = bland.NetList;
 
@@ -1097,6 +1098,52 @@ pub const GraphicCircuit = struct {
     pub fn deleteGround(self: *GraphicCircuit, ground_id: usize) void {
         std.debug.assert(self.grounds.items.len > ground_id);
         _ = self.grounds.orderedRemove(ground_id);
+    }
+
+    pub fn exportToSVG(self: *const GraphicCircuit) !void {
+        if (self.graphic_components.items.len < 1) return;
+
+        var x_min = self.graphic_components.items[0].pos.x;
+        var y_min = self.graphic_components.items[0].pos.y;
+        var x_max = x_min;
+        var y_max = y_min;
+        for (self.graphic_components.items[0..]) |comp| {
+            var terminal_buff: [8]GridPosition = undefined;
+            const terminals = comp.terminals(&terminal_buff);
+
+            for (terminals) |term| {
+                x_min = @min(x_min, term.x);
+                y_min = @min(y_min, term.y);
+                x_max = @max(x_max, term.x);
+                y_max = @max(y_max, term.y);
+            }
+        }
+
+        // make the bounds 1 larger so all elements will fit
+        x_min -= 1;
+        y_min -= 1;
+        x_max += 1;
+        y_max += 1;
+
+        const x_span = x_max - x_min;
+        const y_span = y_max - y_min;
+        const width = @as(f32, @floatFromInt(x_span)) * VectorRenderer.grid_cell_px_size;
+        const height = @as(f32, @floatFromInt(y_span)) * VectorRenderer.grid_cell_px_size;
+        // TODO: 16 KiB seems enough for a component?
+        const file = try std.fs.cwd().createFile("circuit.svg", .{});
+        defer file.close();
+
+        var buffer: [4 * 4096]u8 = undefined;
+        var file_writer = file.writer(&buffer);
+        var writer = &file_writer.interface;
+
+        _ = try writer.print(
+            "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">",
+            .{ width, height },
+        );
+        _ = try writer.write("<rect fill=\"#f00\" width=\"100%\" height=\"100%\"/>");
+        _ = try writer.write("</svg>");
+        try writer.flush();
     }
 };
 

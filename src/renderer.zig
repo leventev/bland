@@ -324,6 +324,14 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
             fw.close();
             close = true;
         }
+
+        if (dvui.menuItemLabel(@src(), "Export to SVG", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.main_circuit.exportToSVG() catch |err| {
+                std.log.err("Failed to export to SVG: {t}", .{err});
+            };
+            fw.close();
+            close = true;
+        }
     }
 
     if (dvui.menuItemLabel(@src(), "Settings", .{ .submenu = true }, .{})) |r| {
