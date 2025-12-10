@@ -269,28 +269,28 @@ pub var pin_counter: usize = 1;
 pub const Ground = struct {
     pos: GridPosition,
     rotation: Rotation,
-};
 
-pub fn groundOtherPos(pos: GridPosition, rotation: Rotation) GridPosition {
-    return switch (rotation) {
-        Rotation.left => GridPosition{
-            .x = pos.x - 1,
-            .y = pos.y,
-        },
-        Rotation.right => GridPosition{
-            .x = pos.x + 1,
-            .y = pos.y,
-        },
-        Rotation.top => GridPosition{
-            .x = pos.x,
-            .y = pos.y - 1,
-        },
-        Rotation.bottom => GridPosition{
-            .x = pos.x,
-            .y = pos.y + 1,
-        },
-    };
-}
+    pub fn otherPos(self: Ground) GridPosition {
+        return switch (self.rotation) {
+            Rotation.left => GridPosition{
+                .x = self.pos.x - 1,
+                .y = self.pos.y,
+            },
+            Rotation.right => GridPosition{
+                .x = self.pos.x + 1,
+                .y = self.pos.y,
+            },
+            Rotation.top => GridPosition{
+                .x = self.pos.x,
+                .y = self.pos.y - 1,
+            },
+            Rotation.bottom => GridPosition{
+                .x = self.pos.x,
+                .y = self.pos.y + 1,
+            },
+        };
+    }
+};
 
 pub const GraphicCircuit = struct {
     allocator: std.mem.Allocator,
@@ -654,7 +654,7 @@ pub const GraphicCircuit = struct {
         rotation: Rotation,
         exclude_ground_id: ?usize,
     ) bool {
-        const other_pos = groundOtherPos(pos, rotation);
+        const other_pos = (Ground{ .pos = pos, .rotation = rotation }).otherPos();
         const ground_positions: []const component.OccupiedGridPosition = &.{
             .{ .pos = pos, .terminal = true },
             .{ .pos = other_pos, .terminal = false },
@@ -1129,6 +1129,15 @@ pub const GraphicCircuit = struct {
             y_max = @max(y_max, wire.pos.y, end.y);
         }
 
+        for (self.grounds.items) |ground| {
+            const other_pos = ground.otherPos();
+
+            x_min = @min(x_min, ground.pos.x, other_pos.x);
+            y_min = @min(y_min, ground.pos.y, other_pos.y);
+            x_max = @max(x_max, ground.pos.x, other_pos.x);
+            y_max = @max(y_max, ground.pos.y, other_pos.y);
+        }
+
         // make the bounds 1 larger so all elements will fit
         x_min -= 1;
         y_min -= 1;
@@ -1172,6 +1181,12 @@ pub const GraphicCircuit = struct {
             try circuit_widget.renderWire(&vector_renderer, wire, .normal);
             try writer.flush();
         }
+
+        for (self.grounds.items) |ground| {
+            try circuit_widget.renderGround(&vector_renderer, ground.pos, ground.rotation, .normal);
+            try writer.flush();
+        }
+
         _ = try writer.write("</svg>");
         try writer.flush();
     }
