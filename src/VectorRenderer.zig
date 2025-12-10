@@ -232,7 +232,7 @@ pub fn render(
                             }
                         }
 
-                        _ = try writer.write("\" style=\"fill:none;stroke:black;stroke-width:2\"/>\n");
+                        _ = try writer.write("\" style=\"fill:none;stroke:black;stroke-width:1;stroke-linecap:round\"/>\n");
                     },
                 }
             },
