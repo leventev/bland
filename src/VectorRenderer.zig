@@ -3,24 +3,34 @@ const dvui = @import("dvui");
 
 const VectorRenderer = @This();
 
-viewport: dvui.Rect.Physical,
-
+output: Output,
 world_top: f32,
 world_bottom: f32,
 world_right: f32,
 world_left: f32,
 
+pub const Output = union(enum) {
+    screen: struct {
+        viewport: dvui.Rect.Physical,
+    },
+    svg_export: struct {
+        canvas_width: f32,
+        canvas_height: f32,
+        writer: *std.Io.Writer,
+    },
+};
+
 /// This is called only once per frame, since the viewport rect is
 /// provided by dvui at the start of each frame
 pub fn init(
-    viewport: dvui.Rect.Physical,
+    output: Output,
     world_top: f32,
     world_bottom: f32,
     world_left: f32,
     world_right: f32,
 ) VectorRenderer {
     return VectorRenderer{
-        .viewport = viewport,
+        .output = output,
         .world_top = world_top,
         .world_bottom = world_bottom,
         .world_left = world_left,
@@ -109,6 +119,12 @@ pub const Transform = struct {
     };
 };
 
+pub const RenderOptions = struct {
+    stroke_color: ?dvui.Color = null,
+
+    fill_color: ?dvui.Color = null,
+};
+
 /// The default size of a grid cell with Transform.scale = 1 in pixels
 pub const grid_cell_px_size = 64;
 
@@ -120,8 +136,7 @@ pub fn render(
     self: *const VectorRenderer,
     comptime instructions: []const BrushInstruction,
     transform: Transform,
-    stroke_color: ?dvui.Color,
-    fill_color: ?dvui.Color,
+    render_opts: RenderOptions,
 ) !void {
     @setEvalBranchQuota(10_000);
 
@@ -180,25 +195,85 @@ pub fn render(
                 }
             },
             .stroke => |opts| {
-                const transformed_points = self.transformPoints(
-                    path_buffer[0..path_buffer_len],
-                    snap_points[0..path_buffer_len],
-                    transform,
-                );
-                const path = dvui.Path{ .points = transformed_points };
-                path.stroke(dvui.Path.StrokeOptions{
-                    .color = stroke_color.?,
-                    .thickness = opts.base_thickness * transform.line_scale,
-                });
+                switch (self.output) {
+                    .screen => |screen_opts| {
+                        const screen_points = self.transformPoints(
+                            screen_opts.viewport,
+                            path_buffer[0..path_buffer_len],
+                            snap_points[0..path_buffer_len],
+                            transform,
+                        );
+                        const path = dvui.Path{ .points = screen_points };
+                        path.stroke(dvui.Path.StrokeOptions{
+                            .color = render_opts.stroke_color.?,
+                            .thickness = opts.base_thickness * transform.line_scale,
+                        });
+                    },
+                    .svg_export => |export_opts| {
+                        const svg_points = self.transformPoints(
+                            .{
+                                .x = 0,
+                                .y = 0,
+                                .w = export_opts.canvas_width,
+                                .h = export_opts.canvas_height,
+                            },
+                            path_buffer[0..path_buffer_len],
+                            null,
+                            transform,
+                        );
+
+                        var writer = export_opts.writer;
+                        _ = try writer.write("<polyline points=\"");
+
+                        for (svg_points, 0..) |point, i| {
+                            _ = try writer.print("{},{}", .{ point.x, point.y });
+                            if (i < svg_points.len - 1) {
+                                _ = try writer.write(" ");
+                            }
+                        }
+
+                        _ = try writer.write("\" style=\"fill:none;stroke:black;stroke-width:2\"/>\n");
+                    },
+                }
             },
             .fill => {
-                const transformed_points = self.transformPoints(
-                    path_buffer[0..path_buffer_len],
-                    snap_points[0..path_buffer_len],
-                    transform,
-                );
-                const path = dvui.Path{ .points = transformed_points };
-                path.fillConvex(dvui.Path.FillConvexOptions{ .color = fill_color.? });
+                switch (self.output) {
+                    .screen => |screen_opts| {
+                        const screen_points = self.transformPoints(
+                            screen_opts.viewport,
+                            path_buffer[0..path_buffer_len],
+                            snap_points[0..path_buffer_len],
+                            transform,
+                        );
+                        const path = dvui.Path{ .points = screen_points };
+                        path.fillConvex(dvui.Path.FillConvexOptions{ .color = render_opts.fill_color.? });
+                    },
+                    .svg_export => |export_opts| {
+                        const svg_points = self.transformPoints(
+                            .{
+                                .x = 0,
+                                .y = 0,
+                                .w = export_opts.canvas_width,
+                                .h = export_opts.canvas_height,
+                            },
+                            path_buffer[0..path_buffer_len],
+                            null,
+                            transform,
+                        );
+
+                        var writer = export_opts.writer;
+                        _ = try writer.write("<polyline points=\"");
+
+                        for (svg_points, 0..) |point, i| {
+                            _ = try writer.print("{},{}", .{ point.x, point.y });
+                            if (i < svg_points.len - 1) {
+                                _ = try writer.write(" ");
+                            }
+                        }
+
+                        _ = try writer.write("\" style=\"fill:black\"/>\n");
+                    },
+                }
             },
             .snap_pixel_set => |enabled| snap_enabled = enabled,
         }
@@ -206,8 +281,9 @@ pub fn render(
 }
 inline fn transformPoints(
     self: *const VectorRenderer,
-    points: []const Vector,
-    snap_points: []const bool,
+    viewport: dvui.Rect.Physical,
+    comptime points: []const Vector,
+    comptime snap_points: ?[]bool,
     transform: Transform,
 ) []dvui.Point.Physical {
     var transformed_points: [points.len]dvui.Point.Physical = undefined;
@@ -235,8 +311,8 @@ inline fn transformPoints(
         const world_width = self.world_right - self.world_left;
         const world_height = self.world_bottom - self.world_top;
 
-        const xscale = self.viewport.w / world_width;
-        const yscale = self.viewport.h / world_height;
+        const xscale = viewport.w / world_width;
+        const yscale = viewport.h / world_height;
         const viewport_pos = dvui.Point.Physical{
             .x = (translated.x - self.world_left) * xscale,
             .y = (translated.y - self.world_top) * yscale,
@@ -244,15 +320,18 @@ inline fn transformPoints(
 
         // from viewport to screen
         const screen_pos = dvui.Point.Physical{
-            .x = viewport_pos.x + self.viewport.x,
-            .y = viewport_pos.y + self.viewport.y,
+            .x = viewport_pos.x + viewport.x,
+            .y = viewport_pos.y + viewport.y,
         };
 
-        const final_screen_pos = if (snap_points[i])
-            dvui.Point.Physical{
-                .x = @round(screen_pos.x),
-                .y = @round(screen_pos.y),
-            }
+        const final_screen_pos = if (snap_points) |snap_pts|
+            if (snap_pts[i])
+                dvui.Point.Physical{
+                    .x = @round(screen_pos.x),
+                    .y = @round(screen_pos.y),
+                }
+            else
+                screen_pos
         else
             screen_pos;
 
@@ -260,4 +339,48 @@ inline fn transformPoints(
     }
 
     return &transformed_points;
+}
+
+inline fn worldToScreen(
+    self: *const VectorRenderer,
+    viewport: dvui.Rect.Physical,
+    points: []const Vector,
+    comptime snap_points: ?[]bool,
+) []dvui.Point.Physical {
+    var screen_points: [points.len]dvui.Point.Physical = undefined;
+    for (0..points.len) |i| {
+        const point = points[i];
+
+        // from world to viewport
+        const world_width = self.world_right - self.world_left;
+        const world_height = self.world_bottom - self.world_top;
+
+        const xscale = viewport.w / world_width;
+        const yscale = viewport.h / world_height;
+        const viewport_pos = dvui.Point.Physical{
+            .x = (point.x - self.world_left) * xscale,
+            .y = (point.y - self.world_top) * yscale,
+        };
+
+        // from viewport to screen
+        const screen_pos = dvui.Point.Physical{
+            .x = viewport_pos.x + viewport.viewport.x,
+            .y = viewport_pos.y + viewport.viewport.y,
+        };
+
+        const final_screen_pos = if (snap_points) |snap_pts|
+            if (snap_pts[i])
+                dvui.Point.Physical{
+                    .x = @round(screen_pos.x),
+                    .y = @round(screen_pos.y),
+                }
+            else
+                screen_pos
+        else
+            screen_pos;
+
+        screen_points[i] = final_screen_pos;
+    }
+
+    return screen_points;
 }

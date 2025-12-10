@@ -479,7 +479,7 @@ pub fn renderGround(
     grid_pos: circuit.GridPosition,
     rot: circuit.Rotation,
     render_type: renderer.ElementRenderType,
-) void {
+) !void {
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
 
@@ -522,8 +522,7 @@ pub fn renderGround(
                 .y = @floatFromInt(grid_pos.y),
             },
         },
-        render_colors.component_color,
-        null,
+        .{ .stroke_color = render_colors.component_color },
     );
 
     try vector_renderer.render(
@@ -537,8 +536,7 @@ pub fn renderGround(
                 .y = @floatFromInt(grid_pos.y),
             },
         },
-        render_colors.terminal_wire_color,
-        null,
+        .{ .stroke_color = render_colors.terminal_wire_color },
     );
 }
 
@@ -568,9 +566,12 @@ fn renderHoldingComponent(
     vector_renderer: *const VectorRenderer,
     exclude_comp_id: ?usize,
 ) !void {
+    std.debug.assert(vector_renderer.output == .screen);
+    const screen = vector_renderer.output.screen;
+
     const grid_pos = component.gridPositionFromScreenPos(
         device_type,
-        vector_renderer.viewport,
+        screen.viewport,
         mouse_pos,
         circuit.placement_rotation,
     );
@@ -592,7 +593,6 @@ fn renderHoldingComponent(
         grid_pos,
         circuit.placement_rotation,
         render_type,
-        zoom_scale,
     );
 }
 
@@ -600,8 +600,11 @@ fn renderHoldingWire(
     vector_renderer: *const VectorRenderer,
     held_wire_p1: ?circuit.GridPosition,
 ) !void {
+    std.debug.assert(vector_renderer.output == .screen);
+    const screen = vector_renderer.output.screen;
+
     const p1 = held_wire_p1 orelse return;
-    const p2 = nearestGridPosition(vector_renderer.viewport, mouse_pos);
+    const p2 = nearestGridPosition(screen.viewport, mouse_pos);
     const xlen = @abs(p2.x - p1.x);
     const ylen = @abs(p2.y - p1.y);
 
@@ -649,8 +652,7 @@ pub fn renderWire(
             .line_scale = thickness * zoom_scale,
             .rotate = rotation,
         },
-        colors.wire_color,
-        null,
+        .{ .stroke_color = colors.wire_color },
     );
 }
 
@@ -679,9 +681,11 @@ fn renderPin(
         .x = @floatFromInt(grid_pos.x),
         .y = @floatFromInt(grid_pos.y),
     };
+    std.debug.assert(vector_renderer.output == .screen);
+    const screen = vector_renderer.output.screen;
     const pos = dvui.Point.Physical{
-        .x = vector_renderer.viewport.x + (grid_pos_f.x - vector_renderer.world_left) * grid_size,
-        .y = vector_renderer.viewport.y + (grid_pos_f.y - vector_renderer.world_top) * grid_size,
+        .x = screen.viewport.x + (grid_pos_f.x - vector_renderer.world_left) * grid_size,
+        .y = screen.viewport.y + (grid_pos_f.y - vector_renderer.world_top) * grid_size,
     };
 
     const rect_width = label_size.w / grid_size + 0.2;
@@ -723,8 +727,7 @@ fn renderPin(
                     },
                     .rotate = rot,
                 },
-                color,
-                null,
+                .{ .stroke_color = color },
             );
 
             const x_rect_start = gap + triangle_len;
@@ -743,8 +746,7 @@ fn renderPin(
                     },
                     .rotate = rot,
                 },
-                color,
-                null,
+                .{ .stroke_color = color },
             );
 
             const x_off = (x_rect_start + rect_width / 2) * grid_size;
@@ -777,8 +779,7 @@ fn renderPin(
                     },
                     .rotate = rot,
                 },
-                color,
-                null,
+                .{ .stroke_color = color },
             );
 
             const y_rect_start = gap + triangle_len;
@@ -797,8 +798,7 @@ fn renderPin(
                     },
                     .rotate = rot,
                 },
-                color,
-                null,
+                .{ .stroke_color = color },
             );
 
             const y_off = (y_rect_start + rect_height / 2) * grid_size;
@@ -815,9 +815,12 @@ fn renderPin(
     }
 }
 
-fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id: ?usize) void {
+fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id: ?usize) !void {
+    std.debug.assert(vector_renderer.output == .screen);
+    const screen = vector_renderer.output.screen;
+
     const grid_pos = nearestGridPosition(
-        vector_renderer.viewport,
+        screen.viewport,
         mouse_pos,
     );
 
@@ -831,12 +834,15 @@ fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id
     else
         ElementRenderType.unable_to_place;
 
-    renderGround(vector_renderer, grid_pos, circuit.placement_rotation, render_type);
+    try renderGround(vector_renderer, grid_pos, circuit.placement_rotation, render_type);
 }
 
 fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
+    std.debug.assert(vector_renderer.output == .screen);
+    const screen = vector_renderer.output.screen;
+
     const grid_pos = nearestGridPosition(
-        vector_renderer.viewport,
+        screen.viewport,
         mouse_pos,
     );
 
@@ -1042,7 +1048,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     const world_bottom = world_top + circuit_rect.h / grid_size;
 
     const vector_renderer = VectorRenderer.init(
-        circuit_rect,
+        .{ .screen = .{ .viewport = circuit_rect } },
         world_top,
         world_bottom,
         world_left,
@@ -1066,8 +1072,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .translate = .{ .x = col, .y = world_top },
                 .line_scale = 1,
             },
-            grid_color,
-            null,
+            .{ .stroke_color = grid_color },
         );
     }
 
@@ -1087,8 +1092,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 .translate = .{ .x = world_left, .y = row },
                 .line_scale = 1,
             },
-            grid_color,
-            null,
+            .{ .stroke_color = grid_color },
         );
     }
 
@@ -1122,7 +1126,6 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         try comp.render(
             &vector_renderer,
             render_type,
-            zoom_scale,
         );
     }
 
@@ -1149,7 +1152,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         var ptr = grid_pos_wire_connections.getPtr(ground.pos).?;
         ptr.end_connection += 1;
 
-        renderGround(&vector_renderer, ground.pos, ground.rotation, render_type);
+        try renderGround(&vector_renderer, ground.pos, ground.rotation, render_type);
     }
 
     for (circuit.main_circuit.wires.items, 0..) |wire, i| {
@@ -1219,8 +1222,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                         .y = @floatFromInt(gpos.y),
                     },
                 },
-                null,
-                ElementRenderType.normal.colors().terminal_wire_color,
+                .{ .fill_color = ElementRenderType.normal.colors().terminal_wire_color },
             );
         } else if (is_end) {
             const insts: []const VectorRenderer.BrushInstruction = &.{
@@ -1246,8 +1248,10 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                         .y = @floatFromInt(gpos.y),
                     },
                 },
-                ElementRenderType.normal.colors().terminal_wire_color,
-                dvui.themeGet().fill,
+                .{
+                    .stroke_color = ElementRenderType.normal.colors().terminal_wire_color,
+                    .fill_color = dvui.themeGet().fill,
+                },
             );
         }
     }
@@ -1279,8 +1283,8 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         ),
         .new_wire => |data| try renderHoldingWire(&vector_renderer, data.held_wire_p1),
         .new_pin => try renderHoldingPin(&vector_renderer),
-        .new_ground => renderHoldingGround(&vector_renderer, null),
-        .dragging_ground => |data| renderHoldingGround(&vector_renderer, data.ground_id),
+        .new_ground => try renderHoldingGround(&vector_renderer, null),
+        .dragging_ground => |data| try renderHoldingGround(&vector_renderer, data.ground_id),
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;

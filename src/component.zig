@@ -61,7 +61,6 @@ fn renderDevice(
     pos: GridPosition,
     rot: Rotation,
     render_type: renderer.ElementRenderType,
-    zoom_scale: f32,
 ) !void {
     const bodyInstructions = switch (dev_type) {
         inline else => |x| graphics_module(x).bodyInstructions,
@@ -88,12 +87,11 @@ fn renderDevice(
                 .x = @floatFromInt(pos.x),
                 .y = @floatFromInt(pos.y),
             },
-            .line_scale = thickness * zoom_scale,
+            .line_scale = thickness,
             .scale = .both(1),
             .rotate = @as(f32, @floatCast(rotation)),
         },
-        colors.component_color,
-        null,
+        .{ .stroke_color = colors.component_color },
     );
 
     try vector_renderer.render(
@@ -103,12 +101,11 @@ fn renderDevice(
                 .x = @floatFromInt(pos.x),
                 .y = @floatFromInt(pos.y),
             },
-            .line_scale = thickness * zoom_scale,
+            .line_scale = thickness,
             .scale = .both(1),
             .rotate = @as(f32, @floatCast(rotation)),
         },
-        colors.terminal_wire_color,
-        null,
+        .{ .stroke_color = colors.terminal_wire_color },
     );
 }
 
@@ -118,7 +115,6 @@ pub fn renderComponent(
     pos: GridPosition,
     rot: Rotation,
     render_type: renderer.ElementRenderType,
-    zoom_scale: f32,
 ) !void {
     switch (dev_type) {
         inline else => |x| try renderDevice(
@@ -127,7 +123,6 @@ pub fn renderComponent(
             pos,
             rot,
             render_type,
-            zoom_scale,
         ),
     }
 }
@@ -650,7 +645,6 @@ pub const GraphicComponent = struct {
         self: *const GraphicComponent,
         vector_renderer: *const VectorRenderer,
         render_type: renderer.ElementRenderType,
-        zoom_scale: f32,
     ) !void {
         const dev_type = @as(DeviceType, self.comp.device);
         try renderComponent(
@@ -659,7 +653,6 @@ pub const GraphicComponent = struct {
             self.pos,
             self.rotation,
             render_type,
-            zoom_scale,
         );
     }
 };

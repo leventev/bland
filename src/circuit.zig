@@ -1138,10 +1138,25 @@ pub const GraphicCircuit = struct {
         var writer = &file_writer.interface;
 
         _ = try writer.print(
-            "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">",
+            "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">\n",
             .{ width, height },
         );
-        _ = try writer.write("<rect fill=\"#f00\" width=\"100%\" height=\"100%\"/>");
+
+        var vector_renderer = VectorRenderer.init(
+            .{ .svg_export = .{
+                .writer = writer,
+                .canvas_width = width,
+                .canvas_height = height,
+            } },
+            @floatFromInt(y_min),
+            @floatFromInt(y_max),
+            @floatFromInt(x_min),
+            @floatFromInt(x_max),
+        );
+        for (self.graphic_components.items) |comp| {
+            try comp.render(&vector_renderer, .normal);
+            try writer.flush();
+        }
         _ = try writer.write("</svg>");
         try writer.flush();
     }
