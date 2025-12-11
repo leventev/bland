@@ -55,38 +55,14 @@ pub fn renderPropertyBox(r: *Float, value_buffer: *GraphicComponent.ValueBuffer,
     );
 }
 
-pub fn mouseInside(
-    grid_pos: GridPosition,
-    rotation: Rotation,
-    circuit_rect: dvui.Rect.Physical,
-    mouse_pos: dvui.Point.Physical,
-) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
-    // const pos = grid_pos.toCircuitPosition(circuit_rect);
-    //
-    // const tolerance = 3;
-    //
-    // const rect: dvui.Rect.Physical = switch (rotation) {
-    //     .left, .right => dvui.Rect.Physical{
-    //         .x = pos.x + wire_pixel_len - tolerance,
-    //         .y = pos.y - resistor_width / 2 - tolerance,
-    //         .w = resistor_length + 2 * tolerance,
-    //         .h = resistor_width + 2 * tolerance,
-    //     },
-    //     .bottom, .top => dvui.Rect.Physical{
-    //         .x = pos.x - resistor_width / 2 - tolerance,
-    //         .y = pos.y + wire_pixel_len - tolerance,
-    //         .w = resistor_width + 2 * tolerance,
-    //         .h = resistor_length + 2 * tolerance,
-    //     },
-    // };
-    //
-    // return rect.contains(mouse_pos);
-}
+pub const clickable_shape: GraphicComponent.ClickableShape = .{
+    .rect = .{
+        .x = wire_len_per_side,
+        .y = -resistor_width / 2.0,
+        .width = resistor_length,
+        .height = resistor_width,
+    },
+};
 
 const total_width = 2.0;
 const resistor_length = 1.3;

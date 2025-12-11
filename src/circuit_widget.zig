@@ -90,62 +90,53 @@ fn checkForKeybinds(ev: dvui.Event.Key) !void {
     }
 }
 
-fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev: dvui.Event.Mouse) !void {
+fn findHoveredElement(viewport: dvui.Rect.Physical, m_pos: dvui.Point.Physical) void {
     switch (circuit.placement_mode) {
         .none => |*data| {
-            var hovered_comp_id: ?usize = null;
-            for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, comp_id| {
-                const inside_comp: bool = graphic_comp.mouseInside(circuit_rect, ev.p);
-
-                if (!inside_comp) continue;
-
-                hovered_comp_id = comp_id;
-                break;
-            }
-
-            var hovered_wire_id: ?usize = null;
-            for (circuit.main_circuit.wires.items, 0..) |wire, wire_id| {
-                const hovered = wire.hovered(circuit_rect, ev.p);
-
-                if (!hovered) continue;
-                hovered_wire_id = wire_id;
-                break;
-            }
-
-            var hovered_pin_id: ?usize = null;
+            const mouse_grid_pos = screenToWorld(viewport, m_pos, zoom_scale);
+            // priority: pin > comp > ground > wire
             for (circuit.main_circuit.pins.items, 0..) |pin, pin_id| {
-                const hovered = pin.hovered(circuit_rect, ev.p);
+                const hovered = pin.hovered(viewport, m_pos);
 
-                if (!hovered) continue;
-                hovered_pin_id = pin_id;
-                break;
+                if (hovered) {
+                    data.hovered_element = .{ .pin = pin_id };
+                    return;
+                }
             }
 
-            var hovered_ground_id: ?usize = null;
+            for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, comp_id| {
+                const hovered: bool = graphic_comp.hovered(mouse_grid_pos, zoom_scale);
+                if (hovered) {
+                    data.hovered_element = .{ .component = comp_id };
+                    return;
+                }
+            }
+
             for (circuit.main_circuit.grounds.items, 0..) |ground, ground_id| {
-                const hovered = mouseInsideGround(ground.pos, ground.rotation, circuit_rect);
+                const hovered = mouseInsideGround(viewport, m_pos, ground.pos, ground.rotation);
 
-                if (!hovered) continue;
-                hovered_ground_id = ground_id;
-                break;
+                if (hovered) {
+                    data.hovered_element = .{ .ground = ground_id };
+                    return;
+                }
             }
 
-            // priority: comp > wire > pin
-            data.hovered_element =
-                if (hovered_comp_id) |id|
-                    .{ .component = id }
-                else if (hovered_ground_id) |id|
-                    .{ .ground = id }
-                else if (hovered_wire_id) |id|
-                    .{ .wire = id }
-                else if (hovered_pin_id) |id|
-                    .{ .pin = id }
-                else
-                    null;
+            for (circuit.main_circuit.wires.items, 0..) |wire, wire_id| {
+                const hovered = wire.hovered(viewport, m_pos);
+
+                if (hovered) {
+                    data.hovered_element = .{ .wire = wire_id };
+                    return;
+                }
+            }
+
+            data.hovered_element = null;
         },
         else => {},
     }
-
+}
+fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev: dvui.Event.Mouse) !void {
+    findHoveredElement(circuit_rect, ev.p);
     switch (ev.action) {
         .motion => {
             if (circuit.mb1_click_pos) |_| {
@@ -171,22 +162,24 @@ fn handleMouseEvent(gpa: std.mem.Allocator, circuit_rect: dvui.Rect.Physical, ev
                                     };
                                 },
                                 .wire => |wire_id| {
-                                    const wire = circuit.main_circuit.wires.items[wire_id];
-                                    const wire_pos = wire.pos.toCircuitPosition(
-                                        circuit_rect,
-                                    );
-
-                                    const offset: f32 = switch (wire.direction) {
-                                        .vertical => ev.p.y - wire_pos.y,
-                                        .horizontal => ev.p.x - wire_pos.x,
-                                    };
-
-                                    circuit.placement_mode = .{
-                                        .dragging_wire = .{
-                                            .wire_id = wire_id,
-                                            .offset = offset,
-                                        },
-                                    };
+                                    _ = wire_id;
+                                    @panic("TODO");
+                                    // const wire = circuit.main_circuit.wires.items[wire_id];
+                                    // const wire_pos = wire.pos.toCircuitPosition(
+                                    //     circuit_rect,
+                                    // );
+                                    //
+                                    // const offset: f32 = switch (wire.direction) {
+                                    //     .vertical => ev.p.y - wire_pos.y,
+                                    //     .horizontal => ev.p.x - wire_pos.x,
+                                    // };
+                                    //
+                                    // circuit.placement_mode = .{
+                                    //     .dragging_wire = .{
+                                    //         .wire_id = wire_id,
+                                    //         .offset = offset,
+                                    //     },
+                                    // };
                                 },
                                 .pin => |pin_id| {
                                     circuit.placement_mode = .{
@@ -464,13 +457,15 @@ const GridPositionWireConnection = struct {
 };
 
 pub fn mouseInsideGround(
+    viewport: dvui.Rect.Physical,
+    m_pos: dvui.Point.Physical,
     grid_pos: circuit.GridPosition,
     rotation: circuit.Rotation,
-    circuit_rect: dvui.Rect.Physical,
 ) bool {
     _ = grid_pos;
     _ = rotation;
-    _ = circuit_rect;
+    _ = viewport;
+    _ = m_pos;
     return false;
     // const pos = grid_pos.toCircuitPosition(circuit_rect);
     //
@@ -616,26 +611,31 @@ fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
     );
 }
 
+fn screenToWorld(
+    viewport: dvui.Rect.Physical,
+    pos: dvui.Point.Physical,
+    zoom: f32,
+) circuit.GridSubposition {
+    const viewport_pos = pos.diff(viewport.topLeft()).diff(.{ .x = -camera_x, .y = -camera_y });
+    const scaled_grid_size = VectorRenderer.grid_cell_px_size * zoom;
+    return circuit.GridSubposition{
+        .x = viewport_pos.x / scaled_grid_size,
+        .y = viewport_pos.y / scaled_grid_size,
+    };
+}
+
 fn adjustCameraForZoom(
-    circuit_rect: dvui.Rect.Physical,
+    viewport: dvui.Rect.Physical,
     pos: dvui.Point.Physical,
     prev_zoom: f32,
     new_zoom: f32,
 ) void {
-    const prev_rel_pos = pos.diff(circuit_rect.topLeft()).diff(.{ .x = -camera_x, .y = -camera_y });
-    const prev_grid_size = VectorRenderer.grid_cell_px_size * prev_zoom;
-
-    const new_rel_pos = pos.diff(circuit_rect.topLeft()).diff(.{ .x = -camera_x, .y = -camera_y });
     const new_grid_size = VectorRenderer.grid_cell_px_size * new_zoom;
+    const prev_pos = screenToWorld(viewport, pos, prev_zoom);
+    const new_pos = screenToWorld(viewport, pos, new_zoom);
 
-    const prev_pos_x = prev_rel_pos.x / prev_grid_size;
-    const prev_pos_y = prev_rel_pos.y / prev_grid_size;
-
-    const new_pos_x = new_rel_pos.x / new_grid_size;
-    const new_pos_y = new_rel_pos.y / new_grid_size;
-
-    camera_x += (prev_pos_x - new_pos_x) * new_grid_size;
-    camera_y += (prev_pos_y - new_pos_y) * new_grid_size;
+    camera_x += (prev_pos.x - new_pos.x) * new_grid_size;
+    camera_y += (prev_pos.y - new_pos.y) * new_grid_size;
 }
 
 pub fn nearestGridPosition(

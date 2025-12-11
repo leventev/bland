@@ -9,6 +9,7 @@ const circuit_widget = @import("circuit_widget.zig");
 
 const Float = bland.Float;
 const GridPosition = circuit.GridPosition;
+const GridSubposition = circuit.GridSubposition;
 const Rotation = circuit.Rotation;
 const Component = bland.Component;
 const Device = Component.Device;
@@ -190,6 +191,46 @@ pub const GraphicComponent = struct {
     name_buffer: []u8,
 
     value_buffer: ValueBuffer,
+
+    pub const ClickableShape = union(enum) {
+        rect: struct {
+            x: f32,
+            y: f32,
+            width: f32,
+            height: f32,
+        },
+        circle: struct {
+            x: f32,
+            y: f32,
+            radius: f32,
+        },
+
+        fn inside(self: ClickableShape, translate: GridPosition, rotation: Rotation, zoom: f32, pos: GridSubposition) bool {
+            const xf: f32 = @floatFromInt(translate.x);
+            const yf: f32 = @floatFromInt(translate.y);
+
+            const grid_size = VectorRenderer.grid_cell_px_size * zoom;
+            const tolerance_px = 7;
+            const tolerance = tolerance_px / grid_size;
+            switch (self) {
+                .rect => |r| {
+                    const x1 = r.x - tolerance;
+                    const y1 = r.y - tolerance;
+                    const x2 = r.x + r.width + tolerance;
+                    const y2 = r.y + r.height + tolerance;
+
+                    const rx1, const ry1, const rx2, const ry2 = switch (rotation) {
+                        .right => .{ xf + x1, yf + y1, xf + x2, yf + y2 },
+                        .left => .{ xf - x2, yf + y1, xf - x1, yf + y2 },
+                        .top => .{ xf + y1, yf - x2, xf + y2, yf - x1 },
+                        .bottom => .{ xf + y1, yf + x1, xf + y2, yf + x2 },
+                    };
+                    return pos.x > rx1 and pos.y > ry1 and pos.x < rx2 and pos.y < ry2;
+                },
+                .circle => return false,
+            }
+        }
+    };
 
     pub const ValueBuffer = union(Component.DeviceType) {
         resistor: struct {
@@ -626,19 +667,17 @@ pub const GraphicComponent = struct {
         };
     }
 
-    pub fn mouseInside(
+    pub fn hovered(
         self: *const GraphicComponent,
-        circuit_rect: dvui.Rect.Physical,
-        mouse_pos: dvui.Point.Physical,
+        grid_pos: GridSubposition,
+        zoom: f32,
     ) bool {
-        return switch (@as(DeviceType, self.comp.device)) {
-            inline else => |x| graphics_module(x).mouseInside(
-                self.pos,
-                self.rotation,
-                circuit_rect,
-                mouse_pos,
-            ),
+        const shape = switch (@as(DeviceType, self.comp.device)) {
+            .resistor => resistor_graphics_module.clickable_shape,
+            inline else => @panic("TODO"),
         };
+
+        return shape.inside(self.pos, self.rotation, zoom, grid_pos);
     }
 
     pub fn render(

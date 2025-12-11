@@ -32,13 +32,11 @@ pub const GridPosition = struct {
     pub fn eql(self: GridPosition, other: GridPosition) bool {
         return self.x == other.x and self.y == other.y;
     }
+};
 
-    pub fn toCircuitPosition(self: GridPosition, circuit_rect: dvui.Rect.Physical) dvui.Point {
-        return dvui.Point{
-            .x = circuit_rect.x + @as(f32, @floatFromInt(self.x * global.grid_size)),
-            .y = circuit_rect.y + @as(f32, @floatFromInt(self.y * global.grid_size)),
-        };
-    }
+pub const GridSubposition = struct {
+    x: f32,
+    y: f32,
 };
 
 pub const AnalysisReport = struct {
@@ -124,31 +122,35 @@ pub const Wire = struct {
 
     pub fn hovered(
         self: Wire,
-        circuit_rect: dvui.Rect.Physical,
+        viewport: dvui.Rect.Physical,
         mouse_pos: dvui.Point.Physical,
     ) bool {
-        const tolerance = 12;
-
-        switch (self.direction) {
-            .horizontal => {
-                const start_pos = self.pos.toCircuitPosition(circuit_rect);
-                const end_pos = self.end().toCircuitPosition(circuit_rect);
-
-                const left = if (end_pos.x > start_pos.x) start_pos else end_pos;
-                const right = if (end_pos.x > start_pos.x) end_pos else start_pos;
-
-                return @abs(mouse_pos.y - start_pos.y) < tolerance and mouse_pos.x >= left.x and mouse_pos.x <= right.x;
-            },
-            .vertical => {
-                const start_pos = self.pos.toCircuitPosition(circuit_rect);
-                const end_pos = self.end().toCircuitPosition(circuit_rect);
-
-                const top = if (end_pos.y > start_pos.y) start_pos else end_pos;
-                const bottom = if (end_pos.y > start_pos.y) end_pos else start_pos;
-
-                return @abs(mouse_pos.x - start_pos.x) < tolerance and mouse_pos.y >= top.y and mouse_pos.y <= bottom.y;
-            },
-        }
+        _ = self;
+        _ = viewport;
+        _ = mouse_pos;
+        return false;
+        // const tolerance = 12;
+        //
+        // switch (self.direction) {
+        //     .horizontal => {
+        //         const start_pos = self.pos.toCircuitPosition(viewport);
+        //         const end_pos = self.end().toCircuitPosition(viewport);
+        //
+        //         const left = if (end_pos.x > start_pos.x) start_pos else end_pos;
+        //         const right = if (end_pos.x > start_pos.x) end_pos else start_pos;
+        //
+        //         return @abs(mouse_pos.y - start_pos.y) < tolerance and mouse_pos.x >= left.x and mouse_pos.x <= right.x;
+        //     },
+        //     .vertical => {
+        //         const start_pos = self.pos.toCircuitPosition(viewport);
+        //         const end_pos = self.end().toCircuitPosition(viewport);
+        //
+        //         const top = if (end_pos.y > start_pos.y) start_pos else end_pos;
+        //         const bottom = if (end_pos.y > start_pos.y) end_pos else start_pos;
+        //
+        //         return @abs(mouse_pos.x - start_pos.x) < tolerance and mouse_pos.y >= top.y and mouse_pos.y <= bottom.y;
+        //     },
+        // }
     }
 };
 
@@ -331,53 +333,57 @@ pub const GraphicCircuit = struct {
             circuit_rect: dvui.Rect.Physical,
             mouse_pos: dvui.Point.Physical,
         ) bool {
-            const f = dvui.Font{
-                .id = .fromName(global.font_name),
-                .size = global.circuit_font_size,
-            };
-
-            const tolerance = 3;
-
-            const dist_from_point = 10;
-            const angle = 15.0 / 180.0 * std.math.pi;
-
-            const start_pos = self.pos.toCircuitPosition(circuit_rect);
-
-            const label_size = dvui.Font.textSize(f, self.name);
-            const rect_width = label_size.w + 20;
-            const rect_height = label_size.h + 10;
-
-            const trig_height_vert = (comptime std.math.tan(angle)) * rect_width / 2;
-            const trig_height_hor = (comptime std.math.tan(angle)) * rect_height / 2;
-
-            const rect = switch (self.rotation) {
-                .right => dvui.Rect.Physical{
-                    .x = start_pos.x + dist_from_point + trig_height_hor - tolerance,
-                    .y = start_pos.y - rect_height / 2 - tolerance,
-                    .w = rect_width + tolerance * 2,
-                    .h = rect_height + tolerance * 2,
-                },
-                .left => dvui.Rect.Physical{
-                    .x = start_pos.x - (dist_from_point + rect_width + trig_height_hor) - tolerance,
-                    .y = start_pos.y - rect_height / 2 - tolerance,
-                    .w = rect_width + tolerance * 2,
-                    .h = rect_height + tolerance * 2,
-                },
-                .top => dvui.Rect.Physical{
-                    .x = start_pos.x - rect_width / 2 - tolerance,
-                    .y = start_pos.y - (rect_height + trig_height_vert + dist_from_point) - tolerance,
-                    .w = rect_width + tolerance * 2,
-                    .h = rect_height + tolerance * 2,
-                },
-                .bottom => dvui.Rect.Physical{
-                    .x = start_pos.x - rect_width / 2 - tolerance,
-                    .y = start_pos.y + trig_height_vert + dist_from_point - tolerance,
-                    .w = rect_width + tolerance * 2,
-                    .h = rect_height + tolerance * 2,
-                },
-            };
-
-            return rect.contains(mouse_pos);
+            _ = self;
+            _ = circuit_rect;
+            _ = mouse_pos;
+            return false;
+            // const f = dvui.Font{
+            //     .id = .fromName(global.font_name),
+            //     .size = global.circuit_font_size,
+            // };
+            //
+            // const tolerance = 3;
+            //
+            // const dist_from_point = 10;
+            // const angle = 15.0 / 180.0 * std.math.pi;
+            //
+            // const start_pos = self.pos.toCircuitPosition(circuit_rect);
+            //
+            // const label_size = dvui.Font.textSize(f, self.name);
+            // const rect_width = label_size.w + 20;
+            // const rect_height = label_size.h + 10;
+            //
+            // const trig_height_vert = (comptime std.math.tan(angle)) * rect_width / 2;
+            // const trig_height_hor = (comptime std.math.tan(angle)) * rect_height / 2;
+            //
+            // const rect = switch (self.rotation) {
+            //     .right => dvui.Rect.Physical{
+            //         .x = start_pos.x + dist_from_point + trig_height_hor - tolerance,
+            //         .y = start_pos.y - rect_height / 2 - tolerance,
+            //         .w = rect_width + tolerance * 2,
+            //         .h = rect_height + tolerance * 2,
+            //     },
+            //     .left => dvui.Rect.Physical{
+            //         .x = start_pos.x - (dist_from_point + rect_width + trig_height_hor) - tolerance,
+            //         .y = start_pos.y - rect_height / 2 - tolerance,
+            //         .w = rect_width + tolerance * 2,
+            //         .h = rect_height + tolerance * 2,
+            //     },
+            //     .top => dvui.Rect.Physical{
+            //         .x = start_pos.x - rect_width / 2 - tolerance,
+            //         .y = start_pos.y - (rect_height + trig_height_vert + dist_from_point) - tolerance,
+            //         .w = rect_width + tolerance * 2,
+            //         .h = rect_height + tolerance * 2,
+            //     },
+            //     .bottom => dvui.Rect.Physical{
+            //         .x = start_pos.x - rect_width / 2 - tolerance,
+            //         .y = start_pos.y + trig_height_vert + dist_from_point - tolerance,
+            //         .w = rect_width + tolerance * 2,
+            //         .h = rect_height + tolerance * 2,
+            //     },
+            // };
+            //
+            // return rect.contains(mouse_pos);
         }
     };
 

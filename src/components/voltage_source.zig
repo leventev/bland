@@ -217,19 +217,24 @@ pub fn mouseInside(
     circuit_rect: dvui.Rect.Physical,
     mouse_pos: dvui.Point.Physical,
 ) bool {
-    const pos = grid_pos.toCircuitPosition(circuit_rect);
-
-    const center: dvui.Point.Physical = switch (rotation) {
-        .left, .right => .{ .x = pos.x + global.grid_size, .y = pos.y },
-        .top, .bottom => .{ .x = pos.x, .y = pos.y + global.grid_size },
-    };
-
-    const xd = mouse_pos.x - center.x;
-    const yd = mouse_pos.y - center.y;
-
-    const check_radius = radius + 3;
-
-    return xd * xd + yd * yd <= check_radius * check_radius;
+    _ = grid_pos;
+    _ = rotation;
+    _ = circuit_rect;
+    _ = mouse_pos;
+    return false;
+    // const pos = grid_pos.toCircuitPosition(circuit_rect);
+    //
+    // const center: dvui.Point.Physical = switch (rotation) {
+    //     .left, .right => .{ .x = pos.x + global.grid_size, .y = pos.y },
+    //     .top, .bottom => .{ .x = pos.x, .y = pos.y + global.grid_size },
+    // };
+    //
+    // const xd = mouse_pos.x - center.x;
+    // const yd = mouse_pos.y - center.y;
+    //
+    // const check_radius = radius + 3;
+    //
+    // return xd * xd + yd * yd <= check_radius * check_radius;
 }
 
 const total_width = 2.0;
