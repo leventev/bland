@@ -85,31 +85,13 @@ pub fn renderPropertyBox(
     te.deinit();
 }
 
-pub fn mouseInside(
-    grid_pos: GridPosition,
-    rotation: Rotation,
-    circuit_rect: dvui.Rect.Physical,
-    mouse_pos: dvui.Point.Physical,
-) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
-    // const pos = grid_pos.toCircuitPosition(circuit_rect);
-    //
-    // const center: dvui.Point.Physical = switch (rotation) {
-    //     .left, .right => .{ .x = pos.x + global.grid_size, .y = pos.y },
-    //     .top, .bottom => .{ .x = pos.x, .y = pos.y + global.grid_size },
-    // };
-    //
-    // const xd = mouse_pos.x - center.x;
-    // const yd = mouse_pos.y - center.y;
-    //
-    // const check_radius = radius + 3;
-    //
-    // return xd * xd + yd * yd <= check_radius * check_radius;
-}
+pub const clickable_shape: GraphicComponent.ClickableShape = .{
+    .circle = .{
+        .x = wire_len_per_side + side_length,
+        .y = 0,
+        .radius = side_length,
+    },
+};
 
 const total_width = 2.0;
 const side_length = 0.4;

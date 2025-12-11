@@ -219,15 +219,30 @@ pub const GraphicComponent = struct {
                     const x2 = r.x + r.width + tolerance;
                     const y2 = r.y + r.height + tolerance;
 
-                    const rx1, const ry1, const rx2, const ry2 = switch (rotation) {
-                        .right => .{ xf + x1, yf + y1, xf + x2, yf + y2 },
-                        .left => .{ xf - x2, yf + y1, xf - x1, yf + y2 },
-                        .top => .{ xf + y1, yf - x2, xf + y2, yf - x1 },
-                        .bottom => .{ xf + y1, yf + x1, xf + y2, yf + x2 },
+                    const x1_off, const y1_off, const x2_off, const y2_off = switch (rotation) {
+                        .right => .{ x1, y1, x2, y2 },
+                        .left => .{ -x2, -y2, -x1, -y1 },
+                        .top => .{ y1, -x2, y2, -x1 },
+                        .bottom => .{ -y2, x1, -y1, x2 },
                     };
+                    const rx1 = xf + x1_off;
+                    const ry1 = yf + y1_off;
+                    const rx2 = xf + x2_off;
+                    const ry2 = yf + y2_off;
                     return pos.x > rx1 and pos.y > ry1 and pos.x < rx2 and pos.y < ry2;
                 },
-                .circle => return false,
+                .circle => |c| {
+                    const rx, const ry = switch (rotation) {
+                        .right => .{ c.x, c.y },
+                        .left => .{ -c.x, c.y },
+                        .top => .{ c.y, -c.x },
+                        .bottom => .{ c.y, c.x },
+                    };
+
+                    const xd = xf + rx - pos.x;
+                    const yd = yf + ry - pos.y;
+                    return xd * xd + yd * yd <= c.radius * c.radius + tolerance;
+                },
             }
         }
     };
@@ -673,8 +688,7 @@ pub const GraphicComponent = struct {
         zoom: f32,
     ) bool {
         const shape = switch (@as(DeviceType, self.comp.device)) {
-            .resistor => resistor_graphics_module.clickable_shape,
-            inline else => @panic("TODO"),
+            inline else => |x| graphics_module(x).clickable_shape,
         };
 
         return shape.inside(self.pos, self.rotation, zoom, grid_pos);

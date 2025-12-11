@@ -55,6 +55,11 @@ pub fn renderPropertyBox(r: *Float, value_buffer: *GraphicComponent.ValueBuffer,
     );
 }
 
+const total_width = 2.0;
+const resistor_length = 1.3;
+const resistor_width = 0.5;
+const wire_len_per_side = (total_width - resistor_length) / 2.0;
+
 pub const clickable_shape: GraphicComponent.ClickableShape = .{
     .rect = .{
         .x = wire_len_per_side,
@@ -63,11 +68,6 @@ pub const clickable_shape: GraphicComponent.ClickableShape = .{
         .height = resistor_width,
     },
 };
-
-const total_width = 2.0;
-const resistor_length = 1.3;
-const resistor_width = 0.5;
-const wire_len_per_side = (total_width - resistor_length) / 2.0;
 
 pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .snap_pixel_set = true },

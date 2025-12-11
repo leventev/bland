@@ -49,37 +49,19 @@ pub fn renderPropertyBox(model: *diode_module.Model, value_buffer: *GraphicCompo
     _ = selected_component_changed;
 }
 
-pub fn mouseInside(
-    grid_pos: GridPosition,
-    rotation: Rotation,
-    circuit_rect: dvui.Rect.Physical,
-    mouse_pos: dvui.Point.Physical,
-) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
-    // const pos = grid_pos.toCircuitPosition(circuit_rect);
-    //
-    // const center: dvui.Point.Physical = switch (rotation) {
-    //     .left, .right => .{ .x = pos.x + wire_pixel_len + diode_length / 2, .y = pos.y },
-    //     .top, .bottom => .{ .x = pos.x, .y = pos.y + wire_pixel_len + diode_length / 2 },
-    // };
-    //
-    // const xd = mouse_pos.x - center.x;
-    // const yd = mouse_pos.y - center.y;
-    //
-    // const tolerance = 6;
-    // const check_radius = diode_length / 2 + tolerance;
-    //
-    // return xd * xd + yd * yd <= check_radius * check_radius;
-}
-
 const total_width = 2.0;
 const diode_side_len = 0.4;
 const diode_length = 0.7;
 const wire_len_per_side = (total_width - diode_length) / 2.0;
+
+pub const clickable_shape: GraphicComponent.ClickableShape = .{
+    .rect = .{
+        .x = wire_len_per_side,
+        .y = -diode_side_len,
+        .width = diode_length,
+        .height = 2 * diode_side_len,
+    },
+};
 
 pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .snap_pixel_set = true },

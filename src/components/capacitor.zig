@@ -57,43 +57,19 @@ pub fn renderPropertyBox(
     );
 }
 
-pub fn mouseInside(
-    grid_pos: GridPosition,
-    rotation: Rotation,
-    circuit_rect: dvui.Rect.Physical,
-    mouse_pos: dvui.Point.Physical,
-) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = circuit_rect;
-    _ = mouse_pos;
-    return false;
-    // const pos = grid_pos.toCircuitPosition(circuit_rect);
-    //
-    // const tolerance = 3;
-    //
-    // const rect: dvui.Rect.Physical = switch (rotation) {
-    //     .left, .right => dvui.Rect.Physical{
-    //         .x = pos.x + wire_pixel_len - tolerance,
-    //         .y = pos.y - plate_width / 2 - tolerance,
-    //         .w = middle_len + 2 * tolerance,
-    //         .h = plate_width + 2 * tolerance,
-    //     },
-    //     .bottom, .top => dvui.Rect.Physical{
-    //         .x = pos.x - plate_width / 2 - tolerance,
-    //         .y = pos.y + wire_pixel_len - tolerance,
-    //         .w = plate_width + 2 * tolerance,
-    //         .h = middle_len + 2 * tolerance,
-    //     },
-    // };
-    //
-    // return rect.contains(mouse_pos);
-}
-
 const total_width = 2.0;
 const plate_distance = 0.3;
 const plate_width = 0.8;
 const wire_len_per_side = (total_width - plate_distance) / 2.0;
+
+pub const clickable_shape: GraphicComponent.ClickableShape = .{
+    .rect = .{
+        .x = wire_len_per_side,
+        .y = -plate_width / 2.0,
+        .width = plate_distance,
+        .height = plate_width,
+    },
+};
 
 pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .snap_pixel_set = true },
