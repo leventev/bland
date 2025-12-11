@@ -8,6 +8,8 @@ const circuit = @import("circuit.zig");
 const sidebar = @import("sidebar.zig");
 const circuit_widget = @import("circuit_widget.zig");
 const console = @import("console.zig");
+const VectorRenderer = @import("VectorRenderer.zig");
+const svg = @import("svg.zig");
 
 const NetList = bland.NetList;
 const GridPosition = circuit.GridPosition;
@@ -326,7 +328,7 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
         }
 
         if (dvui.menuItemLabel(@src(), "Export to SVG", .{}, .{ .expand = .horizontal }) != null) {
-            circuit.main_circuit.exportToSVG() catch |err| {
+            svg.exportToSVG(&circuit.main_circuit) catch |err| {
                 std.log.err("Failed to export to SVG: {t}", .{err});
             };
             fw.close();
@@ -962,4 +964,269 @@ pub fn textEntrySI(
     });
 
     return false;
+}
+
+pub fn renderWire(
+    vector_renderer: *const VectorRenderer,
+    wire: circuit.Wire,
+    render_type: ElementRenderType,
+) !void {
+    const instructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .snap_pixel_set = true },
+        .{ .move_rel = .{ .x = 1, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+
+    const colors = render_type.colors();
+    const thickness = render_type.wireThickness();
+    const rotation: f32 = if (wire.direction == .vertical) std.math.pi / 2.0 else 0.0;
+    try vector_renderer.render(
+        instructions,
+        .{
+            .translate = .{
+                .x = @floatFromInt(wire.pos.x),
+                .y = @floatFromInt(wire.pos.y),
+            },
+            .scale = .both(@floatFromInt(wire.length)),
+            .line_scale = thickness * circuit_widget.zoom_scale,
+            .rotate = rotation,
+        },
+        .{ .stroke_color = colors.wire_color },
+    );
+}
+
+pub fn renderPin(
+    vector_renderer: *const VectorRenderer,
+    grid_pos: circuit.GridPosition,
+    rotation: circuit.Rotation,
+    label: []const u8,
+    render_type: ElementRenderType,
+) !void {
+    // TODO: better font handling
+    const f = dvui.Font{
+        .id = .fromName(global.font_name),
+        .size = global.circuit_font_size * circuit_widget.zoom_scale,
+    };
+
+    // const dist_from_point = 10;
+    const angle: f32 = 15.0 / 180.0 * std.math.pi;
+
+    const color = render_type.colors().component_color;
+    const thickness = render_type.thickness();
+
+    const label_size = dvui.Font.textSize(f, label);
+    const grid_size = VectorRenderer.grid_cell_px_size * circuit_widget.zoom_scale;
+    const grid_pos_f = VectorRenderer.Vector{
+        .x = @floatFromInt(grid_pos.x),
+        .y = @floatFromInt(grid_pos.y),
+    };
+    std.debug.assert(vector_renderer.output == .screen);
+    const screen = vector_renderer.output.screen;
+    const pos = dvui.Point.Physical{
+        .x = screen.viewport.x + (grid_pos_f.x - vector_renderer.world_left) * grid_size,
+        .y = screen.viewport.y + (grid_pos_f.y - vector_renderer.world_top) * grid_size,
+    };
+
+    const rect_width = label_size.w / grid_size + 0.2;
+    const rect_height = label_size.h / grid_size + 0.2;
+    const gap: f32 = 0.2;
+
+    const triangle_head: []const VectorRenderer.BrushInstruction = &.{
+        .{ .place = .{ .x = 1, .y = -1 } },
+        .{ .move_rel = .{ .x = -1, .y = 1 } },
+        .{ .move_rel = .{ .x = 1, .y = 1 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+
+    const partial_rect: []const VectorRenderer.BrushInstruction = &.{
+        .{ .place = .{ .x = 0, .y = -0.5 } },
+        .{ .move_rel = .{ .x = 1, .y = 0 } },
+        .{ .move_rel = .{ .x = 0, .y = 1 } },
+        .{ .move_rel = .{ .x = -1, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+
+    switch (rotation) {
+        .left, .right => {
+            const inv = rotation == .left;
+            const rot: f32 = if (inv) std.math.pi else 0;
+            const triangle_len = (rect_height / 2) * std.math.atan(angle);
+
+            try vector_renderer.render(
+                triangle_head,
+                .{
+                    .translate = .{
+                        .x = grid_pos_f.x + if (inv) -gap else gap,
+                        .y = grid_pos_f.y,
+                    },
+                    .line_scale = thickness,
+                    .scale = .{
+                        .x = triangle_len,
+                        .y = rect_height / 2,
+                    },
+                    .rotate = rot,
+                },
+                .{ .stroke_color = color },
+            );
+
+            const x_rect_start = gap + triangle_len;
+            const x_rect_off = if (inv) -x_rect_start else x_rect_start;
+            try vector_renderer.render(
+                partial_rect,
+                .{
+                    .translate = .{
+                        .x = x_rect_off + grid_pos_f.x,
+                        .y = grid_pos_f.y,
+                    },
+                    .line_scale = thickness,
+                    .scale = .{
+                        .x = rect_width,
+                        .y = rect_height,
+                    },
+                    .rotate = rot,
+                },
+                .{ .stroke_color = color },
+            );
+
+            const x_off = (x_rect_start + rect_width / 2) * grid_size;
+            renderCenteredText(
+                f,
+                dvui.Point.Physical{
+                    .x = pos.x + if (inv) -x_off else x_off,
+                    .y = pos.y,
+                },
+                dvui.themeGet().color(.content, .text),
+                label,
+            );
+        },
+        .top, .bottom => {
+            const inv = rotation == .top;
+            const rot: f32 = if (inv) -std.math.pi / 2.0 else std.math.pi / 2.0;
+            const triangle_len = (rect_width / 2) * std.math.atan(angle);
+
+            try vector_renderer.render(
+                triangle_head,
+                .{
+                    .translate = .{
+                        .x = grid_pos_f.x,
+                        .y = grid_pos_f.y + if (inv) -gap else gap,
+                    },
+                    .line_scale = thickness,
+                    .scale = .{
+                        .x = triangle_len,
+                        .y = rect_width / 2,
+                    },
+                    .rotate = rot,
+                },
+                .{ .stroke_color = color },
+            );
+
+            const y_rect_start = gap + triangle_len;
+            const y_rect_off = if (inv) -y_rect_start else y_rect_start;
+            try vector_renderer.render(
+                partial_rect,
+                .{
+                    .translate = .{
+                        .x = grid_pos_f.x,
+                        .y = grid_pos_f.y + y_rect_off,
+                    },
+                    .line_scale = thickness,
+                    .scale = .{
+                        .x = rect_width,
+                        .y = rect_height,
+                    },
+                    .rotate = rot,
+                },
+                .{ .stroke_color = color },
+            );
+
+            const y_off = (y_rect_start + rect_height / 2) * grid_size;
+            renderCenteredText(
+                f,
+                dvui.Point.Physical{
+                    .x = pos.x,
+                    .y = pos.y + if (inv) -y_off else y_off,
+                },
+                dvui.themeGet().color(.content, .text),
+                label,
+            );
+        },
+    }
+}
+
+const ground_triangle_side = 45;
+const ground_wire_pixel_len = 25;
+const ground_triangle_height = global.grid_size - ground_wire_pixel_len;
+
+const ground_pyramide_length = 0.3;
+const ground_wire_len = 0.6;
+const ground_level_1_len = 0.7;
+const ground_level_2_len = 0.45;
+const ground_level_3_len = 0.2;
+const ground_level_gap = ground_pyramide_length / 2.0;
+
+pub fn renderGround(
+    vector_renderer: *const VectorRenderer,
+    grid_pos: circuit.GridPosition,
+    rot: circuit.Rotation,
+    render_type: ElementRenderType,
+) !void {
+    const render_colors = render_type.colors();
+    const thickness = render_type.thickness();
+
+    const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .snap_pixel_set = true },
+        .{ .place = .{ .x = ground_wire_len, .y = -ground_level_1_len / 2.0 } },
+        .{ .move_rel = .{ .x = 0, .y = ground_level_1_len } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+        .{ .reset = {} },
+        .{ .place = .{ .x = ground_wire_len + ground_level_gap, .y = -ground_level_2_len / 2.0 } },
+        .{ .move_rel = .{ .x = 0, .y = ground_level_2_len } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+        .{ .reset = {} },
+        .{ .place = .{ .x = ground_wire_len + 2.0 * ground_level_gap, .y = -ground_level_3_len / 2.0 } },
+        .{ .move_rel = .{ .x = 0, .y = ground_level_3_len } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+
+    const terminalWireInstructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .snap_pixel_set = true },
+        .{ .move_rel = .{ .x = ground_wire_len, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+
+    const rotation: f32 = switch (rot) {
+        .right => 0,
+        .bottom => std.math.pi / 2.0,
+        .left => std.math.pi,
+        .top => -std.math.pi / 2.0,
+    };
+
+    try vector_renderer.render(
+        bodyInstructions,
+        .{
+            .line_scale = thickness,
+            .scale = .both(1),
+            .rotate = rotation,
+            .translate = .{
+                .x = @floatFromInt(grid_pos.x),
+                .y = @floatFromInt(grid_pos.y),
+            },
+        },
+        .{ .stroke_color = render_colors.component_color },
+    );
+
+    try vector_renderer.render(
+        terminalWireInstructions,
+        .{
+            .line_scale = thickness,
+            .scale = .both(1),
+            .rotate = rotation,
+            .translate = .{
+                .x = @floatFromInt(grid_pos.x),
+                .y = @floatFromInt(grid_pos.y),
+            },
+        },
+        .{ .stroke_color = render_colors.terminal_wire_color },
+    );
 }

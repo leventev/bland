@@ -14,7 +14,7 @@ var mouse_pos: dvui.Point.Physical = undefined;
 
 var camera_x: f32 = 0;
 var camera_y: f32 = 0;
-var zoom_scale: f32 = 1;
+pub var zoom_scale: f32 = 1;
 
 const max_zoom = 3.0;
 const min_zoom = 0.75;
@@ -463,102 +463,29 @@ const GridPositionWireConnection = struct {
     non_end_connection: usize,
 };
 
-const ground_triangle_side = 45;
-const ground_wire_pixel_len = 25;
-const ground_triangle_height = global.grid_size - ground_wire_pixel_len;
-
-const ground_pyramide_length = 0.3;
-const ground_wire_len = 0.6;
-const ground_level_1_len = 0.7;
-const ground_level_2_len = 0.45;
-const ground_level_3_len = 0.2;
-const ground_level_gap = ground_pyramide_length / 2.0;
-
-pub fn renderGround(
-    vector_renderer: *const VectorRenderer,
-    grid_pos: circuit.GridPosition,
-    rot: circuit.Rotation,
-    render_type: renderer.ElementRenderType,
-) !void {
-    const render_colors = render_type.colors();
-    const thickness = render_type.thickness();
-
-    const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
-        .{ .snap_pixel_set = true },
-        .{ .place = .{ .x = ground_wire_len, .y = -ground_level_1_len / 2.0 } },
-        .{ .move_rel = .{ .x = 0, .y = ground_level_1_len } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-        .{ .reset = {} },
-        .{ .place = .{ .x = ground_wire_len + ground_level_gap, .y = -ground_level_2_len / 2.0 } },
-        .{ .move_rel = .{ .x = 0, .y = ground_level_2_len } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-        .{ .reset = {} },
-        .{ .place = .{ .x = ground_wire_len + 2.0 * ground_level_gap, .y = -ground_level_3_len / 2.0 } },
-        .{ .move_rel = .{ .x = 0, .y = ground_level_3_len } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-
-    const terminalWireInstructions: []const VectorRenderer.BrushInstruction = &.{
-        .{ .snap_pixel_set = true },
-        .{ .move_rel = .{ .x = ground_wire_len, .y = 0 } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-
-    const rotation: f32 = switch (rot) {
-        .right => 0,
-        .bottom => std.math.pi / 2.0,
-        .left => std.math.pi,
-        .top => -std.math.pi / 2.0,
-    };
-
-    try vector_renderer.render(
-        bodyInstructions,
-        .{
-            .line_scale = thickness,
-            .scale = .both(1),
-            .rotate = rotation,
-            .translate = .{
-                .x = @floatFromInt(grid_pos.x),
-                .y = @floatFromInt(grid_pos.y),
-            },
-        },
-        .{ .stroke_color = render_colors.component_color },
-    );
-
-    try vector_renderer.render(
-        terminalWireInstructions,
-        .{
-            .line_scale = thickness,
-            .scale = .both(1),
-            .rotate = rotation,
-            .translate = .{
-                .x = @floatFromInt(grid_pos.x),
-                .y = @floatFromInt(grid_pos.y),
-            },
-        },
-        .{ .stroke_color = render_colors.terminal_wire_color },
-    );
-}
-
 pub fn mouseInsideGround(
     grid_pos: circuit.GridPosition,
     rotation: circuit.Rotation,
     circuit_rect: dvui.Rect.Physical,
 ) bool {
-    const pos = grid_pos.toCircuitPosition(circuit_rect);
-
-    const center: dvui.Point.Physical = switch (rotation) {
-        .left, .right => .{ .x = pos.x + ground_wire_pixel_len + ground_triangle_height / 2, .y = pos.y },
-        .top, .bottom => .{ .x = pos.x, .y = pos.y + ground_wire_pixel_len + ground_triangle_height / 2 },
-    };
-
-    const xd = mouse_pos.x - center.x;
-    const yd = mouse_pos.y - center.y;
-
-    const tolerance = 6;
-    const check_radius = ground_triangle_height / 2 + tolerance;
-
-    return xd * xd + yd * yd <= check_radius * check_radius;
+    _ = grid_pos;
+    _ = rotation;
+    _ = circuit_rect;
+    return false;
+    // const pos = grid_pos.toCircuitPosition(circuit_rect);
+    //
+    // const center: dvui.Point.Physical = switch (rotation) {
+    //     .left, .right => .{ .x = pos.x + ground_wire_pixel_len + ground_triangle_height / 2, .y = pos.y },
+    //     .top, .bottom => .{ .x = pos.x, .y = pos.y + ground_wire_pixel_len + ground_triangle_height / 2 },
+    // };
+    //
+    // const xd = mouse_pos.x - center.x;
+    // const yd = mouse_pos.y - center.y;
+    //
+    // const tolerance = 6;
+    // const check_radius = ground_triangle_height / 2 + tolerance;
+    //
+    // return xd * xd + yd * yd <= check_radius * check_radius;
 }
 
 fn renderHoldingComponent(
@@ -624,195 +551,7 @@ fn renderHoldingWire(
     else
         ElementRenderType.unable_to_place;
 
-    try renderWire(vector_renderer, wire, render_type);
-}
-
-pub fn renderWire(
-    vector_renderer: *const VectorRenderer,
-    wire: circuit.Wire,
-    render_type: ElementRenderType,
-) !void {
-    const instructions: []const VectorRenderer.BrushInstruction = &.{
-        .{ .snap_pixel_set = true },
-        .{ .move_rel = .{ .x = 1, .y = 0 } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-
-    const colors = render_type.colors();
-    const thickness = render_type.wireThickness();
-    const rotation: f32 = if (wire.direction == .vertical) std.math.pi / 2.0 else 0.0;
-    try vector_renderer.render(
-        instructions,
-        .{
-            .translate = .{
-                .x = @floatFromInt(wire.pos.x),
-                .y = @floatFromInt(wire.pos.y),
-            },
-            .scale = .both(@floatFromInt(wire.length)),
-            .line_scale = thickness * zoom_scale,
-            .rotate = rotation,
-        },
-        .{ .stroke_color = colors.wire_color },
-    );
-}
-
-fn renderPin(
-    vector_renderer: *const VectorRenderer,
-    grid_pos: circuit.GridPosition,
-    rotation: circuit.Rotation,
-    label: []const u8,
-    render_type: renderer.ElementRenderType,
-) !void {
-    // TODO: better font handling
-    const f = dvui.Font{
-        .id = .fromName(global.font_name),
-        .size = global.circuit_font_size * zoom_scale,
-    };
-
-    // const dist_from_point = 10;
-    const angle: f32 = 15.0 / 180.0 * std.math.pi;
-
-    const color = render_type.colors().component_color;
-    const thickness = render_type.thickness();
-
-    const label_size = dvui.Font.textSize(f, label);
-    const grid_size = VectorRenderer.grid_cell_px_size * zoom_scale;
-    const grid_pos_f = VectorRenderer.Vector{
-        .x = @floatFromInt(grid_pos.x),
-        .y = @floatFromInt(grid_pos.y),
-    };
-    std.debug.assert(vector_renderer.output == .screen);
-    const screen = vector_renderer.output.screen;
-    const pos = dvui.Point.Physical{
-        .x = screen.viewport.x + (grid_pos_f.x - vector_renderer.world_left) * grid_size,
-        .y = screen.viewport.y + (grid_pos_f.y - vector_renderer.world_top) * grid_size,
-    };
-
-    const rect_width = label_size.w / grid_size + 0.2;
-    const rect_height = label_size.h / grid_size + 0.2;
-    const gap: f32 = 0.2;
-
-    const triangle_head: []const VectorRenderer.BrushInstruction = &.{
-        .{ .place = .{ .x = 1, .y = -1 } },
-        .{ .move_rel = .{ .x = -1, .y = 1 } },
-        .{ .move_rel = .{ .x = 1, .y = 1 } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-
-    const partial_rect: []const VectorRenderer.BrushInstruction = &.{
-        .{ .place = .{ .x = 0, .y = -0.5 } },
-        .{ .move_rel = .{ .x = 1, .y = 0 } },
-        .{ .move_rel = .{ .x = 0, .y = 1 } },
-        .{ .move_rel = .{ .x = -1, .y = 0 } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-
-    switch (rotation) {
-        .left, .right => {
-            const inv = rotation == .left;
-            const rot: f32 = if (inv) std.math.pi else 0;
-            const triangle_len = (rect_height / 2) * std.math.atan(angle);
-
-            try vector_renderer.render(
-                triangle_head,
-                .{
-                    .translate = .{
-                        .x = grid_pos_f.x + if (inv) -gap else gap,
-                        .y = grid_pos_f.y,
-                    },
-                    .line_scale = thickness,
-                    .scale = .{
-                        .x = triangle_len,
-                        .y = rect_height / 2,
-                    },
-                    .rotate = rot,
-                },
-                .{ .stroke_color = color },
-            );
-
-            const x_rect_start = gap + triangle_len;
-            const x_rect_off = if (inv) -x_rect_start else x_rect_start;
-            try vector_renderer.render(
-                partial_rect,
-                .{
-                    .translate = .{
-                        .x = x_rect_off + grid_pos_f.x,
-                        .y = grid_pos_f.y,
-                    },
-                    .line_scale = thickness,
-                    .scale = .{
-                        .x = rect_width,
-                        .y = rect_height,
-                    },
-                    .rotate = rot,
-                },
-                .{ .stroke_color = color },
-            );
-
-            const x_off = (x_rect_start + rect_width / 2) * grid_size;
-            renderer.renderCenteredText(
-                f,
-                dvui.Point.Physical{
-                    .x = pos.x + if (inv) -x_off else x_off,
-                    .y = pos.y,
-                },
-                dvui.themeGet().color(.content, .text),
-                label,
-            );
-        },
-        .top, .bottom => {
-            const inv = rotation == .top;
-            const rot: f32 = if (inv) -std.math.pi / 2.0 else std.math.pi / 2.0;
-            const triangle_len = (rect_width / 2) * std.math.atan(angle);
-
-            try vector_renderer.render(
-                triangle_head,
-                .{
-                    .translate = .{
-                        .x = grid_pos_f.x,
-                        .y = grid_pos_f.y + if (inv) -gap else gap,
-                    },
-                    .line_scale = thickness,
-                    .scale = .{
-                        .x = triangle_len,
-                        .y = rect_width / 2,
-                    },
-                    .rotate = rot,
-                },
-                .{ .stroke_color = color },
-            );
-
-            const y_rect_start = gap + triangle_len;
-            const y_rect_off = if (inv) -y_rect_start else y_rect_start;
-            try vector_renderer.render(
-                partial_rect,
-                .{
-                    .translate = .{
-                        .x = grid_pos_f.x,
-                        .y = grid_pos_f.y + y_rect_off,
-                    },
-                    .line_scale = thickness,
-                    .scale = .{
-                        .x = rect_width,
-                        .y = rect_height,
-                    },
-                    .rotate = rot,
-                },
-                .{ .stroke_color = color },
-            );
-
-            const y_off = (y_rect_start + rect_height / 2) * grid_size;
-            renderer.renderCenteredText(
-                f,
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y + if (inv) -y_off else y_off,
-                },
-                dvui.themeGet().color(.content, .text),
-                label,
-            );
-        },
-    }
+    try renderer.renderWire(vector_renderer, wire, render_type);
 }
 
 fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id: ?usize) !void {
@@ -834,7 +573,12 @@ fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id
     else
         ElementRenderType.unable_to_place;
 
-    try renderGround(vector_renderer, grid_pos, circuit.placement_rotation, render_type);
+    try renderer.renderGround(
+        vector_renderer,
+        grid_pos,
+        circuit.placement_rotation,
+        render_type,
+    );
 }
 
 fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
@@ -863,7 +607,13 @@ fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
         .{circuit.pin_counter},
     ) catch @panic("Invalid fmt");
 
-    try renderPin(vector_renderer, grid_pos, circuit.placement_rotation, label, render_type);
+    try renderer.renderPin(
+        vector_renderer,
+        grid_pos,
+        circuit.placement_rotation,
+        label,
+        render_type,
+    );
 }
 
 fn adjustCameraForZoom(
@@ -904,7 +654,6 @@ pub fn nearestGridPosition(
 }
 
 pub fn renderCircuit(allocator: std.mem.Allocator) !void {
-
     // to decide where to render lumps we count all wire connections per node
     // it would be better to visualize this with a drawing on paper
     // if end_connection > 0 and non_end_connection > 0 then we put a lump there
@@ -1152,7 +901,12 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         var ptr = grid_pos_wire_connections.getPtr(ground.pos).?;
         ptr.end_connection += 1;
 
-        try renderGround(&vector_renderer, ground.pos, ground.rotation, render_type);
+        try renderer.renderGround(
+            &vector_renderer,
+            ground.pos,
+            ground.rotation,
+            render_type,
+        );
     }
 
     for (circuit.main_circuit.wires.items, 0..) |wire, i| {
@@ -1185,7 +939,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
                 ptr.non_end_connection += 1;
             }
         }
-        try renderWire(&vector_renderer, wire, render_type);
+        try renderer.renderWire(&vector_renderer, wire, render_type);
     }
 
     const junction_radius = 0.11;
@@ -1271,7 +1025,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ElementRenderType.normal;
 
-        try renderPin(&vector_renderer, pin.pos, pin.rotation, pin.name, render_type);
+        try renderer.renderPin(&vector_renderer, pin.pos, pin.rotation, pin.name, render_type);
     }
 
     switch (circuit.placement_mode) {
@@ -1318,7 +1072,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             else
                 ElementRenderType.unable_to_place;
 
-            try renderWire(&vector_renderer, new_wire, render_type);
+            try renderer.renderWire(&vector_renderer, new_wire, render_type);
         },
         .dragging_pin => |data| {
             const pin = circuit.main_circuit.pins.items[data.pin_id];
@@ -1334,7 +1088,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             else
                 ElementRenderType.unable_to_place;
 
-            try renderPin(
+            try renderer.renderPin(
                 &vector_renderer,
                 pos,
                 circuit.placement_rotation,
