@@ -31,6 +31,10 @@ fn init(win: *dvui.Window) !void {
         .wires = std.ArrayList(circuit.Wire){},
         .pins = std.ArrayList(circuit.GraphicCircuit.Pin){},
         .grounds = std.ArrayList(circuit.Ground){},
+        .junctions = std.AutoHashMapUnmanaged(
+            circuit.GridPosition,
+            circuit.GraphicCircuit.Junction,
+        ){},
     };
 
     console_initialized = true;

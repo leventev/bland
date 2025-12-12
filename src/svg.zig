@@ -93,6 +93,8 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
         try writer.flush();
     }
 
+    try graphic_circuit.renderJunctions(&vector_renderer);
+
     _ = try writer.write("</svg>");
     try writer.flush();
 }

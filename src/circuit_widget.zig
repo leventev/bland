@@ -452,11 +452,6 @@ fn handleCircuitAreaEvents(allocator: std.mem.Allocator, circuit_area: *dvui.Box
     }
 }
 
-const GridPositionWireConnection = struct {
-    end_connection: usize,
-    non_end_connection: usize,
-};
-
 fn renderHoldingComponent(
     device_type: bland.Component.DeviceType,
     vector_renderer: *const VectorRenderer,
@@ -667,20 +662,84 @@ fn renderGrid(
         );
     }
 }
+pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
+    std.debug.assert(vector_renderer.output == .screen);
+    const viewport = vector_renderer.output.screen.viewport;
 
+    switch (circuit.placement_mode) {
+        .none => {},
+        .new_component => |data| try renderHoldingComponent(
+            data.device_type,
+            vector_renderer,
+            null,
+        ),
+        .new_wire => |data| try renderHoldingWire(vector_renderer, data.held_wire_p1),
+        .new_pin => try renderHoldingPin(vector_renderer),
+        .new_ground => try renderHoldingGround(vector_renderer, null),
+        .dragging_ground => |data| try renderHoldingGround(vector_renderer, data.ground_id),
+        .dragging_component => |data| {
+            const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
+            const dev_type = graphic_comp.comp.device;
+            try renderHoldingComponent(dev_type, vector_renderer, data.comp_id);
+        },
+        .dragging_wire => |data| {
+            const wire = circuit.main_circuit.wires.items[data.wire_id];
+            const m_grid_pos = screenToWorld(viewport, mouse_pos, zoom_scale);
+            const adjusted_pos: circuit.GridSubposition = switch (wire.direction) {
+                .vertical => .{
+                    .x = m_grid_pos.x,
+                    .y = m_grid_pos.y - data.offset,
+                },
+                .horizontal => .{
+                    .x = m_grid_pos.x - data.offset,
+                    .y = m_grid_pos.y,
+                },
+            };
+
+            const pos: circuit.GridPosition = .{
+                .x = @intFromFloat(@round(adjusted_pos.x)),
+                .y = @intFromFloat(@round(adjusted_pos.y)),
+            };
+
+            const new_wire = circuit.Wire{
+                .direction = wire.direction,
+                .length = wire.length,
+                .pos = pos,
+            };
+
+            const can_place = circuit.main_circuit.canPlaceWire(new_wire, data.wire_id);
+            const render_type = if (can_place)
+                ElementRenderType.holding
+            else
+                ElementRenderType.unable_to_place;
+
+            try renderer.renderWire(vector_renderer, new_wire, render_type);
+        },
+        .dragging_pin => |data| {
+            const pin = circuit.main_circuit.pins.items[data.pin_id];
+            const pos = nearestGridPosition(viewport, mouse_pos);
+            const can_place = circuit.main_circuit.canPlacePin(
+                pos,
+                circuit.placement_rotation,
+                null,
+            );
+
+            const render_type = if (can_place)
+                ElementRenderType.holding
+            else
+                ElementRenderType.unable_to_place;
+
+            try renderer.renderPin(
+                vector_renderer,
+                pos,
+                circuit.placement_rotation,
+                pin.name,
+                render_type,
+            );
+        },
+    }
+}
 pub fn renderCircuit(allocator: std.mem.Allocator) !void {
-    // to decide where to render lumps we count all wire connections per node
-    // it would be better to visualize this with a drawing on paper
-    // if end_connection > 0 and non_end_connection > 0 then we put a lump there
-    // if end_connection > 2 or non_end_connection == 2 then we put a lump there
-    var grid_pos_wire_connections = std.AutoHashMap(
-        circuit.GridPosition,
-        GridPositionWireConnection,
-    ).init(
-        allocator,
-    );
-    defer grid_pos_wire_connections.deinit();
-
     var circuit_area = dvui.widgetAlloc(dvui.BoxWidget);
     circuit_area.init(@src(), .{
         .dir = .horizontal,
@@ -836,18 +895,6 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ElementRenderType.normal;
 
-        var terminal_buff: [8]circuit.GridPosition = undefined;
-        const terminals = comp.terminals(&terminal_buff);
-        for (terminals) |gpos| {
-            // ensure key existsterm
-            _ = try grid_pos_wire_connections.getOrPutValue(gpos, .{
-                .end_connection = 0,
-                .non_end_connection = 0,
-            });
-            var ptr = grid_pos_wire_connections.getPtr(gpos).?;
-            ptr.end_connection += 1;
-        }
-
         try comp.render(
             &vector_renderer,
             render_type,
@@ -868,14 +915,6 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             ElementRenderType.hovered
         else
             ElementRenderType.normal;
-
-        // ensure key existsterm
-        _ = try grid_pos_wire_connections.getOrPutValue(ground.pos, .{
-            .end_connection = 0,
-            .non_end_connection = 0,
-        });
-        var ptr = grid_pos_wire_connections.getPtr(ground.pos).?;
-        ptr.end_connection += 1;
 
         try renderer.renderGround(
             &vector_renderer,
@@ -900,90 +939,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ElementRenderType.normal;
 
-        var it = wire.iterator();
-        while (it.next()) |gpos| {
-            // ensure key existsterm
-            _ = try grid_pos_wire_connections.getOrPutValue(gpos, .{
-                .end_connection = 0,
-                .non_end_connection = 0,
-            });
-            var ptr = grid_pos_wire_connections.getPtr(gpos).?;
-
-            if (gpos.eql(wire.pos) or gpos.eql(wire.end())) {
-                ptr.end_connection += 1;
-            } else {
-                ptr.non_end_connection += 1;
-            }
-        }
         try renderer.renderWire(&vector_renderer, wire, render_type);
-    }
-
-    const junction_radius = 0.11;
-    var it = grid_pos_wire_connections.iterator();
-    while (it.next()) |entry| {
-        const gpos = entry.key_ptr.*;
-        const wire_connections = entry.value_ptr.*;
-
-        const is_junction = wire_connections.end_connection > 0 and wire_connections.non_end_connection > 0 or
-            wire_connections.end_connection > 2 or wire_connections.non_end_connection == 2;
-
-        const is_end = wire_connections.end_connection == 1 and wire_connections.non_end_connection == 0;
-
-        if (is_junction) {
-            const insts: []const VectorRenderer.BrushInstruction = &.{
-                .{ .reset = {} },
-                .{ .arc = .{
-                    .center = .{ .x = 0, .y = 0 },
-                    .start_angle = 0,
-                    .sweep_angle = 2 * std.math.pi,
-                    .radius = junction_radius,
-                } },
-                .{ .fill = {} },
-            };
-
-            try vector_renderer.render(
-                insts,
-                .{
-                    .line_scale = zoom_scale,
-                    .rotate = 0,
-                    .scale = .both(1),
-                    .translate = .{
-                        .x = @floatFromInt(gpos.x),
-                        .y = @floatFromInt(gpos.y),
-                    },
-                },
-                .{ .fill_color = ElementRenderType.normal.colors().terminal_wire_color },
-            );
-        } else if (is_end) {
-            const insts: []const VectorRenderer.BrushInstruction = &.{
-                .{ .reset = {} },
-                .{ .arc = .{
-                    .center = .{ .x = 0, .y = 0 },
-                    .start_angle = 0,
-                    .sweep_angle = 2 * std.math.pi,
-                    .radius = junction_radius,
-                } },
-                .{ .stroke = .{ .base_thickness = 2 } },
-                .{ .fill = {} },
-            };
-
-            try vector_renderer.render(
-                insts,
-                .{
-                    .line_scale = zoom_scale,
-                    .rotate = 0,
-                    .scale = .both(1),
-                    .translate = .{
-                        .x = @floatFromInt(gpos.x),
-                        .y = @floatFromInt(gpos.y),
-                    },
-                },
-                .{
-                    .stroke_color = ElementRenderType.normal.colors().terminal_wire_color,
-                    .fill_color = dvui.themeGet().fill,
-                },
-            );
-        }
     }
 
     for (circuit.main_circuit.pins.items, 0..) |pin, i| {
@@ -1004,78 +960,10 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         try renderer.renderPin(&vector_renderer, pin.pos, pin.rotation, pin.name, render_type);
     }
 
-    switch (circuit.placement_mode) {
-        .none => {},
-        .new_component => |data| try renderHoldingComponent(
-            data.device_type,
-            &vector_renderer,
-            null,
-        ),
-        .new_wire => |data| try renderHoldingWire(&vector_renderer, data.held_wire_p1),
-        .new_pin => try renderHoldingPin(&vector_renderer),
-        .new_ground => try renderHoldingGround(&vector_renderer, null),
-        .dragging_ground => |data| try renderHoldingGround(&vector_renderer, data.ground_id),
-        .dragging_component => |data| {
-            const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
-            const dev_type = graphic_comp.comp.device;
-            try renderHoldingComponent(dev_type, &vector_renderer, data.comp_id);
-        },
-        .dragging_wire => |data| {
-            const wire = circuit.main_circuit.wires.items[data.wire_id];
-            const m_grid_pos = screenToWorld(circuit_rect, mouse_pos, zoom_scale);
-            const adjusted_pos: circuit.GridSubposition = switch (wire.direction) {
-                .vertical => .{
-                    .x = m_grid_pos.x,
-                    .y = m_grid_pos.y - data.offset,
-                },
-                .horizontal => .{
-                    .x = m_grid_pos.x - data.offset,
-                    .y = m_grid_pos.y,
-                },
-            };
+    try circuit.main_circuit.findJunctions();
+    try circuit.main_circuit.renderJunctions(&vector_renderer);
 
-            const pos: circuit.GridPosition = .{
-                .x = @intFromFloat(@round(adjusted_pos.x)),
-                .y = @intFromFloat(@round(adjusted_pos.y)),
-            };
-
-            const new_wire = circuit.Wire{
-                .direction = wire.direction,
-                .length = wire.length,
-                .pos = pos,
-            };
-
-            const can_place = circuit.main_circuit.canPlaceWire(new_wire, data.wire_id);
-            const render_type = if (can_place)
-                ElementRenderType.holding
-            else
-                ElementRenderType.unable_to_place;
-
-            try renderer.renderWire(&vector_renderer, new_wire, render_type);
-        },
-        .dragging_pin => |data| {
-            const pin = circuit.main_circuit.pins.items[data.pin_id];
-            const pos = nearestGridPosition(circuit_rect, mouse_pos);
-            const can_place = circuit.main_circuit.canPlacePin(
-                pos,
-                circuit.placement_rotation,
-                null,
-            );
-
-            const render_type = if (can_place)
-                ElementRenderType.holding
-            else
-                ElementRenderType.unable_to_place;
-
-            try renderer.renderPin(
-                &vector_renderer,
-                pos,
-                circuit.placement_rotation,
-                pin.name,
-                render_type,
-            );
-        },
-    }
+    try renderPlacement(&vector_renderer);
 
     const Cursor = dvui.enums.Cursor;
 

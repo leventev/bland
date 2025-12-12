@@ -323,7 +323,137 @@ pub const GraphicCircuit = struct {
     pins: std.ArrayList(Pin),
     grounds: std.ArrayList(Ground),
 
+    // NOTE: only updating the relevant information when adding/removing/moving elements
+    // would be the most optimal but it would introduce too much complexity
+    // rather we recount all on every change
+    junctions: std.AutoHashMapUnmanaged(GridPosition, Junction),
     const max_pin_name_lengh = bland.component.max_component_name_length;
+
+    pub const Junction = struct {
+        end_connection: usize,
+        non_end_connection: usize,
+    };
+
+    fn ensureJunctionExists(self: *GraphicCircuit, grid_pos: GridPosition) !void {
+        _ = try self.junctions.getOrPutValue(self.allocator, grid_pos, .{
+            .end_connection = 0,
+            .non_end_connection = 0,
+        });
+    }
+
+    fn addEndConnection(self: *GraphicCircuit, grid_pos: GridPosition) !void {
+        try self.ensureJunctionExists(grid_pos);
+        var ptr = self.junctions.getPtr(grid_pos).?;
+        ptr.end_connection += 1;
+    }
+
+    fn addNonEndConnection(self: *GraphicCircuit, grid_pos: GridPosition) !void {
+        try self.ensureJunctionExists(grid_pos);
+        var ptr = self.junctions.getPtr(grid_pos).?;
+        ptr.non_end_connection += 1;
+    }
+
+    pub fn findJunctions(self: *GraphicCircuit) !void {
+        self.junctions.clearRetainingCapacity();
+        for (self.graphic_components.items) |graphic_comp| {
+            var terminal_buff: [8]GridPosition = undefined;
+            const terminals = graphic_comp.terminals(&terminal_buff);
+            for (terminals) |grid_pos| {
+                try self.addEndConnection(grid_pos);
+            }
+        }
+
+        for (self.grounds.items) |ground| {
+            try self.addEndConnection(ground.pos);
+        }
+
+        for (self.wires.items) |wire| {
+            var it = wire.iterator();
+            while (it.next()) |grid_pos| {
+                if (grid_pos.eql(wire.pos) or grid_pos.eql(wire.end())) {
+                    try self.addEndConnection(grid_pos);
+                } else {
+                    try self.addNonEndConnection(grid_pos);
+                }
+            }
+        }
+    }
+
+    pub fn renderJunctions(
+        self: *const GraphicCircuit,
+        vector_renderer: *const VectorRenderer,
+    ) !void {
+        // to decide where to render lumps we count all wire connections per node
+        // it would be better to visualize this with a drawing on paper
+        // if end_connection > 0 and non_end_connection > 0 then we put a lump there
+        // if end_connection > 2 or non_end_connection == 2 then we put a lump there
+        const junction_radius = 0.11;
+        var it = self.junctions.iterator();
+        while (it.next()) |entry| {
+            const gpos = entry.key_ptr.*;
+            const wire_connections = entry.value_ptr.*;
+
+            const is_junction = wire_connections.end_connection > 0 and wire_connections.non_end_connection > 0 or
+                wire_connections.end_connection > 2 or wire_connections.non_end_connection == 2;
+
+            const is_end = wire_connections.end_connection == 1 and wire_connections.non_end_connection == 0;
+
+            if (is_junction) {
+                const insts: []const VectorRenderer.BrushInstruction = &.{
+                    .{ .reset = {} },
+                    .{ .arc = .{
+                        .center = .{ .x = 0, .y = 0 },
+                        .start_angle = 0,
+                        .sweep_angle = 2 * std.math.pi,
+                        .radius = junction_radius,
+                    } },
+                    .{ .fill = {} },
+                };
+
+                try vector_renderer.render(
+                    insts,
+                    .{
+                        .line_scale = 1,
+                        .rotate = 0,
+                        .scale = .both(1),
+                        .translate = .{
+                            .x = @floatFromInt(gpos.x),
+                            .y = @floatFromInt(gpos.y),
+                        },
+                    },
+                    .{ .fill_color = renderer.ElementRenderType.normal.colors().terminal_wire_color },
+                );
+            } else if (is_end) {
+                const insts: []const VectorRenderer.BrushInstruction = &.{
+                    .{ .reset = {} },
+                    .{ .arc = .{
+                        .center = .{ .x = 0, .y = 0 },
+                        .start_angle = 0,
+                        .sweep_angle = 2 * std.math.pi,
+                        .radius = junction_radius,
+                    } },
+                    .{ .stroke = .{ .base_thickness = 2 } },
+                };
+
+                try vector_renderer.render(
+                    insts,
+                    .{
+                        .line_scale = 1,
+                        .rotate = 0,
+                        .scale = .both(1),
+                        .translate = .{
+                            .x = @floatFromInt(gpos.x),
+                            .y = @floatFromInt(gpos.y),
+                        },
+                    },
+                    .{
+                        .stroke_color = renderer.ElementRenderType.normal.colors().terminal_wire_color,
+                        .fill_color = dvui.themeGet().fill,
+                    },
+                );
+            }
+        }
+    }
 
     pub const Pin = struct {
         pos: GridPosition,
