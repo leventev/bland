@@ -113,7 +113,10 @@ fn findHoveredElement(viewport: dvui.Rect.Physical, m_pos: dvui.Point.Physical) 
             }
 
             for (circuit.main_circuit.grounds.items, 0..) |ground, ground_id| {
-                const hovered = mouseInsideGround(viewport, m_pos, ground.pos, ground.rotation);
+                const hovered = ground.hovered(
+                    mouse_grid_pos,
+                    zoom_scale,
+                );
 
                 if (hovered) {
                     data.hovered_element = .{ .ground = ground_id };
@@ -160,6 +163,8 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                                             .ground_id = ground_id,
                                         },
                                     };
+                                    const gnd = circuit.main_circuit.grounds.items[ground_id];
+                                    circuit.placement_rotation = gnd.rotation;
                                 },
                                 .wire => |wire_id| {
                                     const mouse_grid_pos = screenToWorld(viewport, ev.p, zoom_scale);
@@ -451,33 +456,6 @@ const GridPositionWireConnection = struct {
     end_connection: usize,
     non_end_connection: usize,
 };
-
-pub fn mouseInsideGround(
-    viewport: dvui.Rect.Physical,
-    m_pos: dvui.Point.Physical,
-    grid_pos: circuit.GridPosition,
-    rotation: circuit.Rotation,
-) bool {
-    _ = grid_pos;
-    _ = rotation;
-    _ = viewport;
-    _ = m_pos;
-    return false;
-    // const pos = grid_pos.toCircuitPosition(circuit_rect);
-    //
-    // const center: dvui.Point.Physical = switch (rotation) {
-    //     .left, .right => .{ .x = pos.x + ground_wire_pixel_len + ground_triangle_height / 2, .y = pos.y },
-    //     .top, .bottom => .{ .x = pos.x, .y = pos.y + ground_wire_pixel_len + ground_triangle_height / 2 },
-    // };
-    //
-    // const xd = mouse_pos.x - center.x;
-    // const yd = mouse_pos.y - center.y;
-    //
-    // const tolerance = 6;
-    // const check_radius = ground_triangle_height / 2 + tolerance;
-    //
-    // return xd * xd + yd * yd <= check_radius * check_radius;
-}
 
 fn renderHoldingComponent(
     device_type: bland.Component.DeviceType,

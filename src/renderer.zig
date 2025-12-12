@@ -1154,16 +1154,12 @@ pub fn renderPin(
     }
 }
 
-const ground_triangle_side = 45;
-const ground_wire_pixel_len = 25;
-const ground_triangle_height = global.grid_size - ground_wire_pixel_len;
-
-const ground_pyramide_length = 0.3;
-const ground_wire_len = 0.6;
-const ground_level_1_len = 0.7;
+pub const ground_pyramide_len = 0.3;
+pub const ground_wire_len = 0.6;
+pub const ground_level_1_len = 0.7;
 const ground_level_2_len = 0.45;
 const ground_level_3_len = 0.2;
-const ground_level_gap = ground_pyramide_length / 2.0;
+const ground_level_gap = ground_pyramide_len / 2.0;
 
 pub fn renderGround(
     vector_renderer: *const VectorRenderer,

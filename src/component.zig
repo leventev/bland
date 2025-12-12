@@ -205,7 +205,7 @@ pub const GraphicComponent = struct {
             radius: f32,
         },
 
-        fn inside(self: ClickableShape, translate: GridPosition, rotation: Rotation, zoom: f32, pos: GridSubposition) bool {
+        pub fn inside(self: ClickableShape, translate: GridPosition, rotation: Rotation, zoom: f32, pos: GridSubposition) bool {
             const xf: f32 = @floatFromInt(translate.x);
             const yf: f32 = @floatFromInt(translate.y);
 

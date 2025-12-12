@@ -298,6 +298,22 @@ pub const Ground = struct {
             },
         };
     }
+    pub fn hovered(
+        self: Ground,
+        mouse_grid_pos: GridSubposition,
+        zoom: f32,
+    ) bool {
+        const shape = component.GraphicComponent.ClickableShape{
+            .rect = .{
+                .x = renderer.ground_wire_len,
+                .y = -renderer.ground_level_1_len / 2.0,
+                .width = renderer.ground_pyramide_len,
+                .height = renderer.ground_level_1_len,
+            },
+        };
+
+        return shape.inside(self.pos, self.rotation, zoom, mouse_grid_pos);
+    }
 };
 
 pub const GraphicCircuit = struct {
