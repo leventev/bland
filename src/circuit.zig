@@ -129,14 +129,20 @@ pub const Wire = struct {
         const tolerance_px = 7;
         const tolerance = tolerance_px / grid_size;
 
-        const sp = GridSubposition{
+        var sp = GridSubposition{
             .x = @floatFromInt(self.pos.x),
             .y = @floatFromInt(self.pos.y),
         };
-        const ep = GridSubposition{
+        var ep = GridSubposition{
             .x = @floatFromInt(self.end().x),
             .y = @floatFromInt(self.end().y),
         };
+
+        if (self.length < 0) {
+            const tmp = sp;
+            sp = ep;
+            ep = tmp;
+        }
 
         switch (self.direction) {
             .horizontal => {
