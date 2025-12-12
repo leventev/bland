@@ -122,35 +122,35 @@ pub const Wire = struct {
 
     pub fn hovered(
         self: Wire,
-        viewport: dvui.Rect.Physical,
-        mouse_pos: dvui.Point.Physical,
+        m_pos: GridSubposition,
+        zoom_scale: f32,
     ) bool {
-        _ = self;
-        _ = viewport;
-        _ = mouse_pos;
+        const grid_size = VectorRenderer.grid_cell_px_size * zoom_scale;
+        const tolerance_px = 7;
+        const tolerance = tolerance_px / grid_size;
+
+        const sp = GridSubposition{
+            .x = @floatFromInt(self.pos.x),
+            .y = @floatFromInt(self.pos.y),
+        };
+        const ep = GridSubposition{
+            .x = @floatFromInt(self.end().x),
+            .y = @floatFromInt(self.end().y),
+        };
+
+        switch (self.direction) {
+            .horizontal => {
+                const x_within = m_pos.x >= sp.x and m_pos.x <= ep.x;
+                const y_within = @abs(m_pos.y - sp.y) <= tolerance;
+                return x_within and y_within;
+            },
+            .vertical => {
+                const y_within = m_pos.y >= sp.y and m_pos.y <= ep.y;
+                const x_within = @abs(m_pos.x - sp.x) <= tolerance;
+                return x_within and y_within;
+            },
+        }
         return false;
-        // const tolerance = 12;
-        //
-        // switch (self.direction) {
-        //     .horizontal => {
-        //         const start_pos = self.pos.toCircuitPosition(viewport);
-        //         const end_pos = self.end().toCircuitPosition(viewport);
-        //
-        //         const left = if (end_pos.x > start_pos.x) start_pos else end_pos;
-        //         const right = if (end_pos.x > start_pos.x) end_pos else start_pos;
-        //
-        //         return @abs(mouse_pos.y - start_pos.y) < tolerance and mouse_pos.x >= left.x and mouse_pos.x <= right.x;
-        //     },
-        //     .vertical => {
-        //         const start_pos = self.pos.toCircuitPosition(viewport);
-        //         const end_pos = self.end().toCircuitPosition(viewport);
-        //
-        //         const top = if (end_pos.y > start_pos.y) start_pos else end_pos;
-        //         const bottom = if (end_pos.y > start_pos.y) end_pos else start_pos;
-        //
-        //         return @abs(mouse_pos.x - start_pos.x) < tolerance and mouse_pos.y >= top.y and mouse_pos.y <= bottom.y;
-        //     },
-        // }
     }
 };
 

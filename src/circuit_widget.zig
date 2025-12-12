@@ -122,7 +122,7 @@ fn findHoveredElement(viewport: dvui.Rect.Physical, m_pos: dvui.Point.Physical) 
             }
 
             for (circuit.main_circuit.wires.items, 0..) |wire, wire_id| {
-                const hovered = wire.hovered(viewport, m_pos);
+                const hovered = wire.hovered(mouse_grid_pos, zoom_scale);
 
                 if (hovered) {
                     data.hovered_element = .{ .wire = wire_id };
