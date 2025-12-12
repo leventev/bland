@@ -1008,7 +1008,6 @@ pub fn renderPin(
         .size = global.circuit_font_size * circuit_widget.zoom_scale,
     };
 
-    // const dist_from_point = 10;
     const angle: f32 = 15.0 / 180.0 * std.math.pi;
 
     const color = render_type.colors().component_color;

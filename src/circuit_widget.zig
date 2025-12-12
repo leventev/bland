@@ -627,6 +627,47 @@ pub fn nearestGridPosition(
     return grid_pos;
 }
 
+fn renderGrid(
+    vector_renderer: *const VectorRenderer,
+) !void {
+    const grid_color = comptime dvui.Color.fromHSLuv(200, 5, 30, 50);
+    const grid_instructions = [_]VectorRenderer.BrushInstruction{
+        .{ .move_rel = .{ .x = 1, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+    const first_grid_col = @ceil(vector_renderer.world_left);
+    const last_grid_col = @floor(vector_renderer.world_right);
+    var col = first_grid_col;
+    while (col <= last_grid_col) : (col += 1) {
+        try vector_renderer.render(
+            &grid_instructions,
+            .{
+                .rotate = std.math.pi / 2.0,
+                .scale = .both(vector_renderer.world_bottom - vector_renderer.world_top),
+                .translate = .{ .x = col, .y = vector_renderer.world_top },
+                .line_scale = 1,
+            },
+            .{ .stroke_color = grid_color },
+        );
+    }
+
+    const first_grid_row = @ceil(vector_renderer.world_top);
+    const last_grid_row = @floor(vector_renderer.world_bottom);
+    var row = first_grid_row;
+    while (row <= last_grid_row) : (row += 1) {
+        try vector_renderer.render(
+            &grid_instructions,
+            .{
+                .rotate = 0,
+                .scale = .both(vector_renderer.world_right - vector_renderer.world_left),
+                .translate = .{ .x = vector_renderer.world_left, .y = row },
+                .line_scale = 1,
+            },
+            .{ .stroke_color = grid_color },
+        );
+    }
+}
+
 pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     // to decide where to render lumps we count all wire connections per node
     // it would be better to visualize this with a drawing on paper
@@ -778,46 +819,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         world_right,
     );
 
-    const grid_color = comptime dvui.Color.fromHSLuv(200, 5, 30, 50);
-    const grid_horizontal_instructions = [_]VectorRenderer.BrushInstruction{
-        .{ .move_rel = .{ .x = 0, .y = 1 } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-    const first_grid_col = @ceil(world_left);
-    const last_grid_col = @floor(world_right);
-    var col = first_grid_col;
-    while (col <= last_grid_col) : (col += 1) {
-        try vector_renderer.render(
-            &grid_horizontal_instructions,
-            .{
-                .rotate = 0,
-                .scale = .both(world_bottom - world_top),
-                .translate = .{ .x = col, .y = world_top },
-                .line_scale = 1,
-            },
-            .{ .stroke_color = grid_color },
-        );
-    }
-
-    const grid_vertical_instructions = [_]VectorRenderer.BrushInstruction{
-        .{ .move_rel = .{ .x = 1, .y = 0 } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-    const first_grid_row = @ceil(world_top);
-    const last_grid_row = @floor(world_bottom);
-    var row = first_grid_row;
-    while (row <= last_grid_row) : (row += 1) {
-        try vector_renderer.render(
-            &grid_vertical_instructions,
-            .{
-                .rotate = 0,
-                .scale = .both(world_right - world_left),
-                .translate = .{ .x = world_left, .y = row },
-                .line_scale = 1,
-            },
-            .{ .stroke_color = grid_color },
-        );
-    }
+    try renderGrid(&vector_renderer);
 
     for (0.., circuit.main_circuit.graphic_components.items) |i, comp| {
         switch (circuit.placement_mode) {
