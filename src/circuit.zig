@@ -352,60 +352,51 @@ pub const GraphicCircuit = struct {
 
         pub fn hovered(
             self: Pin,
-            circuit_rect: dvui.Rect.Physical,
-            mouse_pos: dvui.Point.Physical,
+            mouse_pos: GridSubposition,
+            zoom: f32,
         ) bool {
-            _ = self;
-            _ = circuit_rect;
-            _ = mouse_pos;
-            return false;
-            // const f = dvui.Font{
-            //     .id = .fromName(global.font_name),
-            //     .size = global.circuit_font_size,
-            // };
-            //
-            // const tolerance = 3;
-            //
-            // const dist_from_point = 10;
-            // const angle = 15.0 / 180.0 * std.math.pi;
-            //
-            // const start_pos = self.pos.toCircuitPosition(circuit_rect);
-            //
-            // const label_size = dvui.Font.textSize(f, self.name);
-            // const rect_width = label_size.w + 20;
-            // const rect_height = label_size.h + 10;
-            //
-            // const trig_height_vert = (comptime std.math.tan(angle)) * rect_width / 2;
-            // const trig_height_hor = (comptime std.math.tan(angle)) * rect_height / 2;
-            //
-            // const rect = switch (self.rotation) {
-            //     .right => dvui.Rect.Physical{
-            //         .x = start_pos.x + dist_from_point + trig_height_hor - tolerance,
-            //         .y = start_pos.y - rect_height / 2 - tolerance,
-            //         .w = rect_width + tolerance * 2,
-            //         .h = rect_height + tolerance * 2,
-            //     },
-            //     .left => dvui.Rect.Physical{
-            //         .x = start_pos.x - (dist_from_point + rect_width + trig_height_hor) - tolerance,
-            //         .y = start_pos.y - rect_height / 2 - tolerance,
-            //         .w = rect_width + tolerance * 2,
-            //         .h = rect_height + tolerance * 2,
-            //     },
-            //     .top => dvui.Rect.Physical{
-            //         .x = start_pos.x - rect_width / 2 - tolerance,
-            //         .y = start_pos.y - (rect_height + trig_height_vert + dist_from_point) - tolerance,
-            //         .w = rect_width + tolerance * 2,
-            //         .h = rect_height + tolerance * 2,
-            //     },
-            //     .bottom => dvui.Rect.Physical{
-            //         .x = start_pos.x - rect_width / 2 - tolerance,
-            //         .y = start_pos.y + trig_height_vert + dist_from_point - tolerance,
-            //         .w = rect_width + tolerance * 2,
-            //         .h = rect_height + tolerance * 2,
-            //     },
-            // };
-            //
-            // return rect.contains(mouse_pos);
+            const f = dvui.Font{
+                .id = .fromName(global.font_name),
+                .size = global.circuit_font_size * circuit_widget.zoom_scale,
+            };
+
+            const angle: f32 = 15.0 / 180.0 * std.math.pi;
+
+            const label_size = dvui.Font.textSize(f, self.name);
+            const grid_size = VectorRenderer.grid_cell_px_size * circuit_widget.zoom_scale;
+
+            const rect_width = label_size.w / grid_size + 0.2;
+            const rect_height = label_size.h / grid_size + 0.2;
+            const gap: f32 = 0.2;
+
+            switch (self.rotation) {
+                .right, .left => {
+                    const triangle_len = (rect_height / 2) * std.math.atan(angle);
+                    const shape = component.GraphicComponent.ClickableShape{
+                        .rect = .{
+                            .x = gap,
+                            .y = -rect_height / 2,
+                            .width = triangle_len + rect_width,
+                            .height = rect_height,
+                        },
+                    };
+
+                    return shape.inside(self.pos, self.rotation, zoom, mouse_pos);
+                },
+                .top, .bottom => {
+                    const triangle_len = (rect_width / 2) * std.math.atan(angle);
+                    const shape = component.GraphicComponent.ClickableShape{
+                        .rect = .{
+                            .x = gap,
+                            .y = -rect_width / 2,
+                            .width = triangle_len + rect_height,
+                            .height = rect_width,
+                        },
+                    };
+
+                    return shape.inside(self.pos, self.rotation, zoom, mouse_pos);
+                },
+            }
         }
     };
 

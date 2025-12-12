@@ -1132,8 +1132,8 @@ pub fn renderPin(
                     },
                     .line_scale = thickness,
                     .scale = .{
-                        .x = rect_width,
-                        .y = rect_height,
+                        .x = rect_height,
+                        .y = rect_width,
                     },
                     .rotate = rot,
                 },

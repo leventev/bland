@@ -96,7 +96,7 @@ fn findHoveredElement(viewport: dvui.Rect.Physical, m_pos: dvui.Point.Physical) 
             const mouse_grid_pos = screenToWorld(viewport, m_pos, zoom_scale);
             // priority: pin > comp > ground > wire
             for (circuit.main_circuit.pins.items, 0..) |pin, pin_id| {
-                const hovered = pin.hovered(viewport, m_pos);
+                const hovered = pin.hovered(mouse_grid_pos, zoom_scale);
 
                 if (hovered) {
                     data.hovered_element = .{ .pin = pin_id };
