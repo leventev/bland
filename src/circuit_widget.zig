@@ -424,15 +424,17 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                             graphic_comp,
                         );
 
+                        const last_idx = circuit.main_circuit.graphic_components.items.len - 1;
+                        const last_comp = &circuit.main_circuit.graphic_components.items[last_idx];
                         try circuit.main_circuit.labels.append(
                             circuit.main_circuit.allocator,
-                            Label.init(
-                                .{
+                            Label{
+                                .pos = .{
                                     .x = @floatFromInt(grid_pos.x),
                                     .y = @floatFromInt(grid_pos.y),
                                 },
-                                graphic_comp.comp.name,
-                            ),
+                                .text = &last_comp.comp.name,
+                            },
                         );
                     }
                 },
@@ -613,7 +615,7 @@ fn renderHoldingLabel(
     Label.renderLabel(
         vector_renderer,
         pos,
-        label.text,
+        label.text.*,
         dvui.Color.gray,
         null,
     );
