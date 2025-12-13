@@ -315,7 +315,14 @@ pub fn renderText(
                 .rs = .{ .r = r },
             }) catch @panic("Failed to render text");
         },
-        .svg_export => @panic("TODO"),
+        .svg_export => |export_opts| {
+            var writer = export_opts.writer;
+            _ = try writer.print("<text x=\"{}\" y=\"{}\">{s}</text>\n", .{
+                screen_pos.x,
+                screen_pos.y,
+                text,
+            });
+        },
     }
 }
 

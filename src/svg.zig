@@ -67,6 +67,11 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
         .{ width, height },
     );
 
+    // _ = try writer.print("<style>\n");
+    // _ = try writer.print("text {\n");
+    // _ = try writer.print("font-family{\n");
+    // _ = try writer.print("}\n");
+    // _ = try writer.print("</style>\n");
     var vector_renderer = VectorRenderer.init(
         .{ .svg_export = .{
             .writer = writer,
@@ -95,6 +100,14 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
             ground.rotation,
             .normal,
             &graphic_circuit.junctions,
+        );
+        try writer.flush();
+    }
+
+    for (graphic_circuit.labels.items) |label| {
+        label.render(
+            &vector_renderer,
+            false,
         );
         try writer.flush();
     }
