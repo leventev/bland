@@ -11,16 +11,29 @@ const GridSubposition = circuit.GridSubposition;
 const Label = @This();
 
 pos: GridSubposition,
-text: *const []const u8,
-owner: ?Component.Id = null,
+text_backing: TextBacking,
+
+pub const TextBacking = union(enum) {
+    component_name: Component.Id,
+
+    pub fn retrieve(self: TextBacking) []const u8 {
+        switch (self) {
+            .component_name => |id| {
+                const id_int = @intFromEnum(id);
+                return circuit.main_circuit.graphic_components.items[id_int].comp.name;
+            },
+        }
+    }
+};
 
 pub fn renderLabel(
     vector_renderer: *const VectorRenderer,
     pos: GridSubposition,
-    text: []const u8,
+    text_backing: TextBacking,
     fg_color: dvui.Color,
     bg_color: ?dvui.Color,
 ) void {
+    const text = text_backing.retrieve();
     vector_renderer.renderText(
         .{
             .x = pos.x,
@@ -32,6 +45,12 @@ pub fn renderLabel(
     ) catch {};
 }
 
+pub fn owner(self: Label) ?Component.Id {
+    return switch (self.text_backing) {
+        .component_name => |id| id,
+    };
+}
+
 pub fn render(
     self: Label,
     vector_renderer: *const VectorRenderer,
@@ -41,7 +60,7 @@ pub fn render(
     renderLabel(
         vector_renderer,
         self.pos,
-        self.text.*,
+        self.text_backing,
         dvui.Color.white,
         bg_color,
     );
@@ -54,7 +73,8 @@ pub fn hovered(self: Label, mouse_pos: GridSubposition, zoom: f32) bool {
         .line_height_factor = 1,
     };
 
-    const label_size = dvui.Font.textSize(f, self.text.*);
+    const text = self.text_backing.retrieve();
+    const label_size = dvui.Font.textSize(f, text);
     const grid_size = VectorRenderer.grid_cell_px_size * zoom;
 
     const rect_width = label_size.w / grid_size;

@@ -1272,6 +1272,33 @@ pub const GraphicCircuit = struct {
 
         var comp = self.graphic_components.orderedRemove(comp_id);
         comp.deinit(self.allocator);
+
+        std.debug.assert(self.labels.items.len > 0);
+        var idx = self.labels.items.len;
+        var deleted: usize = 0;
+        while (true) {
+            idx -= 1;
+            const label = self.labels.items[idx];
+            if (label.owner() == @as(bland.Component.Id, @enumFromInt(comp_id))) {
+                _ = self.labels.swapRemove(idx);
+                deleted += 1;
+            }
+
+            if (idx == 0) break;
+        }
+
+        // adjust the owner IDs of labels after a component was deleted
+        // TODO: maybe find a nicer way to do this
+        for (self.labels.items) |*label| {
+            switch (label.text_backing) {
+                .component_name => |*id| {
+                    const id_int = @intFromEnum(id.*);
+                    if (id_int > comp_id) {
+                        id.* = @enumFromInt(id_int - deleted);
+                    }
+                },
+            }
+        }
     }
 
     pub fn deleteWire(self: *GraphicCircuit, wire_id: usize) void {
