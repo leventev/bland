@@ -484,7 +484,7 @@ fn renderHoldingComponent(
         grid_pos,
         circuit.placement_rotation,
         render_type,
-        null,
+        &circuit.main_circuit.junctions,
     );
 }
 
@@ -510,13 +510,15 @@ fn renderHoldingWire(
         .pos = p1,
     };
 
+    if (wire.length == 0) return;
+
     const can_place = circuit.main_circuit.canPlaceWire(wire, null);
     const render_type = if (can_place)
         ElementRenderType.holding
     else
         ElementRenderType.unable_to_place;
 
-    try renderer.renderWire(vector_renderer, wire, render_type, null);
+    try renderer.renderWire(vector_renderer, wire, render_type, &circuit.main_circuit.junctions);
 }
 
 fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id: ?usize) !void {
