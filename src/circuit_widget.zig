@@ -369,7 +369,12 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                         circuit.placement_rotation,
                     );
 
-                    if (circuit.main_circuit.canPlaceComponent(data.device_type, grid_pos, circuit.placement_rotation, null)) {
+                    if (circuit.main_circuit.canPlaceComponent(
+                        data.device_type,
+                        grid_pos,
+                        circuit.placement_rotation,
+                        null,
+                    )) {
                         const graphic_comp = try component.GraphicComponent.init(
                             gpa,
                             grid_pos,
@@ -545,6 +550,7 @@ fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id
         grid_pos,
         circuit.placement_rotation,
         render_type,
+        &circuit.main_circuit.junctions,
     );
 }
 
@@ -927,6 +933,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
             ground.pos,
             ground.rotation,
             render_type,
+            &circuit.main_circuit.junctions,
         );
     }
 

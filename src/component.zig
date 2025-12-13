@@ -181,7 +181,7 @@ pub fn renderComponent(
                     .x = line_start_pos.x,
                     .y = line_start_pos.y,
                 },
-                .line_scale = thickness,
+                .line_scale = thickness * circuit_widget.zoom_scale,
                 .scale = .both(scale),
                 .rotate = rotation + wire_rotation,
             },

@@ -89,7 +89,13 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
     }
 
     for (graphic_circuit.grounds.items) |ground| {
-        try renderer.renderGround(&vector_renderer, ground.pos, ground.rotation, .normal);
+        try renderer.renderGround(
+            &vector_renderer,
+            ground.pos,
+            ground.rotation,
+            .normal,
+            &graphic_circuit.junctions,
+        );
         try writer.flush();
     }
 

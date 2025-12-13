@@ -1117,6 +1117,7 @@ pub fn renderGround(
     grid_pos: circuit.GridPosition,
     rot: circuit.Rotation,
     render_type: ElementRenderType,
+    junctions: ?*const std.AutoHashMapUnmanaged(GridPosition, circuit.GraphicCircuit.Junction),
 ) !void {
     const render_colors = render_type.colors();
     const thickness = render_type.thickness();
@@ -1138,7 +1139,7 @@ pub fn renderGround(
 
     const terminalWireInstructions: []const VectorRenderer.BrushInstruction = &.{
         .{ .snap_pixel_set = true },
-        .{ .move_rel = .{ .x = ground_wire_len, .y = 0 } },
+        .{ .move_rel = .{ .x = 1, .y = 0 } },
         .{ .stroke = .{ .base_thickness = 1 } },
     };
 
@@ -1163,16 +1164,32 @@ pub fn renderGround(
         .{ .stroke_color = render_colors.component_color },
     );
 
+    var scale: f32 = ground_wire_len;
+    var x: f32 = @floatFromInt(grid_pos.x);
+    var y: f32 = @floatFromInt(grid_pos.y);
+    if (junctions) |js| {
+        const circle_rendered = if (js.get(grid_pos)) |junction|
+            junction.kind() != .none
+        else
+            false;
+
+        if (circle_rendered) {
+            scale -= circuit.GraphicCircuit.junction_radius;
+            switch (rot) {
+                .right => x += circuit.GraphicCircuit.junction_radius,
+                .left => x -= circuit.GraphicCircuit.junction_radius,
+                .top => y -= circuit.GraphicCircuit.junction_radius,
+                .bottom => y += circuit.GraphicCircuit.junction_radius,
+            }
+        }
+    }
     try vector_renderer.render(
         terminalWireInstructions,
         .{
-            .line_scale = thickness,
-            .scale = .both(1),
+            .line_scale = thickness * circuit_widget.zoom_scale,
+            .scale = .both(scale),
             .rotate = rotation,
-            .translate = .{
-                .x = @floatFromInt(grid_pos.x),
-                .y = @floatFromInt(grid_pos.y),
-            },
+            .translate = .{ .x = x, .y = y },
         },
         .{ .stroke_color = render_colors.terminal_wire_color },
     );
