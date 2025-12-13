@@ -200,9 +200,13 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                                     circuit.placement_rotation = pin.rotation;
                                 },
                                 .label => |label_id| {
+                                    const mouse_grid_pos = screenToWorld(viewport, ev.p, zoom_scale);
+                                    const label = circuit.main_circuit.labels.items[label_id];
                                     circuit.placement_mode = .{
                                         .dragging_label = .{
                                             .label_id = label_id,
+                                            .offset_x = mouse_grid_pos.x - label.pos.x,
+                                            .offset_y = mouse_grid_pos.y - label.pos.y,
                                         },
                                     };
                                 },
@@ -329,9 +333,13 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                     },
                     .dragging_label => |data| {
                         const label = &circuit.main_circuit.labels.items[data.label_id];
-                        const grid_pos = screenToWorld(viewport, ev.p, zoom_scale);
 
-                        label.pos = grid_pos;
+                        const m_grid_pos = screenToWorld(viewport, ev.p, zoom_scale);
+                        const adjusted_pos = circuit.GridSubposition{
+                            .x = m_grid_pos.x - data.offset_x,
+                            .y = m_grid_pos.y - data.offset_y,
+                        };
+                        label.pos = adjusted_pos;
 
                         circuit.placement_mode = .{
                             .none = .{
@@ -595,20 +603,16 @@ fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id
     );
 }
 
-fn renderHoldingLabel(vector_renderer: *const VectorRenderer, label_id: usize) !void {
-    std.debug.assert(vector_renderer.output == .screen);
-    const screen = vector_renderer.output.screen;
-
+fn renderHoldingLabel(
+    vector_renderer: *const VectorRenderer,
+    label_id: usize,
+    pos: circuit.GridSubposition,
+) !void {
     const label = circuit.main_circuit.labels.items[label_id];
-    const grid_pos = screenToWorld(
-        screen.viewport,
-        mouse_pos,
-        zoom_scale,
-    );
 
     Label.renderLabel(
         vector_renderer,
-        grid_pos,
+        pos,
         label.text,
         dvui.Color.gray,
         null,
@@ -747,7 +751,14 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
         .new_pin => try renderHoldingPin(vector_renderer),
         .new_ground => try renderHoldingGround(vector_renderer, null),
         .dragging_ground => |data| try renderHoldingGround(vector_renderer, data.ground_id),
-        .dragging_label => |data| try renderHoldingLabel(vector_renderer, data.label_id),
+        .dragging_label => |data| {
+            const m_grid_pos = screenToWorld(viewport, mouse_pos, zoom_scale);
+            const adjusted_pos = circuit.GridSubposition{
+                .x = m_grid_pos.x - data.offset_x,
+                .y = m_grid_pos.y - data.offset_y,
+            };
+            try renderHoldingLabel(vector_renderer, data.label_id, adjusted_pos);
+        },
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;

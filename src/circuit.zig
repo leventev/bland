@@ -209,6 +209,8 @@ pub const PlacementMode = union(PlacementModeType) {
     },
     dragging_label: struct {
         label_id: usize,
+        offset_x: f32,
+        offset_y: f32,
     },
 };
 
