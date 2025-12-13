@@ -148,7 +148,7 @@ pub fn renderProperties() void {
 
                 selected_graphic_comp.renderPropertyBox(circuit.selection_changed);
             },
-            .wire, .ground => {},
+            .wire, .ground, .label => {},
             .pin => |pin_id| {
                 // TODO: there should be no scrollArea here right?
                 var pin = &circuit.main_circuit.pins.items[pin_id];

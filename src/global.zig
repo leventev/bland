@@ -20,7 +20,7 @@ pub const bold_font_name = "JetBrainsMonoBold";
 pub const bold_font_path = "ttf/JetBrainsMono-Bold.ttf";
 pub const bold_font_data = @embedFile(bold_font_path);
 
-pub const circuit_font_size = 18;
+pub const circuit_font_size = 21;
 
 // TODO: make this const and make it nicer
 

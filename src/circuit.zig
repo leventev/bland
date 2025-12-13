@@ -6,6 +6,7 @@ const global = @import("global.zig");
 const dvui = @import("dvui");
 const VectorRenderer = @import("VectorRenderer.zig");
 const circuit_widget = @import("circuit_widget.zig");
+const Label = @import("Label.zig");
 
 const NetList = bland.NetList;
 
@@ -170,6 +171,7 @@ pub const PlacementModeType = enum {
     dragging_wire,
     dragging_pin,
     dragging_ground,
+    dragging_label,
 };
 
 pub const Element = union(enum) {
@@ -177,6 +179,7 @@ pub const Element = union(enum) {
     wire: usize,
     pin: usize,
     ground: usize,
+    label: usize,
 };
 
 pub const PlacementMode = union(PlacementModeType) {
@@ -203,6 +206,9 @@ pub const PlacementMode = union(PlacementModeType) {
     },
     dragging_ground: struct {
         ground_id: usize,
+    },
+    dragging_label: struct {
+        label_id: usize,
     },
 };
 
@@ -233,6 +239,7 @@ pub fn delete() void {
             .ground => |ground_id| {
                 main_circuit.deleteGround(ground_id);
             },
+            .label => {},
         }
         selection = null;
     }
@@ -322,6 +329,7 @@ pub const GraphicCircuit = struct {
     wires: std.ArrayList(Wire),
     pins: std.ArrayList(Pin),
     grounds: std.ArrayList(Ground),
+    labels: std.ArrayList(Label),
 
     // NOTE: only updating the relevant information when adding/removing/moving elements
     // would be the most optimal but it would introduce too much complexity
@@ -472,6 +480,16 @@ pub const GraphicCircuit = struct {
                     );
                 },
             }
+        }
+    }
+
+    pub fn renderLabels(
+        self: *const GraphicCircuit,
+        vector_renderer: *const VectorRenderer,
+        hovered_id: ?usize,
+    ) void {
+        for (self.labels.items, 0..) |label, id| {
+            label.render(vector_renderer, id == hovered_id);
         }
     }
 

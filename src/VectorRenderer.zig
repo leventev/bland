@@ -1,5 +1,6 @@
 const std = @import("std");
 const dvui = @import("dvui");
+const global = @import("global.zig");
 
 const VectorRenderer = @This();
 
@@ -12,6 +13,7 @@ world_left: f32,
 pub const Output = union(enum) {
     screen: struct {
         viewport: dvui.Rect.Physical,
+        zoom: f32,
     },
     svg_export: struct {
         canvas_width: f32,
@@ -197,8 +199,8 @@ pub fn render(
             .stroke => |opts| {
                 switch (self.output) {
                     .screen => |screen_opts| {
+                        _ = screen_opts;
                         const screen_points = self.transformPoints(
-                            screen_opts.viewport,
                             path_buffer[0..path_buffer_len],
                             snap_points[0..path_buffer_len],
                             transform,
@@ -211,12 +213,6 @@ pub fn render(
                     },
                     .svg_export => |export_opts| {
                         const svg_points = self.transformPoints(
-                            .{
-                                .x = 0,
-                                .y = 0,
-                                .w = export_opts.canvas_width,
-                                .h = export_opts.canvas_height,
-                            },
                             path_buffer[0..path_buffer_len],
                             null,
                             transform,
@@ -239,8 +235,8 @@ pub fn render(
             .fill => {
                 switch (self.output) {
                     .screen => |screen_opts| {
+                        _ = screen_opts;
                         const screen_points = self.transformPoints(
-                            screen_opts.viewport,
                             path_buffer[0..path_buffer_len],
                             snap_points[0..path_buffer_len],
                             transform,
@@ -250,12 +246,6 @@ pub fn render(
                     },
                     .svg_export => |export_opts| {
                         const svg_points = self.transformPoints(
-                            .{
-                                .x = 0,
-                                .y = 0,
-                                .w = export_opts.canvas_width,
-                                .h = export_opts.canvas_height,
-                            },
                             path_buffer[0..path_buffer_len],
                             null,
                             transform,
@@ -279,9 +269,82 @@ pub fn render(
         }
     }
 }
+
+fn viewport(self: *const VectorRenderer) dvui.Rect.Physical {
+    return switch (self.output) {
+        .screen => |s| s.viewport,
+        .svg_export => |s| .{
+            .x = 0,
+            .y = 0,
+            .w = s.canvas_width,
+            .h = s.canvas_height,
+        },
+    };
+}
+
+pub fn renderText(
+    self: *const VectorRenderer,
+    pos: Vector,
+    text: []const u8,
+    fg_color: dvui.Color,
+    bg_color: ?dvui.Color,
+) !void {
+    const screen_pos = self.worldToScreen(pos);
+    switch (self.output) {
+        .screen => |screen_opts| {
+            const f = dvui.Font{
+                .id = .fromName(global.font_name),
+                .size = global.circuit_font_size * screen_opts.zoom,
+                .line_height_factor = 1,
+            };
+
+            const s = dvui.Font.textSize(f, text);
+
+            const r = dvui.Rect.Physical{
+                .x = screen_pos.x,
+                .y = screen_pos.y,
+                .w = s.w,
+                .h = s.h,
+            };
+
+            dvui.renderText(.{
+                .font = f,
+                .text = text,
+                .color = fg_color,
+                .background_color = bg_color,
+                .rs = .{ .r = r },
+            }) catch @panic("Failed to render text");
+        },
+        .svg_export => @panic("TODO"),
+    }
+}
+
+inline fn worldToScreen(
+    self: *const VectorRenderer,
+    world_pos: Vector,
+) dvui.Point.Physical {
+    const vp = self.viewport();
+
+    // from world to viewport
+    const world_width = self.world_right - self.world_left;
+    const world_height = self.world_bottom - self.world_top;
+
+    const xscale = vp.w / world_width;
+    const yscale = vp.h / world_height;
+    const viewport_pos = dvui.Point.Physical{
+        .x = (world_pos.x - self.world_left) * xscale,
+        .y = (world_pos.y - self.world_top) * yscale,
+    };
+
+    // from viewport to screen
+    return dvui.Point.Physical{
+        .x = viewport_pos.x + vp.x,
+        .y = viewport_pos.y + vp.y,
+    };
+}
+
 inline fn transformPoints(
     self: *const VectorRenderer,
-    viewport: dvui.Rect.Physical,
     comptime points: []const Vector,
     comptime snap_points: ?[]bool,
     transform: Transform,
@@ -307,22 +370,7 @@ inline fn transformPoints(
             .y = rotated.y + transform.translate.y,
         };
 
-        // from world to viewport
-        const world_width = self.world_right - self.world_left;
-        const world_height = self.world_bottom - self.world_top;
-
-        const xscale = viewport.w / world_width;
-        const yscale = viewport.h / world_height;
-        const viewport_pos = dvui.Point.Physical{
-            .x = (translated.x - self.world_left) * xscale,
-            .y = (translated.y - self.world_top) * yscale,
-        };
-
-        // from viewport to screen
-        const screen_pos = dvui.Point.Physical{
-            .x = viewport_pos.x + viewport.x,
-            .y = viewport_pos.y + viewport.y,
-        };
+        const screen_pos = self.worldToScreen(translated);
 
         const final_screen_pos = if (snap_points) |snap_pts|
             if (snap_pts[i])
@@ -339,48 +387,4 @@ inline fn transformPoints(
     }
 
     return &transformed_points;
-}
-
-inline fn worldToScreen(
-    self: *const VectorRenderer,
-    viewport: dvui.Rect.Physical,
-    points: []const Vector,
-    comptime snap_points: ?[]bool,
-) []dvui.Point.Physical {
-    var screen_points: [points.len]dvui.Point.Physical = undefined;
-    for (0..points.len) |i| {
-        const point = points[i];
-
-        // from world to viewport
-        const world_width = self.world_right - self.world_left;
-        const world_height = self.world_bottom - self.world_top;
-
-        const xscale = viewport.w / world_width;
-        const yscale = viewport.h / world_height;
-        const viewport_pos = dvui.Point.Physical{
-            .x = (point.x - self.world_left) * xscale,
-            .y = (point.y - self.world_top) * yscale,
-        };
-
-        // from viewport to screen
-        const screen_pos = dvui.Point.Physical{
-            .x = viewport_pos.x + viewport.viewport.x,
-            .y = viewport_pos.y + viewport.viewport.y,
-        };
-
-        const final_screen_pos = if (snap_points) |snap_pts|
-            if (snap_pts[i])
-                dvui.Point.Physical{
-                    .x = @round(screen_pos.x),
-                    .y = @round(screen_pos.y),
-                }
-            else
-                screen_pos
-        else
-            screen_pos;
-
-        screen_points[i] = final_screen_pos;
-    }
-
-    return screen_points;
 }

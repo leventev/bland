@@ -7,6 +7,7 @@ const circuit = @import("circuit.zig");
 const component = @import("component.zig");
 const global = @import("global.zig");
 const VectorRenderer = @import("VectorRenderer.zig");
+const Label = @import("Label.zig");
 
 const ElementRenderType = renderer.ElementRenderType;
 
@@ -95,6 +96,14 @@ fn findHoveredElement(viewport: dvui.Rect.Physical, m_pos: dvui.Point.Physical) 
         .none => |*data| {
             const mouse_grid_pos = screenToWorld(viewport, m_pos, zoom_scale);
             // priority: pin > comp > ground > wire
+            for (circuit.main_circuit.labels.items, 0..) |label, label_id| {
+                const hovered = label.hovered(mouse_grid_pos, zoom_scale);
+
+                if (hovered) {
+                    data.hovered_element = .{ .label = label_id };
+                    return;
+                }
+            }
             for (circuit.main_circuit.pins.items, 0..) |pin, pin_id| {
                 const hovered = pin.hovered(mouse_grid_pos, zoom_scale);
 
@@ -189,6 +198,13 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
 
                                     const pin = circuit.main_circuit.pins.items[pin_id];
                                     circuit.placement_rotation = pin.rotation;
+                                },
+                                .label => |label_id| {
+                                    circuit.placement_mode = .{
+                                        .dragging_label = .{
+                                            .label_id = label_id,
+                                        },
+                                    };
                                 },
                             }
                         } else {
@@ -311,6 +327,18 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                             },
                         };
                     },
+                    .dragging_label => |data| {
+                        const label = &circuit.main_circuit.labels.items[data.label_id];
+                        const grid_pos = screenToWorld(viewport, ev.p, zoom_scale);
+
+                        label.pos = grid_pos;
+
+                        circuit.placement_mode = .{
+                            .none = .{
+                                .hovered_element = null,
+                            },
+                        };
+                    },
                     else => {},
                 }
             }
@@ -338,6 +366,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                                 circuit.selection_changed = true;
                                 circuit.selection = .{ .ground = ground_id };
                             },
+                            .label => {},
                         }
                     }
                 },
@@ -345,6 +374,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                     _ = data;
                     std.log.warn("unimplemented", .{});
                 },
+                .dragging_label => {},
                 .dragging_ground => {},
                 .dragging_wire => {},
                 .dragging_pin => {},
@@ -384,6 +414,17 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                         try circuit.main_circuit.graphic_components.append(
                             circuit.main_circuit.allocator,
                             graphic_comp,
+                        );
+
+                        try circuit.main_circuit.labels.append(
+                            circuit.main_circuit.allocator,
+                            Label.init(
+                                .{
+                                    .x = @floatFromInt(grid_pos.x),
+                                    .y = @floatFromInt(grid_pos.y),
+                                },
+                                graphic_comp.comp.name,
+                            ),
                         );
                     }
                 },
@@ -554,6 +595,26 @@ fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id
     );
 }
 
+fn renderHoldingLabel(vector_renderer: *const VectorRenderer, label_id: usize) !void {
+    std.debug.assert(vector_renderer.output == .screen);
+    const screen = vector_renderer.output.screen;
+
+    const label = circuit.main_circuit.labels.items[label_id];
+    const grid_pos = screenToWorld(
+        screen.viewport,
+        mouse_pos,
+        zoom_scale,
+    );
+
+    Label.renderLabel(
+        vector_renderer,
+        grid_pos,
+        label.text,
+        dvui.Color.gray,
+        null,
+    );
+}
+
 fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
     std.debug.assert(vector_renderer.output == .screen);
     const screen = vector_renderer.output.screen;
@@ -686,6 +747,7 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
         .new_pin => try renderHoldingPin(vector_renderer),
         .new_ground => try renderHoldingGround(vector_renderer, null),
         .dragging_ground => |data| try renderHoldingGround(vector_renderer, data.ground_id),
+        .dragging_label => |data| try renderHoldingLabel(vector_renderer, data.label_id),
         .dragging_component => |data| {
             const graphic_comp = circuit.main_circuit.graphic_components.items[data.comp_id];
             const dev_type = graphic_comp.comp.device;
@@ -869,6 +931,16 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         };
     } else null;
 
+    const hovered_label_id: ?usize = blk: switch (circuit.placement_mode) {
+        .none => |data| if (data.hovered_element) |element| {
+            break :blk switch (element) {
+                .label => |label_id| label_id,
+                else => null,
+            };
+        } else break :blk null,
+        else => null,
+    };
+
     // TODO
     // TODO
     // TODO
@@ -882,7 +954,10 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     const world_bottom = world_top + circuit_rect.h / grid_size;
 
     const vector_renderer = VectorRenderer.init(
-        .{ .screen = .{ .viewport = circuit_rect } },
+        .{ .screen = .{
+            .viewport = circuit_rect,
+            .zoom = zoom_scale,
+        } },
         world_top,
         world_bottom,
         world_left,
@@ -980,13 +1055,15 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
 
     try circuit.main_circuit.renderJunctions(&vector_renderer);
 
+    circuit.main_circuit.renderLabels(&vector_renderer, hovered_label_id);
+
     try renderPlacement(&vector_renderer);
 
     const Cursor = dvui.enums.Cursor;
 
     const cursor = switch (circuit.placement_mode) {
         .none => |data| if (data.hovered_element != null) Cursor.hand else Cursor.arrow,
-        .dragging_component, .dragging_wire, .dragging_pin, .dragging_ground => Cursor.arrow_all,
+        .dragging_component, .dragging_wire, .dragging_pin, .dragging_ground, .dragging_label => Cursor.arrow_all,
         .new_wire, .new_pin, .new_component, .new_ground => Cursor.arrow,
     };
 

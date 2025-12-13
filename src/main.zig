@@ -3,10 +3,10 @@ const std = @import("std");
 const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const circuit_widget = @import("circuit_widget.zig");
-
 const component = @import("component.zig");
 const circuit = @import("circuit.zig");
 const console = @import("console.zig");
+const Label = @import("Label.zig");
 
 const dvui = @import("dvui");
 
@@ -35,6 +35,7 @@ fn init(win: *dvui.Window) !void {
             circuit.GridPosition,
             circuit.GraphicCircuit.Junction,
         ){},
+        .labels = std.ArrayList(Label){},
     };
 
     console_initialized = true;
