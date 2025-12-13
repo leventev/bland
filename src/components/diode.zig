@@ -63,7 +63,7 @@ pub const clickable_shape: GraphicComponent.ClickableShape = .{
     },
 };
 
-pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+pub const body_instructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .snap_pixel_set = true },
     .{ .place = .{ .x = wire_len_per_side, .y = 0 } },
     .{ .move_rel = .{ .x = 0, .y = diode_side_len } },
@@ -77,11 +77,15 @@ pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .stroke = .{ .base_thickness = 1 } },
 };
 
-pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
-    .{ .snap_pixel_set = true },
-    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
-    .{ .stroke = .{ .base_thickness = 1 } },
-    .{ .place = .{ .x = total_width - wire_len_per_side, .y = 0 } },
-    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
-    .{ .stroke = .{ .base_thickness = 1 } },
+pub const terminal_wires: []const GraphicComponent.Terminal = &.{
+    .{
+        .relative_pos = .{ .x = 0, .y = 0 },
+        .direction = .horizontal,
+        .len = wire_len_per_side,
+    },
+    .{
+        .relative_pos = .{ .x = 2, .y = 0 },
+        .direction = .horizontal,
+        .len = -wire_len_per_side,
+    },
 };

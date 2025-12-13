@@ -63,8 +63,8 @@ fn renderDevice(
     rot: Rotation,
     render_type: renderer.ElementRenderType,
 ) !void {
-    const bodyInstructions = switch (dev_type) {
-        inline else => |x| graphics_module(x).bodyInstructions,
+    const body_instructions = switch (dev_type) {
+        inline else => |x| graphics_module(x).body_instructions,
     };
 
     const colors = render_type.colors();
@@ -78,7 +78,7 @@ fn renderDevice(
     };
 
     try vector_renderer.render(
-        bodyInstructions,
+        body_instructions,
         .{
             .translate = .{
                 .x = @floatFromInt(pos.x),
@@ -121,8 +121,7 @@ pub fn renderComponent(
     };
 
     const terminal_wires = switch (dev_type) {
-        inline else => @panic("TODO"),
-        .resistor => resistor_graphics_module.terminal_wires,
+        inline else => |x| graphics_module(x).terminal_wires,
     };
 
     const instructions: []const VectorRenderer.BrushInstruction = &.{

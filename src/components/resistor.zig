@@ -69,7 +69,7 @@ pub const clickable_shape: GraphicComponent.ClickableShape = .{
     },
 };
 
-pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+pub const body_instructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .snap_pixel_set = true },
     .{ .place = .{ .x = wire_len_per_side, .y = -resistor_width / 2.0 } },
     .{ .move_rel = .{ .x = resistor_length, .y = 0 } },
@@ -90,13 +90,4 @@ pub const terminal_wires: []const GraphicComponent.Terminal = &.{
         .direction = .horizontal,
         .len = -wire_len_per_side,
     },
-};
-
-pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
-    .{ .snap_pixel_set = true },
-    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
-    .{ .stroke = .{ .base_thickness = 1 } },
-    .{ .place = .{ .x = wire_len_per_side + resistor_length, .y = 0 } },
-    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
-    .{ .stroke = .{ .base_thickness = 1 } },
 };

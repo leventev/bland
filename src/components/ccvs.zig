@@ -98,7 +98,7 @@ const side_length = 0.4;
 const wire_len_per_side = (total_width - 2 * side_length) / 2.0;
 const line_len = 0.15;
 
-pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
+pub const body_instructions: []const VectorRenderer.BrushInstruction = &.{
     // diamond
     .{ .place = .{ .x = wire_len_per_side, .y = 0 } },
     .{ .move_rel = .{ .x = side_length, .y = -side_length } },
@@ -120,11 +120,15 @@ pub const bodyInstructions: []const VectorRenderer.BrushInstruction = &.{
     .{ .stroke = .{ .base_thickness = 1 } },
 };
 
-pub const terminalWireBrushInstructions: []const VectorRenderer.BrushInstruction = &.{
-    .{ .snap_pixel_set = true },
-    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
-    .{ .stroke = .{ .base_thickness = 1 } },
-    .{ .place = .{ .x = wire_len_per_side + 2.0 * side_length, .y = 0 } },
-    .{ .move_rel = .{ .x = wire_len_per_side, .y = 0 } },
-    .{ .stroke = .{ .base_thickness = 1 } },
+pub const terminal_wires: []const GraphicComponent.Terminal = &.{
+    .{
+        .relative_pos = .{ .x = 0, .y = 0 },
+        .direction = .horizontal,
+        .len = wire_len_per_side,
+    },
+    .{
+        .relative_pos = .{ .x = 2, .y = 0 },
+        .direction = .horizontal,
+        .len = -wire_len_per_side,
+    },
 };
