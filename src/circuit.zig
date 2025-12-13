@@ -397,7 +397,7 @@ pub const GraphicCircuit = struct {
         }
     }
 
-    pub const junction_radius = 0.11;
+    pub const junction_radius = 0.08;
 
     pub fn renderJunctions(
         self: *const GraphicCircuit,
