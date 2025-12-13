@@ -316,10 +316,18 @@ pub fn renderText(
             }) catch @panic("Failed to render text");
         },
         .svg_export => |export_opts| {
+            // TODO: when exporting the texts have a small offset
+            const f = dvui.Font{
+                .id = .fromName(global.font_name),
+                .size = global.circuit_font_size,
+                .line_height_factor = 1,
+            };
+
+            const s = dvui.Font.textSize(f, text);
             var writer = export_opts.writer;
             _ = try writer.print("<text x=\"{}\" y=\"{}\">{s}</text>\n", .{
                 screen_pos.x,
-                screen_pos.y,
+                screen_pos.y + s.h / 2 + global.circuit_font_size * 0.35,
                 text,
             });
         },

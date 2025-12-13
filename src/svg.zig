@@ -67,11 +67,10 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
         .{ width, height },
     );
 
-    // _ = try writer.print("<style>\n");
-    // _ = try writer.print("text {\n");
-    // _ = try writer.print("font-family{\n");
-    // _ = try writer.print("}\n");
-    // _ = try writer.print("</style>\n");
+    _ = try writer.write("<style>\n");
+    _ = try writer.write(@embedFile("svg.css"));
+    _ = try writer.write("</style>\n");
+
     var vector_renderer = VectorRenderer.init(
         .{ .svg_export = .{
             .writer = writer,
