@@ -21,19 +21,19 @@ const min_zoom = 0.75;
 
 pub fn initKeybinds(allocator: std.mem.Allocator) !void {
     const win = dvui.currentWindow();
-    try win.keybinds.putNoClobber(allocator, "normal_mode", .{ .key = .escape });
-    try win.keybinds.putNoClobber(allocator, "register_placement_mode", .{ .key = .r });
-    try win.keybinds.putNoClobber(allocator, "voltage_source_placement_mode", .{ .key = .v });
-    try win.keybinds.putNoClobber(allocator, "current_source_placement_mode", .{ .key = .i });
-    try win.keybinds.putNoClobber(allocator, "ground_placement_mode", .{ .key = .g });
-    try win.keybinds.putNoClobber(allocator, "capacitor_placement_mode", .{ .key = .c });
-    try win.keybinds.putNoClobber(allocator, "inductor_placement_mode", .{ .key = .l });
-    try win.keybinds.putNoClobber(allocator, "diode_placement_mode", .{ .key = .d });
-    try win.keybinds.putNoClobber(allocator, "wire_placement_mode", .{ .key = .w });
-    try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .t });
-    try win.keybinds.putNoClobber(allocator, "open_debug_window", .{ .key = .o });
-    try win.keybinds.putNoClobber(allocator, "pin_placement_mode", .{ .key = .p });
-    try win.keybinds.putNoClobber(allocator, "delete", .{ .key = .delete });
+    try win.keybinds.putNoClobber(allocator, "normal_mode", .{ .key = .escape, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "register_placement_mode", .{ .key = .r, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "voltage_source_placement_mode", .{ .key = .v, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "current_source_placement_mode", .{ .key = .i, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "ground_placement_mode", .{ .key = .g, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "capacitor_placement_mode", .{ .key = .c, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "inductor_placement_mode", .{ .key = .l, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "diode_placement_mode", .{ .key = .d, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "wire_placement_mode", .{ .key = .w, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .r, .control = true, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "open_debug_window", .{ .key = .o, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "pin_placement_mode", .{ .key = .p, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(allocator, "delete", .{ .key = .delete, .control = false, .shift = false });
 }
 
 fn checkForKeybinds(ev: dvui.Event.Key) !void {

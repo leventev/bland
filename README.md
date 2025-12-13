@@ -74,20 +74,20 @@ The program uses a fix-sized snap grid where elements (components, wires and pin
 
 The default keybinds are:
 
-| Function                | Keybind |
-| ----------------------- | ------- |
-| Place Register          | R       |
-| Place Voltage Source    | V       |
-| Place Current Source    | I       |
-| Place Ground            | G       |
-| Place Capacitor         | C       |
-| Place Inductor          | L       |
-| Place Diode             | D       |
-| Place Pin               | P       |
-| Rotate Element          | T       |
-| Wire                    | W       |
-| Open DVUI Debug Window  | O       |
-| Delete Element          | Delete  |
+| Function                | Keybind  |
+| ----------------------- | -------- |
+| Place Register          | R        |
+| Place Voltage Source    | V        |
+| Place Current Source    | I        |
+| Place Ground            | G        |
+| Place Capacitor         | C        |
+| Place Inductor          | L        |
+| Place Diode             | D        |
+| Place Pin               | P        |
+| Rotate Element          | Ctrl + R |
+| Wire                    | W        |
+| Open DVUI Debug Window  | O        |
+| Delete Element          | Delete   |
 
 ## Features/TODO
 
