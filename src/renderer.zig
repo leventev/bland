@@ -509,8 +509,11 @@ pub fn renderFWReport(
     S.yaxis.gridline_color = dvui.themeGet().color(.control, .fill).lighten(20);
     S.xaxis.subtick_gridline_color = dvui.themeGet().color(.control, .fill);
 
-    var comp_idxs = try gpa.alloc(usize, report.component_names.len);
-    defer gpa.free(comp_idxs);
+    var arena_allocator = std.heap.ArenaAllocator.init(gpa);
+    defer arena_allocator.deinit();
+    const arena = arena_allocator.allocator();
+
+    var comp_idxs = try arena.alloc(usize, report.component_names.len);
 
     var component_entry_count: usize = 0;
     for (report.component_names, 0..) |name, comp_idx| {
@@ -521,22 +524,16 @@ pub fn renderFWReport(
     }
 
     // TODO: allocate less or use arena or something else
-    var var_entries = try gpa.alloc([]u8, report.pinned_nodes.len + component_entry_count);
-    defer {
-        for (var_entries) |ent| {
-            gpa.free(ent);
-        }
-        gpa.free(var_entries);
-    }
+    var var_entries = try arena.alloc([]u8, report.pinned_nodes.len + component_entry_count);
 
     for (report.pinned_nodes, 0..) |pin, i| {
-        var_entries[i] = try std.fmt.allocPrint(gpa, "V({s})", .{pin.name});
+        var_entries[i] = try std.fmt.allocPrint(arena, "V({s})", .{pin.name});
     }
 
     var idx: usize = report.pinned_nodes.len;
     for (report.component_names) |name| {
         if (name) |str| {
-            var_entries[idx] = try std.fmt.allocPrint(gpa, "I({s})", .{str});
+            var_entries[idx] = try std.fmt.allocPrint(arena, "I({s})", .{str});
             idx += 1;
         }
     }
