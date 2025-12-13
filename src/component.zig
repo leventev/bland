@@ -67,10 +67,6 @@ fn renderDevice(
         inline else => |x| graphics_module(x).bodyInstructions,
     };
 
-    const terminalWireInstructions = switch (dev_type) {
-        inline else => |x| graphics_module(x).terminalWireBrushInstructions,
-    };
-
     const colors = render_type.colors();
     const thickness = render_type.thickness();
 
@@ -94,20 +90,6 @@ fn renderDevice(
         },
         .{ .stroke_color = colors.component_color },
     );
-
-    try vector_renderer.render(
-        terminalWireInstructions,
-        .{
-            .translate = .{
-                .x = @floatFromInt(pos.x),
-                .y = @floatFromInt(pos.y),
-            },
-            .line_scale = thickness,
-            .scale = .both(1),
-            .rotate = @as(f32, @floatCast(rotation)),
-        },
-        .{ .stroke_color = colors.terminal_wire_color },
-    );
 }
 
 pub fn renderComponent(
@@ -116,6 +98,7 @@ pub fn renderComponent(
     pos: GridPosition,
     rot: Rotation,
     render_type: renderer.ElementRenderType,
+    junctions: ?*const std.AutoHashMapUnmanaged(GridPosition, circuit.GraphicCircuit.Junction),
 ) !void {
     switch (dev_type) {
         inline else => |x| try renderDevice(
@@ -125,6 +108,84 @@ pub fn renderComponent(
             rot,
             render_type,
         ),
+    }
+
+    const colors = render_type.colors();
+    const thickness = render_type.thickness();
+
+    const rotation: f32 = switch (rot) {
+        .right => 0,
+        .left => -std.math.pi,
+        .top => -std.math.pi / 2.0,
+        .bottom => std.math.pi / 2.0,
+    };
+
+    const terminal_wires = switch (dev_type) {
+        inline else => @panic("TODO"),
+        .resistor => resistor_graphics_module.terminal_wires,
+    };
+
+    const instructions: []const VectorRenderer.BrushInstruction = &.{
+        .{ .move_rel = .{ .x = 1, .y = 0 } },
+        .{ .stroke = .{ .base_thickness = 1 } },
+    };
+
+    for (terminal_wires) |terminal| {
+        const wire_rotation: f32 = switch (terminal.direction) {
+            .horizontal => 0,
+            .vertical => std.math.pi / 2.0,
+        };
+
+        var rot_2 = rot;
+        if (terminal.direction == .vertical) rot_2 = rot_2.rotateClockwise();
+        const relative_pos_rotated: circuit.GridPosition = switch (rot_2) {
+            .right => .{ .x = terminal.relative_pos.x, .y = terminal.relative_pos.y },
+            .left => .{ .x = -terminal.relative_pos.x, .y = terminal.relative_pos.y },
+            .bottom => .{ .x = -terminal.relative_pos.y, .y = terminal.relative_pos.x },
+            .top => .{ .x = terminal.relative_pos.y, .y = -terminal.relative_pos.x },
+        };
+        const grid_pos = GridPosition{
+            .x = pos.x + relative_pos_rotated.x,
+            .y = pos.y + relative_pos_rotated.y,
+        };
+        var scale = terminal.len;
+
+        const sign = std.math.sign(terminal.len);
+
+        var line_start_pos = circuit.GridSubposition{
+            .x = @floatFromInt(grid_pos.x),
+            .y = @floatFromInt(grid_pos.y),
+        };
+        if (junctions) |js| {
+            const circle_rendered = if (js.get(grid_pos)) |junction|
+                junction.kind() != .none
+            else
+                false;
+
+            if (circle_rendered) {
+                switch (rot_2) {
+                    .right => line_start_pos.x += sign * circuit.GraphicCircuit.junction_radius,
+                    .left => line_start_pos.x -= sign * circuit.GraphicCircuit.junction_radius,
+                    .bottom => line_start_pos.y += sign * circuit.GraphicCircuit.junction_radius,
+                    .top => line_start_pos.y -= sign * circuit.GraphicCircuit.junction_radius,
+                }
+                scale -= sign * circuit.GraphicCircuit.junction_radius;
+            }
+        }
+
+        try vector_renderer.render(
+            instructions,
+            .{
+                .translate = .{
+                    .x = line_start_pos.x,
+                    .y = line_start_pos.y,
+                },
+                .line_scale = thickness,
+                .scale = .both(scale),
+                .rotate = rotation + wire_rotation,
+            },
+            .{ .stroke_color = colors.terminal_wire_color },
+        );
     }
 }
 
@@ -245,6 +306,12 @@ pub const GraphicComponent = struct {
                 },
             }
         }
+    };
+
+    pub const Terminal = struct {
+        relative_pos: GridPosition,
+        direction: circuit.Wire.Direction,
+        len: f32,
     };
 
     pub const ValueBuffer = union(Component.DeviceType) {
@@ -698,6 +765,7 @@ pub const GraphicComponent = struct {
         self: *const GraphicComponent,
         vector_renderer: *const VectorRenderer,
         render_type: renderer.ElementRenderType,
+        junctions: *const std.AutoHashMapUnmanaged(GridPosition, circuit.GraphicCircuit.Junction),
     ) !void {
         const dev_type = @as(DeviceType, self.comp.device);
         try renderComponent(
@@ -706,6 +774,7 @@ pub const GraphicComponent = struct {
             self.pos,
             self.rotation,
             render_type,
+            junctions,
         );
     }
 };

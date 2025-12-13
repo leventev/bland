@@ -484,6 +484,7 @@ fn renderHoldingComponent(
         grid_pos,
         circuit.placement_rotation,
         render_type,
+        null,
     );
 }
 
@@ -864,6 +865,8 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     // TODO
     // TODO
 
+    try circuit.main_circuit.findJunctions();
+
     const grid_size = @as(f32, VectorRenderer.grid_cell_px_size) * zoom_scale;
     const world_left = camera_x / grid_size;
     const world_top = camera_y / grid_size;
@@ -898,6 +901,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         try comp.render(
             &vector_renderer,
             render_type,
+            &circuit.main_circuit.junctions,
         );
     }
 
@@ -960,7 +964,6 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         try renderer.renderPin(&vector_renderer, pin.pos, pin.rotation, pin.name, render_type);
     }
 
-    try circuit.main_circuit.findJunctions();
     try circuit.main_circuit.renderJunctions(&vector_renderer);
 
     try renderPlacement(&vector_renderer);

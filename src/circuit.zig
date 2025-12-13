@@ -327,11 +327,29 @@ pub const GraphicCircuit = struct {
     // would be the most optimal but it would introduce too much complexity
     // rather we recount all on every change
     junctions: std.AutoHashMapUnmanaged(GridPosition, Junction),
+
     const max_pin_name_lengh = bland.component.max_component_name_length;
 
     pub const Junction = struct {
         end_connection: usize,
         non_end_connection: usize,
+
+        pub const Kind = enum {
+            none,
+            junction,
+            end,
+        };
+
+        pub fn kind(self: Junction) Kind {
+            const is_junction = self.end_connection > 0 and self.non_end_connection > 0 or
+                self.end_connection > 2 or self.non_end_connection == 2;
+            if (is_junction) return .junction;
+
+            const is_end = self.end_connection == 1 and self.non_end_connection == 0;
+            if (is_end) return .end;
+
+            return .none;
+        }
     };
 
     fn ensureJunctionExists(self: *GraphicCircuit, grid_pos: GridPosition) !void {
@@ -379,6 +397,8 @@ pub const GraphicCircuit = struct {
         }
     }
 
+    pub const junction_radius = 0.11;
+
     pub fn renderJunctions(
         self: *const GraphicCircuit,
         vector_renderer: *const VectorRenderer,
@@ -387,70 +407,70 @@ pub const GraphicCircuit = struct {
         // it would be better to visualize this with a drawing on paper
         // if end_connection > 0 and non_end_connection > 0 then we put a lump there
         // if end_connection > 2 or non_end_connection == 2 then we put a lump there
-        const junction_radius = 0.11;
         var it = self.junctions.iterator();
         while (it.next()) |entry| {
             const gpos = entry.key_ptr.*;
-            const wire_connections = entry.value_ptr.*;
+            const junction = entry.value_ptr.*;
 
-            const is_junction = wire_connections.end_connection > 0 and wire_connections.non_end_connection > 0 or
-                wire_connections.end_connection > 2 or wire_connections.non_end_connection == 2;
+            const kind = junction.kind();
 
-            const is_end = wire_connections.end_connection == 1 and wire_connections.non_end_connection == 0;
+            switch (kind) {
+                .none => {},
+                .junction => {
+                    const insts: []const VectorRenderer.BrushInstruction = &.{
+                        .{ .reset = {} },
+                        .{ .arc = .{
+                            .center = .{ .x = 0, .y = 0 },
+                            .start_angle = 0,
+                            .sweep_angle = 2 * std.math.pi,
+                            .radius = junction_radius,
+                        } },
+                        .{ .fill = {} },
+                    };
 
-            if (is_junction) {
-                const insts: []const VectorRenderer.BrushInstruction = &.{
-                    .{ .reset = {} },
-                    .{ .arc = .{
-                        .center = .{ .x = 0, .y = 0 },
-                        .start_angle = 0,
-                        .sweep_angle = 2 * std.math.pi,
-                        .radius = junction_radius,
-                    } },
-                    .{ .fill = {} },
-                };
-
-                try vector_renderer.render(
-                    insts,
-                    .{
-                        .line_scale = 1,
-                        .rotate = 0,
-                        .scale = .both(1),
-                        .translate = .{
-                            .x = @floatFromInt(gpos.x),
-                            .y = @floatFromInt(gpos.y),
+                    try vector_renderer.render(
+                        insts,
+                        .{
+                            .line_scale = 1,
+                            .rotate = 0,
+                            .scale = .both(1),
+                            .translate = .{
+                                .x = @floatFromInt(gpos.x),
+                                .y = @floatFromInt(gpos.y),
+                            },
                         },
-                    },
-                    .{ .fill_color = renderer.ElementRenderType.normal.colors().terminal_wire_color },
-                );
-            } else if (is_end) {
-                const insts: []const VectorRenderer.BrushInstruction = &.{
-                    .{ .reset = {} },
-                    .{ .arc = .{
-                        .center = .{ .x = 0, .y = 0 },
-                        .start_angle = 0,
-                        .sweep_angle = 2 * std.math.pi,
-                        .radius = junction_radius,
-                    } },
-                    .{ .stroke = .{ .base_thickness = 2 } },
-                };
+                        .{ .fill_color = renderer.ElementRenderType.normal.colors().terminal_wire_color },
+                    );
+                },
+                .end => {
+                    const insts: []const VectorRenderer.BrushInstruction = &.{
+                        .{ .reset = {} },
+                        .{ .arc = .{
+                            .center = .{ .x = 0, .y = 0 },
+                            .start_angle = 0,
+                            .sweep_angle = 2 * std.math.pi,
+                            .radius = junction_radius,
+                        } },
+                        .{ .stroke = .{ .base_thickness = 2 } },
+                    };
 
-                try vector_renderer.render(
-                    insts,
-                    .{
-                        .line_scale = 1,
-                        .rotate = 0,
-                        .scale = .both(1),
-                        .translate = .{
-                            .x = @floatFromInt(gpos.x),
-                            .y = @floatFromInt(gpos.y),
+                    try vector_renderer.render(
+                        insts,
+                        .{
+                            .line_scale = 1,
+                            .rotate = 0,
+                            .scale = .both(1),
+                            .translate = .{
+                                .x = @floatFromInt(gpos.x),
+                                .y = @floatFromInt(gpos.y),
+                            },
                         },
-                    },
-                    .{
-                        .stroke_color = renderer.ElementRenderType.normal.colors().terminal_wire_color,
-                        .fill_color = dvui.themeGet().fill,
-                    },
-                );
+                        .{
+                            .stroke_color = renderer.ElementRenderType.normal.colors().terminal_wire_color,
+                            .fill_color = dvui.themeGet().fill,
+                        },
+                    );
+                },
             }
         }
     }

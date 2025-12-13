@@ -79,7 +79,7 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
         @floatFromInt(x_max),
     );
     for (graphic_circuit.graphic_components.items) |comp| {
-        try comp.render(&vector_renderer, .normal);
+        try comp.render(&vector_renderer, .normal, &graphic_circuit.junctions);
         try writer.flush();
     }
 
