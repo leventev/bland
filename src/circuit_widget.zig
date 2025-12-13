@@ -516,7 +516,7 @@ fn renderHoldingWire(
     else
         ElementRenderType.unable_to_place;
 
-    try renderer.renderWire(vector_renderer, wire, render_type);
+    try renderer.renderWire(vector_renderer, wire, render_type, null);
 }
 
 fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id: ?usize) !void {
@@ -714,7 +714,7 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
             else
                 ElementRenderType.unable_to_place;
 
-            try renderer.renderWire(vector_renderer, new_wire, render_type);
+            try renderer.renderWire(vector_renderer, new_wire, render_type, &circuit.main_circuit.junctions);
         },
         .dragging_pin => |data| {
             const pin = circuit.main_circuit.pins.items[data.pin_id];
@@ -943,7 +943,12 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ElementRenderType.normal;
 
-        try renderer.renderWire(&vector_renderer, wire, render_type);
+        try renderer.renderWire(
+            &vector_renderer,
+            wire,
+            render_type,
+            &circuit.main_circuit.junctions,
+        );
     }
 
     for (circuit.main_circuit.pins.items, 0..) |pin, i| {

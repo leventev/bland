@@ -84,7 +84,7 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
     }
 
     for (graphic_circuit.wires.items) |wire| {
-        try renderer.renderWire(&vector_renderer, wire, .normal);
+        try renderer.renderWire(&vector_renderer, wire, .normal, &graphic_circuit.junctions);
         try writer.flush();
     }
 

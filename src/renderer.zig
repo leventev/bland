@@ -136,83 +136,6 @@ pub const TerminalWire = struct {
     direction: circuit.Wire.Direction,
 };
 
-pub fn renderTerminalWire(
-    wire: TerminalWire,
-    render_type: ElementRenderType,
-) void {
-    const pos = wire.pos;
-    const wire_color = render_type.colors().terminal_wire_color;
-    const thickness = render_type.wireThickness();
-
-    switch (wire.direction) {
-        .horizontal => {
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y - 1,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + wire.pixel_length,
-                    .y = pos.y - 1,
-                },
-                wire_color,
-                thickness,
-            );
-
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x + wire.pixel_length,
-                    .y = pos.y,
-                },
-                wire_color,
-                thickness,
-            );
-        },
-        .vertical => {
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x - 1,
-                    .y = pos.y,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x - 1,
-                    .y = pos.y + wire.pixel_length,
-                },
-                wire_color,
-                thickness,
-            );
-
-            drawLine(
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y,
-                },
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y + wire.pixel_length,
-                },
-                wire_color,
-                thickness,
-            );
-        },
-    }
-}
-
-fn renderTerminalWires(
-    wires: []TerminalWire,
-    render_type: ElementRenderType,
-) void {
-    // for (wires) |wire| {
-    //     renderTerminalWire(wire, render_type);
-    // }
-    _ = wires;
-    _ = render_type;
-}
-
 fn renderToolbox(parentSubwindowId: dvui.Id) bool {
     var toolbox = dvui.box(@src(), .{
         .dir = .vertical,
@@ -970,12 +893,41 @@ pub fn renderWire(
     vector_renderer: *const VectorRenderer,
     wire: circuit.Wire,
     render_type: ElementRenderType,
+    junctions: ?*const std.AutoHashMapUnmanaged(GridPosition, circuit.GraphicCircuit.Junction),
 ) !void {
     const instructions: []const VectorRenderer.BrushInstruction = &.{
         .{ .snap_pixel_set = true },
         .{ .move_rel = .{ .x = 1, .y = 0 } },
         .{ .stroke = .{ .base_thickness = 1 } },
     };
+
+    var scale: f32 = @floatFromInt(wire.length);
+    var x: f32 = @floatFromInt(wire.pos.x);
+    var y: f32 = @floatFromInt(wire.pos.y);
+    if (junctions) |js| {
+        const start_circle_rendered = if (js.get(wire.pos)) |junction|
+            junction.kind() != .none
+        else
+            false;
+
+        const end_circle_rendered = if (js.get(wire.end())) |junction|
+            junction.kind() != .none
+        else
+            false;
+
+        const sign: f32 = @floatFromInt(std.math.sign(wire.length));
+
+        if (start_circle_rendered) {
+            scale -= sign * circuit.GraphicCircuit.junction_radius;
+            switch (wire.direction) {
+                .horizontal => x += sign * circuit.GraphicCircuit.junction_radius,
+                .vertical => y += sign * circuit.GraphicCircuit.junction_radius,
+            }
+        }
+        if (end_circle_rendered) {
+            scale -= sign * circuit.GraphicCircuit.junction_radius;
+        }
+    }
 
     const colors = render_type.colors();
     const thickness = render_type.wireThickness();
@@ -984,10 +936,10 @@ pub fn renderWire(
         instructions,
         .{
             .translate = .{
-                .x = @floatFromInt(wire.pos.x),
-                .y = @floatFromInt(wire.pos.y),
+                .x = x,
+                .y = y,
             },
-            .scale = .both(@floatFromInt(wire.length)),
+            .scale = .both(scale),
             .line_scale = thickness * circuit_widget.zoom_scale,
             .rotate = rotation,
         },

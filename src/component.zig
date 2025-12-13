@@ -148,14 +148,15 @@ pub fn renderComponent(
             .x = pos.x + relative_pos_rotated.x,
             .y = pos.y + relative_pos_rotated.y,
         };
-        var scale = terminal.len;
 
+        var scale = terminal.len;
         const sign = std.math.sign(terminal.len);
 
         var line_start_pos = circuit.GridSubposition{
             .x = @floatFromInt(grid_pos.x),
             .y = @floatFromInt(grid_pos.y),
         };
+
         if (junctions) |js| {
             const circle_rendered = if (js.get(grid_pos)) |junction|
                 junction.kind() != .none
