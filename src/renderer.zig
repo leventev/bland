@@ -329,13 +329,13 @@ pub fn renderDCReport(
 
     // TODO: less allocations?
     var values = try std.ArrayList(DCVariable).initCapacity(
-        gpa,
+        arena,
         currents.len + voltages.len,
     );
 
     for (report.pinned_nodes) |pinned_node| {
         const voltage = voltages[@intFromEnum(pinned_node.node_id)];
-        try values.append(gpa, .{
+        try values.append(arena, .{
             .display_name = try std.fmt.allocPrint(arena, "V({s})", .{pinned_node.name}),
             .value = try bland.units.formatUnitAlloc(arena, .voltage, voltage, 3),
         });
@@ -345,7 +345,7 @@ pub fn renderDCReport(
         if (current) |cur| {
             const comp_name = report.component_names[i];
             if (comp_name) |name| {
-                try values.append(gpa, .{
+                try values.append(arena, .{
                     .display_name = try std.fmt.allocPrint(arena, "I({s})", .{name}),
                     .value = try bland.units.formatUnitAlloc(arena, .current, cur, 3),
                 });
