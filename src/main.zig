@@ -8,6 +8,7 @@ const circuit = @import("circuit.zig");
 const console = @import("console.zig");
 const Label = @import("Label.zig");
 const Ground = @import("Ground.zig");
+const Pin = @import("Pin.zig");
 
 const dvui = @import("dvui");
 
@@ -30,7 +31,7 @@ fn init(win: *dvui.Window) !void {
         .allocator = allocator,
         .graphic_components = std.ArrayList(component.GraphicComponent){},
         .wires = std.ArrayList(circuit.Wire){},
-        .pins = std.ArrayList(circuit.GraphicCircuit.Pin){},
+        .pins = std.ArrayList(Pin){},
         .grounds = std.ArrayList(Ground){},
         .junctions = std.AutoHashMapUnmanaged(
             circuit.GridPosition,

@@ -110,7 +110,7 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
     }
 
     for (graphic_circuit.pins.items) |pin| {
-        try renderer.renderPin(&vector_renderer, pin.pos, pin.rotation, pin.name, .normal);
+        try pin.render(&vector_renderer, .normal);
     }
 
     try graphic_circuit.renderJunctions(&vector_renderer);

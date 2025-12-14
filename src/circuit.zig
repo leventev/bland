@@ -8,6 +8,7 @@ const VectorRenderer = @import("VectorRenderer.zig");
 const circuit_widget = @import("circuit_widget.zig");
 const Label = @import("Label.zig");
 const Ground = @import("Ground.zig");
+const Pin = @import("Pin.zig");
 
 const NetList = bland.NetList;
 
@@ -282,8 +283,6 @@ const TerminalWithPos = struct {
 
 pub var main_circuit: GraphicCircuit = undefined;
 
-pub var pin_counter: usize = 1;
-
 pub const GraphicCircuit = struct {
     allocator: std.mem.Allocator,
     graphic_components: std.ArrayList(component.GraphicComponent),
@@ -296,8 +295,6 @@ pub const GraphicCircuit = struct {
     // would be the most optimal but it would introduce too much complexity
     // rather we recount all on every change
     junctions: std.AutoHashMapUnmanaged(GridPosition, Junction),
-
-    const max_pin_name_lengh = bland.component.max_component_name_length;
 
     pub const Junction = struct {
         end_connection: usize,
@@ -459,81 +456,6 @@ pub const GraphicCircuit = struct {
             label.render(vector_renderer, id == hovered_id);
         }
     }
-
-    pub const Pin = struct {
-        pos: GridPosition,
-        rotation: Rotation,
-        name_buffer: []u8,
-        // name is a slice into name_buffer
-        name: []const u8,
-
-        pub fn init(gpa: std.mem.Allocator, pos: GridPosition, rotation: Rotation) !Pin {
-            var pin = Pin{
-                .pos = pos,
-                .rotation = rotation,
-                .name_buffer = try gpa.alloc(u8, max_pin_name_lengh),
-                .name = &.{},
-            };
-
-            pin.name = std.fmt.bufPrint(pin.name_buffer, "P{}", .{pin_counter}) catch @panic("not possible");
-            pin_counter += 1;
-
-            return pin;
-        }
-
-        pub fn deinit(self: *Pin, gpa: std.mem.Allocator) void {
-            gpa.free(self.name_buffer);
-        }
-
-        pub fn hovered(
-            self: Pin,
-            mouse_pos: GridSubposition,
-            zoom: f32,
-        ) bool {
-            const f = dvui.Font{
-                .id = .fromName(global.font_name),
-                .size = global.circuit_font_size * circuit_widget.zoom_scale,
-            };
-
-            const angle: f32 = 15.0 / 180.0 * std.math.pi;
-
-            const label_size = dvui.Font.textSize(f, self.name);
-            const grid_size = VectorRenderer.grid_cell_px_size * circuit_widget.zoom_scale;
-
-            const rect_width = label_size.w / grid_size + 0.2;
-            const rect_height = label_size.h / grid_size + 0.2;
-            const gap: f32 = 0.2;
-
-            switch (self.rotation) {
-                .right, .left => {
-                    const triangle_len = (rect_height / 2) * std.math.atan(angle);
-                    const shape = component.GraphicComponent.ClickableShape{
-                        .rect = .{
-                            .x = gap,
-                            .y = -rect_height / 2,
-                            .width = triangle_len + rect_width,
-                            .height = rect_height,
-                        },
-                    };
-
-                    return shape.inside(self.pos, self.rotation, zoom, mouse_pos);
-                },
-                .top, .bottom => {
-                    const triangle_len = (rect_width / 2) * std.math.atan(angle);
-                    const shape = component.GraphicComponent.ClickableShape{
-                        .rect = .{
-                            .x = gap,
-                            .y = -rect_width / 2,
-                            .width = triangle_len + rect_height,
-                            .height = rect_width,
-                        },
-                    };
-
-                    return shape.inside(self.pos, self.rotation, zoom, mouse_pos);
-                },
-            }
-        }
-    };
 
     pub fn getAllTerminals(self: *const GraphicCircuit) !std.array_list.Managed(TerminalWithPos) {
         const terminal_count_approx = self.graphic_components.items.len * 2;

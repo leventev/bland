@@ -9,6 +9,7 @@ const global = @import("global.zig");
 const VectorRenderer = @import("VectorRenderer.zig");
 const Label = @import("Label.zig");
 const Ground = @import("Ground.zig");
+const Pin = @import("Pin.zig");
 
 const ElementRenderType = renderer.ElementRenderType;
 
@@ -473,7 +474,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                     const grid_pos = nearestGridPosition(viewport, mouse_pos);
 
                     if (circuit.main_circuit.canPlacePin(grid_pos, circuit.placement_rotation, null)) {
-                        const pin = try circuit.GraphicCircuit.Pin.init(
+                        const pin = try Pin.init(
                             gpa,
                             grid_pos,
                             circuit.placement_rotation,
@@ -627,7 +628,7 @@ fn renderHoldingLabel(
     );
 }
 
-fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
+fn renderHoldingPin(vector_renderer: *const VectorRenderer, pin_id: ?usize) !void {
     std.debug.assert(vector_renderer.output == .screen);
     const screen = vector_renderer.output.screen;
 
@@ -639,7 +640,7 @@ fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
     const can_place = circuit.main_circuit.canPlacePin(
         grid_pos,
         circuit.placement_rotation,
-        null,
+        pin_id,
     );
     const render_type = if (can_place)
         ElementRenderType.holding
@@ -647,13 +648,16 @@ fn renderHoldingPin(vector_renderer: *const VectorRenderer) !void {
         ElementRenderType.unable_to_place;
 
     var buff: [256]u8 = undefined;
-    const label = std.fmt.bufPrint(
-        &buff,
-        "P{}",
-        .{circuit.pin_counter},
-    ) catch @panic("Invalid fmt");
+    const label = if (pin_id) |id|
+        circuit.main_circuit.pins.items[id].name
+    else
+        std.fmt.bufPrint(
+            &buff,
+            "P{}",
+            .{Pin.pin_counter},
+        ) catch @panic("Invalid fmt");
 
-    try renderer.renderPin(
+    try Pin.renderPin(
         vector_renderer,
         grid_pos,
         circuit.placement_rotation,
@@ -756,7 +760,7 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
             null,
         ),
         .new_wire => |data| try renderHoldingWire(vector_renderer, data.held_wire_p1),
-        .new_pin => try renderHoldingPin(vector_renderer),
+        .new_pin => try renderHoldingPin(vector_renderer, null),
         .new_ground => try renderHoldingGround(vector_renderer, null),
         .dragging_ground => |data| try renderHoldingGround(vector_renderer, data.ground_id),
         .dragging_label => |data| {
@@ -806,26 +810,7 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
             try renderer.renderWire(vector_renderer, new_wire, render_type, &circuit.main_circuit.junctions);
         },
         .dragging_pin => |data| {
-            const pin = circuit.main_circuit.pins.items[data.pin_id];
-            const pos = nearestGridPosition(viewport, mouse_pos);
-            const can_place = circuit.main_circuit.canPlacePin(
-                pos,
-                circuit.placement_rotation,
-                null,
-            );
-
-            const render_type = if (can_place)
-                ElementRenderType.holding
-            else
-                ElementRenderType.unable_to_place;
-
-            try renderer.renderPin(
-                vector_renderer,
-                pos,
-                circuit.placement_rotation,
-                pin.name,
-                render_type,
-            );
+            try renderHoldingPin(vector_renderer, data.pin_id);
         },
     }
 }
@@ -1067,7 +1052,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ElementRenderType.normal;
 
-        try renderer.renderPin(&vector_renderer, pin.pos, pin.rotation, pin.name, render_type);
+        try pin.render(&vector_renderer, render_type);
     }
 
     try circuit.main_circuit.renderJunctions(&vector_renderer);
