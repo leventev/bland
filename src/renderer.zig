@@ -16,53 +16,6 @@ const GridPosition = circuit.GridPosition;
 
 pub var dark_mode: bool = true;
 
-pub fn renderCenteredText(
-    f: dvui.Font,
-    pos: dvui.Point.Physical,
-    color: dvui.Color,
-    text: []const u8,
-) void {
-    const s = dvui.Font.textSize(f, text);
-
-    const r = dvui.Rect.Physical{
-        .x = pos.x - s.w / 2,
-        .y = pos.y - s.h / 2,
-        .w = s.w,
-        .h = s.h,
-    };
-
-    dvui.renderText(.{
-        .color = color,
-        .background_color = null,
-        .debug = false,
-        .font = f,
-        .rs = .{
-            .r = r,
-        },
-        .text = text,
-    }) catch @panic("failed to render text");
-}
-
-pub fn drawRect(rect: dvui.Rect.Physical, color: dvui.Color, thickness: f32) void {
-    dvui.Rect.stroke(rect, dvui.Rect.Physical.all(0), .{
-        .color = color,
-        .thickness = thickness,
-    });
-}
-
-pub fn fillRect(rect: dvui.Rect.Physical, color: dvui.Color) void {
-    dvui.Rect.fill(rect, dvui.Rect.Physical.all(0), .{
-        .color = color,
-    });
-}
-
-pub fn drawLine(p1: dvui.Point.Physical, p2: dvui.Point.Physical, color: dvui.Color, thickness: f32) void {
-    dvui.Path.stroke(
-        .{ .points = &.{ p1, p2 } },
-        .{ .color = color, .thickness = thickness },
-    );
-}
-
 pub const ElementRenderType = enum {
     normal,
     holding,
