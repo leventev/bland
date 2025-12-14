@@ -964,15 +964,10 @@ pub fn renderPin(
         .x = @floatFromInt(grid_pos.x),
         .y = @floatFromInt(grid_pos.y),
     };
-    std.debug.assert(vector_renderer.output == .screen);
-    const screen = vector_renderer.output.screen;
-    const pos = dvui.Point.Physical{
-        .x = screen.viewport.x + (grid_pos_f.x - vector_renderer.world_left) * grid_size,
-        .y = screen.viewport.y + (grid_pos_f.y - vector_renderer.world_top) * grid_size,
-    };
 
-    const rect_width = label_size.w / grid_size + 0.2;
-    const rect_height = label_size.h / grid_size + 0.2;
+    const padding = 0.2;
+    const rect_width = label_size.w / grid_size + padding;
+    const rect_height = label_size.h / grid_size + padding;
     const gap: f32 = 0.2;
 
     const triangle_head: []const VectorRenderer.BrushInstruction = &.{
@@ -1032,16 +1027,11 @@ pub fn renderPin(
                 .{ .stroke_color = color },
             );
 
-            const x_off = (x_rect_start + rect_width / 2) * grid_size;
-            renderCenteredText(
-                f,
-                dvui.Point.Physical{
-                    .x = pos.x + if (inv) -x_off else x_off,
-                    .y = pos.y,
-                },
-                dvui.themeGet().color(.content, .text),
-                label,
-            );
+            const x_off: f32 = (if (inv) -rect_width else 0) + padding / 2.0;
+            try vector_renderer.renderText(.{
+                .x = grid_pos_f.x + x_rect_off + x_off,
+                .y = grid_pos_f.y - (label_size.h / 2) / grid_size,
+            }, label, dvui.themeGet().color(.content, .text), null);
         },
         .top, .bottom => {
             const inv = rotation == .top;
@@ -1084,16 +1074,15 @@ pub fn renderPin(
                 .{ .stroke_color = color },
             );
 
-            const y_off = (y_rect_start + rect_height / 2) * grid_size;
-            renderCenteredText(
-                f,
-                dvui.Point.Physical{
-                    .x = pos.x,
-                    .y = pos.y + if (inv) -y_off else y_off,
-                },
-                dvui.themeGet().color(.content, .text),
-                label,
-            );
+            const y_off: f32 = if (inv)
+                -y_rect_start - rect_height / 2 - label_size.h / grid_size / 2.0
+            else
+                y_rect_start + rect_height / 2 - label_size.h / grid_size / 2.0;
+
+            try vector_renderer.renderText(.{
+                .x = grid_pos_f.x - rect_width / 2 + padding / 2.0,
+                .y = grid_pos_f.y + y_off,
+            }, label, dvui.themeGet().color(.content, .text), null);
         },
     }
 }

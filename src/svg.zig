@@ -111,6 +111,10 @@ pub fn exportToSVG(graphic_circuit: *const GraphicCircuit) !void {
         try writer.flush();
     }
 
+    for (graphic_circuit.pins.items) |pin| {
+        try renderer.renderPin(&vector_renderer, pin.pos, pin.rotation, pin.name, .normal);
+    }
+
     try graphic_circuit.renderJunctions(&vector_renderer);
 
     _ = try writer.write("</svg>");
