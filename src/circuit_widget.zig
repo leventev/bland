@@ -422,25 +422,20 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                                 data.device_type,
                             ),
                         );
-
                         const last_idx = circuit.main_circuit.graphic_components.items.len - 1;
+                        const comp = &circuit.main_circuit.graphic_components.items[last_idx];
+
                         try circuit.main_circuit.labels.append(
                             circuit.main_circuit.allocator,
                             Label{
-                                .pos = .{
-                                    .x = @floatFromInt(grid_pos.x),
-                                    .y = @floatFromInt(grid_pos.y),
-                                },
+                                .pos = comp.defaultNameLabelPos(),
                                 .text_backing = .{ .component_name = @enumFromInt(last_idx) },
                             },
                         );
 
-                        if (circuit.main_circuit.graphic_components.items[last_idx].isValueDisplayed()) {
+                        if (comp.isValueDisplayed()) {
                             try circuit.main_circuit.labels.append(circuit.main_circuit.allocator, Label{
-                                .pos = .{
-                                    .x = @floatFromInt(grid_pos.x),
-                                    .y = @floatFromInt(grid_pos.y),
-                                },
+                                .pos = comp.defaultValueLabelPos(),
                                 .text_backing = .{ .component_value = @enumFromInt(last_idx) },
                             });
                         }

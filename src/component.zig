@@ -757,6 +757,52 @@ pub const GraphicComponent = struct {
         };
     }
 
+    pub fn defaultValueLabelPos(self: *const GraphicComponent) GridSubposition {
+        const x: f32 = @floatFromInt(self.pos.x);
+        const y: f32 = @floatFromInt(self.pos.y);
+        return switch (self.rotation) {
+            .right => .{
+                .x = x + 1.5,
+                .y = y - 0.8,
+            },
+            .left => .{
+                .x = x - 1.5,
+                .y = y - 0.8,
+            },
+            .top => .{
+                .x = x + 0.5,
+                .y = y - 1.7,
+            },
+            .bottom => .{
+                .x = x + 0.5,
+                .y = y + 1.3,
+            },
+        };
+    }
+
+    pub fn defaultNameLabelPos(self: *const GraphicComponent) GridSubposition {
+        const x: f32 = @floatFromInt(self.pos.x);
+        const y: f32 = @floatFromInt(self.pos.y);
+        return switch (self.rotation) {
+            .right => .{
+                .x = x + 0.5,
+                .y = y - 0.8,
+            },
+            .left => .{
+                .x = x - 0.5,
+                .y = y - 0.8,
+            },
+            .top => .{
+                .x = x + 0.5,
+                .y = y - 0.7,
+            },
+            .bottom => .{
+                .x = x + 0.5,
+                .y = y + 0.3,
+            },
+        };
+    }
+
     pub fn setNewComponentName(self: *GraphicComponent) !void {
         self.comp.name = switch (@as(DeviceType, self.comp.device)) {
             inline else => |x| try graphics_module(x).setNewComponentName(
