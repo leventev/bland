@@ -23,21 +23,21 @@ pub var zoom_scale: f32 = 1;
 const max_zoom = 3.0;
 const min_zoom = 0.75;
 
-pub fn initKeybinds(allocator: std.mem.Allocator) !void {
+pub fn initKeybinds(gpa: std.mem.Allocator) !void {
     const win = dvui.currentWindow();
-    try win.keybinds.putNoClobber(allocator, "normal_mode", .{ .key = .escape, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "register_placement_mode", .{ .key = .r, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "voltage_source_placement_mode", .{ .key = .v, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "current_source_placement_mode", .{ .key = .i, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "ground_placement_mode", .{ .key = .g, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "capacitor_placement_mode", .{ .key = .c, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "inductor_placement_mode", .{ .key = .l, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "diode_placement_mode", .{ .key = .d, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "wire_placement_mode", .{ .key = .w, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "rotate", .{ .key = .r, .control = true, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "open_debug_window", .{ .key = .o, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "pin_placement_mode", .{ .key = .p, .control = false, .shift = false });
-    try win.keybinds.putNoClobber(allocator, "delete", .{ .key = .delete, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "normal_mode", .{ .key = .escape, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "register_placement_mode", .{ .key = .r, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "voltage_source_placement_mode", .{ .key = .v, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "current_source_placement_mode", .{ .key = .i, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "ground_placement_mode", .{ .key = .g, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "capacitor_placement_mode", .{ .key = .c, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "inductor_placement_mode", .{ .key = .l, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "diode_placement_mode", .{ .key = .d, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "wire_placement_mode", .{ .key = .w, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "rotate", .{ .key = .r, .control = true, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "open_debug_window", .{ .key = .o, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "pin_placement_mode", .{ .key = .p, .control = false, .shift = false });
+    try win.keybinds.putNoClobber(gpa, "delete", .{ .key = .delete, .control = false, .shift = false });
 }
 
 fn checkForKeybinds(ev: dvui.Event.Key) !void {
@@ -815,7 +815,7 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
         },
     }
 }
-pub fn renderCircuit(allocator: std.mem.Allocator) !void {
+pub fn renderCircuit(gpa: std.mem.Allocator) !void {
     var circuit_area = dvui.widgetAlloc(dvui.BoxWidget);
     circuit_area.init(@src(), .{
         .dir = .horizontal,
@@ -828,13 +828,13 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
     defer circuit_area.deinit();
 
     circuit_area.drawBackground();
-    try handleCircuitAreaEvents(allocator, circuit_area);
+    try handleCircuitAreaEvents(gpa, circuit_area);
 
     const circuit_rect = circuit_area.data().rectScale().r;
 
     // TODO: optimize this
     var grid_positions = std.ArrayList(circuit.GridPosition){};
-    defer grid_positions.deinit(allocator);
+    defer grid_positions.deinit(gpa);
 
     for (circuit.main_circuit.graphic_components.items, 0..) |graphic_comp, i| {
         switch (circuit.placement_mode) {
@@ -847,7 +847,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         var buff: [100]component.OccupiedGridPosition = undefined;
         const occupied_positions = graphic_comp.getOccupiedGridPositions(buff[0..]);
         for (occupied_positions) |occupied_pos| {
-            try grid_positions.append(allocator, occupied_pos.pos);
+            try grid_positions.append(gpa, occupied_pos.pos);
         }
     }
 
@@ -860,7 +860,7 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         }
         var it = wire.iterator();
         while (it.next()) |pos| {
-            try grid_positions.append(allocator, pos);
+            try grid_positions.append(gpa, pos);
         }
     }
 

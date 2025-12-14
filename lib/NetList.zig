@@ -42,9 +42,9 @@ pub const Error = error{
     SourceShorted,
 } || std.mem.Allocator.Error;
 
-pub fn init(allocator: std.mem.Allocator) Error!NetList {
+pub fn init(gpa: std.mem.Allocator) Error!NetList {
     var nodes = std.ArrayListUnmanaged(Node){};
-    try nodes.append(allocator, .{
+    try nodes.append(gpa, .{
         .id = .ground,
         .connected_terminals = std.ArrayListUnmanaged(Terminal){},
         .voltage = 0,
@@ -56,9 +56,9 @@ pub fn init(allocator: std.mem.Allocator) Error!NetList {
     };
 }
 
-pub fn allocateNode(self: *NetList, allocator: std.mem.Allocator) Error!Node.Id {
+pub fn allocateNode(self: *NetList, gpa: std.mem.Allocator) Error!Node.Id {
     const next_id: Node.Id = @enumFromInt(self.nodes.items.len);
-    try self.nodes.append(allocator, .{
+    try self.nodes.append(gpa, .{
         .id = next_id,
         .connected_terminals = std.ArrayListUnmanaged(Terminal){},
         .voltage = null,
@@ -69,27 +69,27 @@ pub fn allocateNode(self: *NetList, allocator: std.mem.Allocator) Error!Node.Id 
 
 pub fn addComponent(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     device: Component.Device,
     name: []const u8,
     node_ids: []const Node.Id,
 ) Error!Component.Id {
     const comp_id: Component.Id = @enumFromInt(self.components.items.len);
-    try self.components.append(allocator, Component{
+    try self.components.append(gpa, Component{
         .device = device,
         .name = name,
-        .terminal_node_ids = try allocator.dupe(Node.Id, node_ids),
+        .terminal_node_ids = try gpa.dupe(Node.Id, node_ids),
     });
     for (node_ids, 0..) |node_id, term_id_int| {
         const term_id: Terminal.Id = @enumFromInt(term_id_int);
-        try self.addComponentConnection(allocator, node_id, comp_id, term_id);
+        try self.addComponentConnection(gpa, node_id, comp_id, term_id);
     }
     return comp_id;
 }
 
 pub fn addComponentConnection(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     node_id: Node.Id,
     comp_id: Component.Id,
     term_id: Terminal.Id,
@@ -98,7 +98,7 @@ pub fn addComponentConnection(
     if (@intFromEnum(comp_id) >= self.components.items.len) return error.InvalidComponentID;
 
     try self.nodes.items[@intFromEnum(node_id)].connected_terminals.append(
-        allocator,
+        gpa,
         NetList.Terminal{
             .component_id = comp_id,
             .terminal_id = term_id,
@@ -106,20 +106,20 @@ pub fn addComponentConnection(
     );
 }
 
-pub fn deinit(self: *NetList, allocator: std.mem.Allocator) void {
+pub fn deinit(self: *NetList, gpa: std.mem.Allocator) void {
     for (self.nodes.items) |*node| {
-        node.connected_terminals.deinit(allocator);
+        node.connected_terminals.deinit(gpa);
     }
 
-    self.nodes.deinit(allocator);
-    self.components.deinit(allocator);
+    self.nodes.deinit(gpa);
+    self.components.deinit(gpa);
     self.* = undefined;
 }
 
 // TODO: get rid of angular_frequency and ac_analysis
 fn createMNAMatrix(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     group_2: []const Component.Id,
     angular_frequency: Float,
     ac_analysis: bool,
@@ -128,7 +128,7 @@ fn createMNAMatrix(
     // if there are less than 3 components then the circuit is sure to be invalid
     if (self.components.items.len < 2) return error.NotEnoughComponents;
 
-    const validation_result = try validator.validate(allocator, self);
+    const validation_result = try validator.validate(gpa, self);
     for (validation_result.comps, 0..) |comp_result, comp_id_int| {
         const comp = self.components.items[comp_id_int];
         if (comp_result.value_invalid) {
@@ -159,7 +159,7 @@ fn createMNAMatrix(
     }
 
     var mna = MNA.init(
-        allocator,
+        gpa,
         self.nodes.items,
         group_2,
         self.components.items.len,
@@ -183,17 +183,17 @@ const Group2 = struct {
 
     fn addComponents(
         self: *Group2,
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
         comp_ids: []const Component.Id,
     ) !void {
         for (comp_ids) |comp_id| {
-            _ = try self.addComponent(allocator, comp_id);
+            _ = try self.addComponent(gpa, comp_id);
         }
     }
 
     fn addComponent(
         self: *Group2,
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
         comp_id: Component.Id,
     ) !Group2Id {
         const idx = std.mem.indexOf(Component.Id, self.arr.items, &.{comp_id});
@@ -202,7 +202,7 @@ const Group2 = struct {
         }
 
         const group_2_id = self.arr.items.len;
-        try self.arr.append(allocator, comp_id);
+        try self.arr.append(gpa, comp_id);
 
         return @enumFromInt(group_2_id);
     }
@@ -211,14 +211,14 @@ const Group2 = struct {
         return Group2{ .arr = std.ArrayList(Component.Id){} };
     }
 
-    fn deinit(self: *Group2, allocator: std.mem.Allocator) void {
-        self.arr.deinit(allocator);
+    fn deinit(self: *Group2, gpa: std.mem.Allocator) void {
+        self.arr.deinit(gpa);
     }
 };
 
 fn createGroup2(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     currents_watched: ?[]const Component.Id,
 ) !Group2 {
     // group edges:
@@ -228,27 +228,27 @@ fn createGroup2(
     var group_2 = Group2.init();
 
     if (currents_watched) |currs| {
-        try group_2.addComponents(allocator, currs);
+        try group_2.addComponents(gpa, currs);
 
         for (0.., self.components.items) |comp_id_int, *comp| {
             const comp_id: Component.Id = @enumFromInt(comp_id_int);
             switch (comp.device) {
                 .voltage_source, .inductor => {
-                    _ = try group_2.addComponent(allocator, comp_id);
+                    _ = try group_2.addComponent(gpa, comp_id);
                 },
                 .ccvs => |*inner| {
                     // controller's current
-                    _ = try group_2.addComponent(allocator, inner.controller_comp_id);
+                    _ = try group_2.addComponent(gpa, inner.controller_comp_id);
 
                     // ccvs's current
-                    _ = try group_2.addComponent(allocator, comp_id);
+                    _ = try group_2.addComponent(gpa, comp_id);
                 },
                 .cccs => |*inner| {
                     // controller's current
-                    _ = try group_2.addComponent(allocator, inner.controller_comp_id);
+                    _ = try group_2.addComponent(gpa, inner.controller_comp_id);
 
                     // ccvs's current
-                    _ = try group_2.addComponent(allocator, comp_id);
+                    _ = try group_2.addComponent(gpa, comp_id);
                 },
                 else => {},
             }
@@ -257,7 +257,7 @@ fn createGroup2(
         for (0..self.components.items.len) |comp_id_int| {
             const comp_id: Component.Id = @enumFromInt(comp_id_int);
             // TODO: optimize
-            _ = try group_2.addComponent(allocator, comp_id);
+            _ = try group_2.addComponent(gpa, comp_id);
         }
     }
 
@@ -266,18 +266,18 @@ fn createGroup2(
 
 pub fn analyseDC(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     currents_watched: ?[]const Component.Id,
 ) Error!MNA.RealAnalysisReport {
     const start_time: i64 = std.time.microTimestamp();
 
-    var group_2 = try self.createGroup2(allocator, currents_watched);
-    defer group_2.deinit(allocator);
+    var group_2 = try self.createGroup2(gpa, currents_watched);
+    defer group_2.deinit(gpa);
 
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // iterate over all elements and stamp them onto the matrix
-    var mna = try self.createMNAMatrix(allocator, group_2.arr.items, 0, false);
-    defer mna.deinit(allocator);
+    var mna = try self.createMNAMatrix(gpa, group_2.arr.items, 0, false);
+    defer mna.deinit(gpa);
 
     for (0.., self.components.items) |comp_id_int, comp| {
         const comp_id: Component.Id = @enumFromInt(comp_id_int);
@@ -306,7 +306,7 @@ pub fn analyseDC(
     }
 
     // solve the matrix with Gauss elimination
-    const res = try mna.solveReal(allocator);
+    const res = try mna.solveReal(gpa);
 
     const end_time: i64 = std.time.microTimestamp();
     const elapsed_us: f64 = @as(f64, @floatFromInt(end_time - start_time));
@@ -327,14 +327,14 @@ pub fn analyseDC(
 
 pub fn analyseTransient(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     currents_watched: ?[]const Component.Id,
     duration: Float,
 ) TransientResult.Error!TransientResult {
     const start_time: i64 = std.time.microTimestamp();
 
-    var group_2 = try self.createGroup2(allocator, currents_watched);
-    defer group_2.deinit(allocator);
+    var group_2 = try self.createGroup2(gpa, currents_watched);
+    defer group_2.deinit(gpa);
 
     const time_step: Float = 5e-5;
 
@@ -342,7 +342,7 @@ pub fn analyseTransient(
 
     // TODO: adaptive time steps
     var transient_report = try TransientResult.init(
-        allocator,
+        gpa,
         self.nodes.items.len,
         self.components.items.len,
         time_point_count,
@@ -361,8 +361,8 @@ pub fn analyseTransient(
 
     // t0 = 0
     transient_report.time_values[0] = 0;
-    var mna = try self.createMNAMatrix(allocator, group_2.arr.items, 0, false);
-    defer mna.deinit(allocator);
+    var mna = try self.createMNAMatrix(gpa, group_2.arr.items, 0, false);
+    defer mna.deinit(gpa);
 
     for (1..time_point_count) |time_idx| {
         const time = @as(Float, @floatFromInt(time_idx)) * time_step;
@@ -406,8 +406,8 @@ pub fn analyseTransient(
         }
 
         // TODO: no allocation
-        var step_res = try mna.solveReal(allocator);
-        defer step_res.deinit(allocator);
+        var step_res = try mna.solveReal(gpa);
+        defer step_res.deinit(gpa);
 
         for (0..self.nodes.items.len) |node_idx| {
             const idx = node_idx * time_point_count + time_idx;
@@ -467,20 +467,20 @@ pub fn analyseTransient(
 
 pub fn analyseSinusoidalSteadyState(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     currents_watched: ?[]const Component.Id,
     frequency: Float,
 ) Error!MNA.ComplexAnalysisReport {
     std.debug.assert(frequency >= 0);
     const angular_frequency = 2 * std.math.pi * frequency;
 
-    var group_2 = try self.createGroup2(allocator, currents_watched);
-    defer group_2.deinit(allocator);
+    var group_2 = try self.createGroup2(gpa, currents_watched);
+    defer group_2.deinit(gpa);
 
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // iterate over all elements and stamp them onto the matrix
-    var mna = try self.createMNAMatrix(allocator, group_2.arr.items, angular_frequency, true);
-    defer mna.deinit(allocator);
+    var mna = try self.createMNAMatrix(gpa, group_2.arr.items, angular_frequency, true);
+    defer mna.deinit(gpa);
 
     for (0.., self.components.items) |comp_id_int, comp| {
         const comp_id: Component.Id = @enumFromInt(comp_id_int);
@@ -510,7 +510,7 @@ pub fn analyseSinusoidalSteadyState(
     }
 
     // solve the matrix with Gauss elimination
-    const res = try mna.solveComplex(allocator);
+    const res = try mna.solveComplex(gpa);
     return res;
 }
 
@@ -532,7 +532,7 @@ pub const FrequencySweepResult = struct {
     } || NetList.Error;
 
     fn init(
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
         node_count: usize,
         component_count: usize,
         start_freq: Float,
@@ -547,19 +547,19 @@ pub const FrequencySweepResult = struct {
         std.debug.assert(node_count > 0);
         std.debug.assert(component_count > 0);
 
-        const all_voltages = try allocator.alloc(
+        const all_voltages = try gpa.alloc(
             Complex,
             node_count * frequency_count,
         );
-        errdefer allocator.free(all_voltages);
+        errdefer gpa.free(all_voltages);
 
-        const all_currents = try allocator.alloc(
+        const all_currents = try gpa.alloc(
             ?Complex,
             component_count * frequency_count,
         );
-        errdefer allocator.free(all_currents);
+        errdefer gpa.free(all_currents);
 
-        const frequency_values = try allocator.alloc(Float, frequency_count);
+        const frequency_values = try gpa.alloc(Float, frequency_count);
 
         const start_freq_exponent: Float = std.math.log10(start_freq);
         const end_freq_exponent: Float = std.math.log10(end_freq);
@@ -581,10 +581,10 @@ pub const FrequencySweepResult = struct {
         };
     }
 
-    pub fn deinit(self: *FrequencySweepResult, allocator: std.mem.Allocator) void {
-        allocator.free(self.frequency_values);
-        allocator.free(self.all_voltages);
-        allocator.free(self.all_currents);
+    pub fn deinit(self: *FrequencySweepResult, gpa: std.mem.Allocator) void {
+        gpa.free(self.frequency_values);
+        gpa.free(self.all_voltages);
+        gpa.free(self.all_currents);
         self.* = undefined;
     }
 
@@ -648,7 +648,7 @@ pub const TransientResult = struct {
     } || NetList.Error;
 
     fn init(
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
         node_count: usize,
         component_count: usize,
         time_count: usize,
@@ -659,19 +659,19 @@ pub const TransientResult = struct {
         std.debug.assert(node_count > 0);
         std.debug.assert(component_count > 0);
 
-        const all_voltages = try allocator.alloc(
+        const all_voltages = try gpa.alloc(
             Float,
             node_count * time_count,
         );
-        errdefer allocator.free(all_voltages);
+        errdefer gpa.free(all_voltages);
 
-        const all_currents = try allocator.alloc(
+        const all_currents = try gpa.alloc(
             ?Float,
             component_count * time_count,
         );
-        errdefer allocator.free(all_currents);
+        errdefer gpa.free(all_currents);
 
-        const time_values = try allocator.alloc(Float, time_count);
+        const time_values = try gpa.alloc(Float, time_count);
 
         return TransientResult{
             .all_voltages = all_voltages,
@@ -682,10 +682,10 @@ pub const TransientResult = struct {
         };
     }
 
-    pub fn deinit(self: *TransientResult, allocator: std.mem.Allocator) void {
-        allocator.free(self.time_values);
-        allocator.free(self.all_voltages);
-        allocator.free(self.all_currents);
+    pub fn deinit(self: *TransientResult, gpa: std.mem.Allocator) void {
+        gpa.free(self.time_values);
+        gpa.free(self.all_voltages);
+        gpa.free(self.all_currents);
         self.* = undefined;
     }
 
@@ -733,7 +733,7 @@ pub const TransientResult = struct {
 
 pub fn analyseFrequencySweep(
     self: *NetList,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     start_freq: Float,
     end_freq: Float,
     freq_count: usize,
@@ -742,7 +742,7 @@ pub fn analyseFrequencySweep(
     const start_time: i64 = std.time.microTimestamp();
 
     var fw_report = try FrequencySweepResult.init(
-        allocator,
+        gpa,
         self.nodes.items.len,
         self.components.items.len,
         start_freq,
@@ -753,8 +753,8 @@ pub fn analyseFrequencySweep(
     // TODO:
     for (fw_report.frequency_values, 0..) |freq, freq_idx| {
         // TODO
-        var report = try self.analyseSinusoidalSteadyState(allocator, currents_watched, freq);
-        defer report.deinit(allocator);
+        var report = try self.analyseSinusoidalSteadyState(gpa, currents_watched, freq);
+        defer report.deinit(gpa);
 
         for (0..self.nodes.items.len) |node_idx| {
             const idx = node_idx * freq_count + freq_idx;

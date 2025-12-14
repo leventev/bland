@@ -19,7 +19,7 @@ component_count: usize,
 group_2: []const Component.Id,
 
 pub fn init(
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     nodes: []const NetList.Node,
     group_2: []const Component.Id,
     component_count: usize,
@@ -30,7 +30,7 @@ pub fn init(
         return MNA{
             .mat = .{
                 .ac = try complex_matrix.ComplexMatrix(Float).init(
-                    allocator,
+                    gpa,
                     total_variable_count,
                     total_variable_count + 1,
                 ),
@@ -43,7 +43,7 @@ pub fn init(
         return MNA{
             .mat = .{
                 .dc = try matrix.Matrix(Float).init(
-                    allocator,
+                    gpa,
                     total_variable_count,
                     total_variable_count + 1,
                 ),
@@ -74,13 +74,13 @@ pub fn zero(self: *MNA) void {
     }
 }
 
-pub fn deinit(self: *MNA, allocator: std.mem.Allocator) void {
+pub fn deinit(self: *MNA, gpa: std.mem.Allocator) void {
     switch (self.mat) {
         .dc => |*mat| {
-            mat.deinit(allocator);
+            mat.deinit(gpa);
         },
         .ac => |*mat| {
-            mat.deinit(allocator);
+            mat.deinit(gpa);
         },
     }
 }
@@ -306,13 +306,13 @@ fn print(
     }
 }
 
-pub fn solveReal(self: *MNA, allocator: std.mem.Allocator) !RealAnalysisReport {
+pub fn solveReal(self: *MNA, gpa: std.mem.Allocator) !RealAnalysisReport {
     var mat = self.mat.dc;
 
     mat.toRowReducedEchelon();
 
     var dc_results = try RealAnalysisReport.init(
-        allocator,
+        gpa,
         self.nodes.len,
         self.component_count,
     );
@@ -335,13 +335,13 @@ pub fn solveReal(self: *MNA, allocator: std.mem.Allocator) !RealAnalysisReport {
     return dc_results;
 }
 
-pub fn solveComplex(self: *MNA, allocator: std.mem.Allocator) !ComplexAnalysisReport {
+pub fn solveComplex(self: *MNA, gpa: std.mem.Allocator) !ComplexAnalysisReport {
     var mat = self.mat.ac;
 
     mat.toRowReducedEchelon();
 
     var ac_results = try ComplexAnalysisReport.init(
-        allocator,
+        gpa,
         self.nodes.len,
         self.component_count,
     );
@@ -369,16 +369,16 @@ pub const RealAnalysisReport = struct {
     currents: []?Float,
 
     pub fn init(
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
         node_count: usize,
         comp_count: usize,
     ) !RealAnalysisReport {
         return RealAnalysisReport{
-            .voltages = try allocator.alloc(
+            .voltages = try gpa.alloc(
                 Float,
                 node_count,
             ),
-            .currents = try allocator.alloc(
+            .currents = try gpa.alloc(
                 ?Float,
                 comp_count,
             ),
@@ -387,10 +387,10 @@ pub const RealAnalysisReport = struct {
 
     pub fn deinit(
         self: *RealAnalysisReport,
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
     ) void {
-        allocator.free(self.voltages);
-        allocator.free(self.currents);
+        gpa.free(self.voltages);
+        gpa.free(self.currents);
         self.* = undefined;
     }
 
@@ -414,16 +414,16 @@ pub const ComplexAnalysisReport = struct {
     currents: []?Complex,
 
     pub fn init(
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
         node_count: usize,
         comp_count: usize,
     ) !ComplexAnalysisReport {
         return ComplexAnalysisReport{
-            .voltages = try allocator.alloc(
+            .voltages = try gpa.alloc(
                 Complex,
                 node_count,
             ),
-            .currents = try allocator.alloc(
+            .currents = try gpa.alloc(
                 ?Complex,
                 comp_count,
             ),
@@ -432,10 +432,10 @@ pub const ComplexAnalysisReport = struct {
 
     pub fn deinit(
         self: *ComplexAnalysisReport,
-        allocator: std.mem.Allocator,
+        gpa: std.mem.Allocator,
     ) void {
-        allocator.free(self.voltages);
-        allocator.free(self.currents);
+        gpa.free(self.voltages);
+        gpa.free(self.currents);
         self.* = undefined;
     }
 
