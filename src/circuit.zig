@@ -7,6 +7,7 @@ const dvui = @import("dvui");
 const VectorRenderer = @import("VectorRenderer.zig");
 const circuit_widget = @import("circuit_widget.zig");
 const Label = @import("Label.zig");
+const Ground = @import("Ground.zig");
 
 const NetList = bland.NetList;
 
@@ -282,48 +283,6 @@ const TerminalWithPos = struct {
 pub var main_circuit: GraphicCircuit = undefined;
 
 pub var pin_counter: usize = 1;
-
-pub const Ground = struct {
-    pos: GridPosition,
-    rotation: Rotation,
-
-    pub fn otherPos(self: Ground) GridPosition {
-        return switch (self.rotation) {
-            Rotation.left => GridPosition{
-                .x = self.pos.x - 1,
-                .y = self.pos.y,
-            },
-            Rotation.right => GridPosition{
-                .x = self.pos.x + 1,
-                .y = self.pos.y,
-            },
-            Rotation.top => GridPosition{
-                .x = self.pos.x,
-                .y = self.pos.y - 1,
-            },
-            Rotation.bottom => GridPosition{
-                .x = self.pos.x,
-                .y = self.pos.y + 1,
-            },
-        };
-    }
-    pub fn hovered(
-        self: Ground,
-        mouse_grid_pos: GridSubposition,
-        zoom: f32,
-    ) bool {
-        const shape = component.GraphicComponent.ClickableShape{
-            .rect = .{
-                .x = renderer.ground_wire_len,
-                .y = -renderer.ground_level_1_len / 2.0,
-                .width = renderer.ground_pyramide_len,
-                .height = renderer.ground_level_1_len,
-            },
-        };
-
-        return shape.inside(self.pos, self.rotation, zoom, mouse_grid_pos);
-    }
-};
 
 pub const GraphicCircuit = struct {
     allocator: std.mem.Allocator,

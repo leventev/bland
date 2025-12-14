@@ -8,6 +8,7 @@ const component = @import("component.zig");
 const global = @import("global.zig");
 const VectorRenderer = @import("VectorRenderer.zig");
 const Label = @import("Label.zig");
+const Ground = @import("Ground.zig");
 
 const ElementRenderType = renderer.ElementRenderType;
 
@@ -392,7 +393,7 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                     if (circuit.main_circuit.canPlaceGround(grid_pos, circuit.placement_rotation, null)) {
                         try circuit.main_circuit.grounds.append(
                             circuit.main_circuit.allocator,
-                            circuit.Ground{
+                            Ground{
                                 .pos = grid_pos,
                                 .rotation = circuit.placement_rotation,
                             },
@@ -599,10 +600,12 @@ fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id
     else
         ElementRenderType.unable_to_place;
 
-    try renderer.renderGround(
+    const held_ground = Ground{
+        .pos = grid_pos,
+        .rotation = circuit.placement_rotation,
+    };
+    try held_ground.render(
         vector_renderer,
-        grid_pos,
-        circuit.placement_rotation,
         render_type,
         &circuit.main_circuit.junctions,
     );
@@ -1019,10 +1022,8 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ElementRenderType.normal;
 
-        try renderer.renderGround(
+        try ground.render(
             &vector_renderer,
-            ground.pos,
-            ground.rotation,
             render_type,
             &circuit.main_circuit.junctions,
         );
