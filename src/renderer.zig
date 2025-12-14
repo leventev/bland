@@ -83,12 +83,6 @@ const ElementRenderColors = struct {
     wire_color: dvui.Color,
 };
 
-pub const TerminalWire = struct {
-    pos: dvui.Point,
-    pixel_length: f32,
-    direction: circuit.Wire.Direction,
-};
-
 fn renderToolbox(parentSubwindowId: dvui.Id) bool {
     var toolbox = dvui.box(@src(), .{
         .dir = .vertical,
@@ -833,62 +827,4 @@ pub fn textEntrySI(
     });
 
     return false;
-}
-
-pub fn renderWire(
-    vector_renderer: *const VectorRenderer,
-    wire: circuit.Wire,
-    render_type: ElementRenderType,
-    junctions: ?*const std.AutoHashMapUnmanaged(GridPosition, circuit.GraphicCircuit.Junction),
-) !void {
-    const instructions: []const VectorRenderer.BrushInstruction = &.{
-        .{ .snap_pixel_set = true },
-        .{ .move_rel = .{ .x = 1, .y = 0 } },
-        .{ .stroke = .{ .base_thickness = 1 } },
-    };
-
-    var scale: f32 = @floatFromInt(wire.length);
-    var x: f32 = @floatFromInt(wire.pos.x);
-    var y: f32 = @floatFromInt(wire.pos.y);
-    if (junctions) |js| {
-        const start_circle_rendered = if (js.get(wire.pos)) |junction|
-            junction.kind() != .none
-        else
-            false;
-
-        const end_circle_rendered = if (js.get(wire.end())) |junction|
-            junction.kind() != .none
-        else
-            false;
-
-        const sign: f32 = @floatFromInt(std.math.sign(wire.length));
-
-        if (start_circle_rendered) {
-            scale -= sign * circuit.GraphicCircuit.junction_radius;
-            switch (wire.direction) {
-                .horizontal => x += sign * circuit.GraphicCircuit.junction_radius,
-                .vertical => y += sign * circuit.GraphicCircuit.junction_radius,
-            }
-        }
-        if (end_circle_rendered) {
-            scale -= sign * circuit.GraphicCircuit.junction_radius;
-        }
-    }
-
-    const colors = render_type.colors();
-    const thickness = render_type.wireThickness();
-    const rotation: f32 = if (wire.direction == .vertical) std.math.pi / 2.0 else 0.0;
-    try vector_renderer.render(
-        instructions,
-        .{
-            .translate = .{
-                .x = x,
-                .y = y,
-            },
-            .scale = .both(scale),
-            .line_scale = thickness * circuit_widget.zoom_scale,
-            .rotate = rotation,
-        },
-        .{ .stroke_color = colors.wire_color },
-    );
 }

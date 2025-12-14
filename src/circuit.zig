@@ -9,6 +9,7 @@ const circuit_widget = @import("circuit_widget.zig");
 const Label = @import("Label.zig");
 const Ground = @import("Ground.zig");
 const Pin = @import("Pin.zig");
+const Wire = @import("Wire.zig");
 
 const NetList = bland.NetList;
 
@@ -56,112 +57,6 @@ pub const AnalysisReport = struct {
 };
 
 pub var analysis_reports: std.ArrayList(AnalysisReport) = .{};
-
-pub const Wire = struct {
-    pos: GridPosition,
-    // length can be negative
-    length: i32,
-    direction: Direction,
-
-    pub const Direction = enum {
-        horizontal,
-        vertical,
-    };
-
-    pub fn end(self: Wire) GridPosition {
-        switch (self.direction) {
-            .horizontal => return GridPosition{
-                .x = self.pos.x + self.length,
-                .y = self.pos.y,
-            },
-            .vertical => return GridPosition{
-                .x = self.pos.x,
-                .y = self.pos.y + self.length,
-            },
-        }
-    }
-
-    const WireIterator = struct {
-        wire: Wire,
-        idx: u32,
-
-        pub fn next(self: *WireIterator) ?GridPosition {
-            if (self.idx > @abs(self.wire.length)) return null;
-            const sign: i32 = if (self.wire.length > 0) 1 else -1;
-            const increment: i32 = @as(i32, @intCast(self.idx)) * sign;
-            self.idx += 1;
-            switch (self.wire.direction) {
-                .horizontal => return GridPosition{
-                    .x = self.wire.pos.x + increment,
-                    .y = self.wire.pos.y,
-                },
-                .vertical => return GridPosition{
-                    .x = self.wire.pos.x,
-                    .y = self.wire.pos.y + increment,
-                },
-            }
-        }
-    };
-
-    pub fn iterator(self: Wire) WireIterator {
-        return WireIterator{
-            .wire = self,
-            .idx = 0,
-        };
-    }
-
-    pub fn intersectsWire(self: Wire, other: Wire) bool {
-        // TODO: optimize
-        var it1 = self.iterator();
-        while (it1.next()) |pos1| {
-            var it2 = other.iterator();
-            while (it2.next()) |pos2| {
-                if (pos1.eql(pos2)) return true;
-            }
-        }
-
-        return false;
-    }
-
-    pub fn hovered(
-        self: Wire,
-        m_pos: GridSubposition,
-        zoom_scale: f32,
-    ) bool {
-        const grid_size = VectorRenderer.grid_cell_px_size * zoom_scale;
-        const tolerance_px = 7;
-        const tolerance = tolerance_px / grid_size;
-
-        var sp = GridSubposition{
-            .x = @floatFromInt(self.pos.x),
-            .y = @floatFromInt(self.pos.y),
-        };
-        var ep = GridSubposition{
-            .x = @floatFromInt(self.end().x),
-            .y = @floatFromInt(self.end().y),
-        };
-
-        if (self.length < 0) {
-            const tmp = sp;
-            sp = ep;
-            ep = tmp;
-        }
-
-        switch (self.direction) {
-            .horizontal => {
-                const x_within = m_pos.x >= sp.x and m_pos.x <= ep.x;
-                const y_within = @abs(m_pos.y - sp.y) <= tolerance;
-                return x_within and y_within;
-            },
-            .vertical => {
-                const y_within = m_pos.y >= sp.y and m_pos.y <= ep.y;
-                const x_within = @abs(m_pos.x - sp.x) <= tolerance;
-                return x_within and y_within;
-            },
-        }
-        return false;
-    }
-};
 
 pub const PlacementModeType = enum {
     none,
@@ -247,33 +142,6 @@ pub fn delete() void {
         }
         selection = null;
     }
-}
-
-fn getOccupiedGridPositions(
-    wire: Wire,
-    occupied: []component.OccupiedGridPosition,
-) []component.OccupiedGridPosition {
-    const abs_len = @abs(wire.length);
-    const point_count = abs_len + 1;
-    std.debug.assert(point_count < occupied.len);
-    const negative = wire.length < 0;
-
-    for (0..point_count) |i| {
-        const idx: i32 = if (negative) -@as(i32, @intCast(i)) else @intCast(i);
-        const pos: GridPosition = if (wire.direction == .horizontal) .{
-            .x = wire.pos.x + idx,
-            .y = wire.pos.y,
-        } else .{
-            .x = wire.pos.x,
-            .y = wire.pos.y + idx,
-        };
-        occupied[i] = component.OccupiedGridPosition{
-            .pos = pos,
-            .terminal = true,
-        };
-    }
-
-    return occupied[0..point_count];
 }
 
 const TerminalWithPos = struct {
@@ -652,7 +520,7 @@ pub const GraphicCircuit = struct {
 
     pub fn canPlaceWire(self: *const GraphicCircuit, wire: Wire, exclude_wire_id: ?usize) bool {
         var buffer: [100]component.OccupiedGridPosition = undefined;
-        const positions = getOccupiedGridPositions(wire, buffer[0..]);
+        const positions = wire.getOccupiedGridPositions(buffer[0..]);
 
         for (self.graphic_components.items) |comp| {
             if (comp.intersects(positions)) return false;
@@ -773,7 +641,7 @@ pub const GraphicCircuit = struct {
         var buffer2: [100]component.OccupiedGridPosition = undefined;
         for (self.wires.items, 0..) |wire, i| {
             if (i == excluded_wire_id) continue;
-            const wire_positions = getOccupiedGridPositions(wire, buffer2[0..]);
+            const wire_positions = wire.getOccupiedGridPositions(buffer2[0..]);
             if (component.occupiedPointsIntersect(positions, wire_positions)) return false;
         }
 

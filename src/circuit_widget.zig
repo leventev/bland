@@ -10,6 +10,7 @@ const VectorRenderer = @import("VectorRenderer.zig");
 const Label = @import("Label.zig");
 const Ground = @import("Ground.zig");
 const Pin = @import("Pin.zig");
+const Wire = @import("Wire.zig");
 
 const ElementRenderType = renderer.ElementRenderType;
 
@@ -449,11 +450,11 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                         const xlen = @abs(p2.x - p1.x);
                         const ylen = @abs(p2.y - p1.y);
 
-                        const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
+                        const wire: Wire = if (xlen >= ylen) Wire{
                             .direction = .horizontal,
                             .length = p2.x - p1.x,
                             .pos = p1,
-                        } else circuit.Wire{
+                        } else Wire{
                             .direction = .vertical,
                             .length = p2.y - p1.y,
                             .pos = p1,
@@ -561,11 +562,11 @@ fn renderHoldingWire(
     const xlen = @abs(p2.x - p1.x);
     const ylen = @abs(p2.y - p1.y);
 
-    const wire: circuit.Wire = if (xlen >= ylen) circuit.Wire{
+    const wire: Wire = if (xlen >= ylen) .{
         .direction = .horizontal,
         .length = p2.x - p1.x,
         .pos = p1,
-    } else circuit.Wire{
+    } else .{
         .direction = .vertical,
         .length = p2.y - p1.y,
         .pos = p1,
@@ -579,7 +580,7 @@ fn renderHoldingWire(
     else
         ElementRenderType.unable_to_place;
 
-    try renderer.renderWire(vector_renderer, wire, render_type, &circuit.main_circuit.junctions);
+    try wire.render(vector_renderer, render_type, &circuit.main_circuit.junctions);
 }
 
 fn renderHoldingGround(vector_renderer: *const VectorRenderer, exclude_ground_id: ?usize) !void {
@@ -795,7 +796,7 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
                 .y = @intFromFloat(@round(adjusted_pos.y)),
             };
 
-            const new_wire = circuit.Wire{
+            const new_wire = Wire{
                 .direction = wire.direction,
                 .length = wire.length,
                 .pos = pos,
@@ -807,7 +808,7 @@ pub fn renderPlacement(vector_renderer: *const VectorRenderer) !void {
             else
                 ElementRenderType.unable_to_place;
 
-            try renderer.renderWire(vector_renderer, new_wire, render_type, &circuit.main_circuit.junctions);
+            try new_wire.render(vector_renderer, render_type, &circuit.main_circuit.junctions);
         },
         .dragging_pin => |data| {
             try renderHoldingPin(vector_renderer, data.pin_id);
@@ -1029,9 +1030,8 @@ pub fn renderCircuit(allocator: std.mem.Allocator) !void {
         else
             ElementRenderType.normal;
 
-        try renderer.renderWire(
+        try wire.render(
             &vector_renderer,
-            wire,
             render_type,
             &circuit.main_circuit.junctions,
         );

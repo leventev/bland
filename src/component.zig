@@ -6,6 +6,7 @@ const global = @import("global.zig");
 const renderer = @import("renderer.zig");
 const VectorRenderer = @import("VectorRenderer.zig");
 const circuit_widget = @import("circuit_widget.zig");
+const Wire = @import("Wire.zig");
 
 const Float = bland.Float;
 const GridPosition = circuit.GridPosition;
@@ -310,7 +311,7 @@ pub const GraphicComponent = struct {
 
     pub const Terminal = struct {
         relative_pos: GridPosition,
-        direction: circuit.Wire.Direction,
+        direction: Wire.Direction,
         len: f32,
     };
 
