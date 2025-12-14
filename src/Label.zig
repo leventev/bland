@@ -15,12 +15,17 @@ text_backing: TextBacking,
 
 pub const TextBacking = union(enum) {
     component_name: Component.Id,
+    component_value: Component.Id,
 
     pub fn retrieve(self: TextBacking) []const u8 {
         switch (self) {
             .component_name => |id| {
                 const id_int = @intFromEnum(id);
                 return circuit.main_circuit.graphic_components.items[id_int].comp.name;
+            },
+            .component_value => |id| {
+                const id_int = @intFromEnum(id);
+                return circuit.main_circuit.graphic_components.items[id_int].valueStr();
             },
         }
     }
@@ -48,6 +53,7 @@ pub fn renderLabel(
 pub fn owner(self: Label) ?Component.Id {
     return switch (self.text_backing) {
         .component_name => |id| id,
+        .component_value => |id| id,
     };
 }
 

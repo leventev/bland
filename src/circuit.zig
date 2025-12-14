@@ -1297,6 +1297,12 @@ pub const GraphicCircuit = struct {
                         id.* = @enumFromInt(id_int - deleted);
                     }
                 },
+                .component_value => |*id| {
+                    const id_int = @intFromEnum(id.*);
+                    if (id_int > comp_id) {
+                        id.* = @enumFromInt(id_int - deleted);
+                    }
+                },
             }
         }
     }

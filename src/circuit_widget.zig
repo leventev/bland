@@ -413,15 +413,14 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                         circuit.placement_rotation,
                         null,
                     )) {
-                        const graphic_comp = try component.GraphicComponent.init(
-                            gpa,
-                            grid_pos,
-                            circuit.placement_rotation,
-                            data.device_type,
-                        );
                         try circuit.main_circuit.graphic_components.append(
                             circuit.main_circuit.allocator,
-                            graphic_comp,
+                            try component.GraphicComponent.init(
+                                gpa,
+                                grid_pos,
+                                circuit.placement_rotation,
+                                data.device_type,
+                            ),
                         );
 
                         const last_idx = circuit.main_circuit.graphic_components.items.len - 1;
@@ -435,6 +434,16 @@ fn handleMouseEvent(gpa: std.mem.Allocator, viewport: dvui.Rect.Physical, ev: dv
                                 .text_backing = .{ .component_name = @enumFromInt(last_idx) },
                             },
                         );
+
+                        if (circuit.main_circuit.graphic_components.items[last_idx].isValueDisplayed()) {
+                            try circuit.main_circuit.labels.append(circuit.main_circuit.allocator, Label{
+                                .pos = .{
+                                    .x = @floatFromInt(grid_pos.x),
+                                    .y = @floatFromInt(grid_pos.y),
+                                },
+                                .text_backing = .{ .component_value = @enumFromInt(last_idx) },
+                            });
+                        }
                     }
                 },
                 .new_wire => |*data| {

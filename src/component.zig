@@ -741,6 +741,22 @@ pub const GraphicComponent = struct {
         }
     }
 
+    pub fn isValueDisplayed(self: *const GraphicComponent) bool {
+        switch (self.comp.device) {
+            .resistor, .inductor, .capacitor => return true,
+            else => return false,
+        }
+    }
+
+    pub fn valueStr(self: *const GraphicComponent) []const u8 {
+        return switch (self.comp.device) {
+            .resistor => self.value_buffer.resistor.actual,
+            .inductor => self.value_buffer.inductor.actual,
+            .capacitor => self.value_buffer.capacitor.actual,
+            else => @panic("the value for this type of component is not displayed"),
+        };
+    }
+
     pub fn setNewComponentName(self: *GraphicComponent) !void {
         self.comp.name = switch (@as(DeviceType, self.comp.device)) {
             inline else => |x| try graphics_module(x).setNewComponentName(
