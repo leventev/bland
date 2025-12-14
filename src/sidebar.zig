@@ -388,6 +388,9 @@ pub fn render() void {
                     circuit.main_circuit.analyseDC();
                 },
                 .sin_ss_freq_sweep => {
+                    if (AnalysisMode.fs_start <= 0) return;
+                    if (AnalysisMode.fs_end <= 0) return;
+                    if (AnalysisMode.fs_count <= 0) return;
                     circuit.main_circuit.analyseFrequencySweep(
                         AnalysisMode.fs_start,
                         AnalysisMode.fs_end,
@@ -395,6 +398,7 @@ pub fn render() void {
                     );
                 },
                 .transient => {
+                    if (AnalysisMode.transient_duration <= 0) return;
                     circuit.main_circuit.analyseTransient(AnalysisMode.transient_duration);
                 },
             }
