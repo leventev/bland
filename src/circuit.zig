@@ -491,6 +491,12 @@ pub const GraphicCircuit = struct {
         hovered_id: ?usize,
     ) void {
         for (self.labels.items, 0..) |label, id| {
+            switch (placement_mode) {
+                .dragging_label => |data| {
+                    if (data.label_id == id) continue;
+                },
+                else => {},
+            }
             label.render(vector_renderer, id == hovered_id);
         }
     }
