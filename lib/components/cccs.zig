@@ -26,30 +26,25 @@ pub fn stampMatrix(
     inner: Inner,
     terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?NetList.Group2Id,
+    aux_idx_counter: usize,
     stamp_opts: StampOptions,
 ) StampError!void {
     // stamping is the same for every kind of analysis
     _ = stamp_opts;
+    _ = inner;
+    _ = terminal_node_ids;
+    _ = mna;
+    _ = aux_idx_counter;
+    @panic("TODO");
 
-    const controller_curr_id: NetList.Group2Id = @enumFromInt(std.mem.indexOfScalar(
-        Component.Id,
-        mna.group_2,
-        inner.controller_comp_id,
-    ) orelse unreachable);
-
-    const v_plus = terminal_node_ids[0];
-    const v_minus = terminal_node_ids[1];
-    // TODO: explain stamping
-    if (current_group_2_idx) |curr_idx| {
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
-        mna.stampCurrentCurrent(curr_idx, controller_curr_id, -inner.multiplier);
-    } else {
-        mna.stampVoltageCurrent(v_plus, controller_curr_id, -inner.multiplier);
-        mna.stampVoltageCurrent(v_minus, controller_curr_id, inner.multiplier);
-    }
+    // const v_plus = terminal_node_ids[0];
+    // const v_minus = terminal_node_ids[1];
+    // // TODO: explain stamping
+    // const aux_eq_idx = aux_idx_counter;
+    // mna.stampVoltageCurrent(v_plus, aux_eq_idx, 1);
+    // mna.stampVoltageCurrent(v_minus, aux_eq_idx, -1);
+    // mna.stampCurrentCurrent(aux_eq_idx, aux_eq_idx, 1);
+    // mna.stampCurrentCurrent(aux_eq_idx, controller_curr_id, -inner.multiplier);
 }
 
 pub fn validate(

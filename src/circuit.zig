@@ -904,7 +904,7 @@ pub const GraphicCircuit = struct {
         }
 
         // TODO
-        const result = simulation_params.netlist.analyseDC(self.allocator, null) catch |err| {
+        const result = simulation_params.netlist.analyseDC(self.allocator) catch |err| {
             std.log.err("DC analysis failed: {t}", .{err});
             return;
         };
@@ -946,7 +946,6 @@ pub const GraphicCircuit = struct {
         // TODO
         const result = simulation_params.netlist.analyseTransient(
             self.allocator,
-            null,
             duration,
         ) catch {
             std.log.err("Transient analysis failed", .{});
@@ -1002,7 +1001,6 @@ pub const GraphicCircuit = struct {
             start_freq,
             end_freq,
             freq_count,
-            null,
         ) catch {
             std.log.err("Sinusoidal steady state frequency sweep failed", .{});
             return;

@@ -16,16 +16,16 @@ mat: union(enum) {
 },
 nodes: []const NetList.Node,
 component_count: usize,
-group_2: []const Component.Id,
+aux_equation_count: usize,
 
 pub fn init(
     gpa: std.mem.Allocator,
     nodes: []const NetList.Node,
-    group_2: []const Component.Id,
+    aux_count: usize,
     component_count: usize,
     complex: bool,
 ) !MNA {
-    const total_variable_count = nodes.len - 1 + group_2.len;
+    const total_variable_count = nodes.len - 1 + aux_count;
     if (complex) {
         return MNA{
             .mat = .{
@@ -36,8 +36,8 @@ pub fn init(
                 ),
             },
             .nodes = nodes,
-            .group_2 = group_2,
             .component_count = component_count,
+            .aux_equation_count = aux_count,
         };
     } else {
         return MNA{
@@ -49,8 +49,8 @@ pub fn init(
                 ),
             },
             .nodes = nodes,
-            .group_2 = group_2,
             .component_count = component_count,
+            .aux_equation_count = aux_count,
         };
     }
 }
@@ -136,38 +136,38 @@ pub fn stampVoltageVoltage(
 pub fn stampVoltageCurrent(
     self: *MNA,
     row_voltage_id: NetList.Node.Id,
-    col_current_id: NetList.Group2Id,
+    col_current_id: usize,
     val: Float,
 ) void {
     // ignore grounds
     if (row_voltage_id == .ground) return;
 
     const row = @intFromEnum(row_voltage_id) - 1;
-    const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
+    const col = self.nodes.len - 1 + col_current_id;
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentCurrent(
     self: *MNA,
-    row_current_id: NetList.Group2Id,
-    col_current_id: NetList.Group2Id,
+    row_current_id: usize,
+    col_current_id: usize,
     val: Float,
 ) void {
-    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
-    const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
+    const row = self.nodes.len - 1 + row_current_id;
+    const col = self.nodes.len - 1 + col_current_id;
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentVoltage(
     self: *MNA,
-    row_current_id: NetList.Group2Id,
+    row_current_id: usize,
     col_voltage_id: NetList.Node.Id,
     val: Float,
 ) void {
     // ignore ground
     if (col_voltage_id == .ground) return;
 
-    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
+    const row = self.nodes.len - 1 + row_current_id;
     const col = @intFromEnum(col_voltage_id) - 1;
     self.addRealToMatrixCell(row, col, val);
 }
@@ -181,17 +181,17 @@ pub fn stampVoltageRHS(
     if (row_voltage_id == .ground) return;
 
     const row = @intFromEnum(row_voltage_id) - 1;
-    const col = self.nodes.len + self.group_2.len - 1;
+    const col = self.nodes.len + self.aux_equation_count - 1;
     self.addRealToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentRHS(
     self: *MNA,
-    row_current_id: NetList.Group2Id,
+    row_current_id: usize,
     val: Float,
 ) void {
-    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
-    const col = self.nodes.len + self.group_2.len - 1;
+    const row = self.nodes.len - 1 + row_current_id;
+    const col = self.nodes.len + self.aux_equation_count - 1;
     self.addRealToMatrixCell(row, col, val);
 }
 
@@ -211,38 +211,38 @@ pub fn stampVoltageVoltageComplex(
 pub fn stampVoltageCurrentComplex(
     self: *MNA,
     row_voltage_id: NetList.Node.Id,
-    col_current_id: NetList.Group2Id,
+    col_current_id: usize,
     val: Complex,
 ) void {
     // ignore grounds
     if (row_voltage_id == .ground) return;
 
-    const row = @intFromEnum(row_voltage_id) - 1;
+    const row = row_voltage_id - 1;
     const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentCurrentComplex(
     self: *MNA,
-    row_current_id: NetList.Group2Id,
-    col_current_id: NetList.Group2Id,
+    row_current_id: usize,
+    col_current_id: usize,
     val: Complex,
 ) void {
-    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
-    const col = self.nodes.len - 1 + @intFromEnum(col_current_id);
+    const row = self.nodes.len - 1 + row_current_id;
+    const col = self.nodes.len - 1 + col_current_id;
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentVoltageComplex(
     self: *MNA,
-    row_current_id: NetList.Group2Id,
+    row_current_id: usize,
     col_voltage_id: NetList.Node.Id,
     val: Complex,
 ) void {
     // ignore ground
     if (col_voltage_id == .ground) return;
 
-    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
+    const row = self.nodes.len - 1 + row_current_id;
     const col = @intFromEnum(col_voltage_id) - 1;
     self.addComplexToMatrixCell(row, col, val);
 }
@@ -256,17 +256,17 @@ pub fn stampVoltageRHSComplex(
     if (row_voltage_id == .ground) return;
 
     const row = @intFromEnum(row_voltage_id) - 1;
-    const col = self.nodes.len + self.group_2.len - 1;
+    const col = self.nodes.len + self.aux_equation_count - 1;
     self.addComplexToMatrixCell(row, col, val);
 }
 
 pub fn stampCurrentRHSComplex(
     self: *MNA,
-    row_current_id: NetList.Group2Id,
+    row_current_id: usize,
     val: Complex,
 ) void {
-    const row = self.nodes.len - 1 + @intFromEnum(row_current_id);
-    const col = self.nodes.len + self.group_2.len - 1;
+    const row = self.nodes.len - 1 + row_current_id;
+    const col = self.nodes.len + self.aux_equation_count - 1;
     self.addComplexToMatrixCell(row, col, val);
 }
 
@@ -276,7 +276,7 @@ fn print(
     group_2: []const usize,
 ) void {
     const mat = self.mat;
-    const total_variable_count = nodes.len - 1 + group_2.len;
+    const total_variable_count = nodes.len - 1 + self.aux_equation_count;
     std.debug.assert(mat.row_count == total_variable_count);
     std.debug.assert(mat.col_count == total_variable_count + 1);
 
@@ -327,11 +327,6 @@ pub fn solveReal(self: *MNA, gpa: std.mem.Allocator) !RealAnalysisReport {
         dc_results.currents[i] = null;
     }
 
-    for (self.group_2, 0..) |comp_id, i| {
-        const val = mat.data[(self.nodes.len + i - 1) * mat.col_count + mat.col_count - 1];
-        dc_results.currents[@intFromEnum(comp_id)] = val;
-    }
-
     return dc_results;
 }
 
@@ -354,11 +349,6 @@ pub fn solveComplex(self: *MNA, gpa: std.mem.Allocator) !ComplexAnalysisReport {
     // null out currents
     for (0..self.component_count) |i| {
         ac_results.currents[i] = null;
-    }
-
-    for (self.group_2, 0..) |comp_id, i| {
-        const val = mat.data[self.nodes.len + i - 1][mat.col_count - 1];
-        ac_results.currents[@intFromEnum(comp_id)] = val;
     }
 
     return ac_results;

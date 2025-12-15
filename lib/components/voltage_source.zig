@@ -21,12 +21,11 @@ pub fn stampMatrix(
     voltage_output: OutputFunction,
     terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?NetList.Group2Id,
+    aux_idx_counter: usize,
     stamp_opts: StampOptions,
 ) StampError!void {
     const v_plus = terminal_node_ids[0];
     const v_minus = terminal_node_ids[1];
-    const curr_idx = current_group_2_idx orelse @panic("Invalid voltage stamp");
 
     const RealOrComplex = union(enum) {
         real: Float,
@@ -78,15 +77,16 @@ pub fn stampMatrix(
         },
     };
 
-    mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-    mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+    const aux_eq_idx = aux_idx_counter;
+    mna.stampVoltageCurrent(v_plus, aux_eq_idx, 1);
+    mna.stampVoltageCurrent(v_minus, aux_eq_idx, -1);
 
-    mna.stampCurrentVoltage(curr_idx, v_plus, 1);
-    mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+    mna.stampCurrentVoltage(aux_eq_idx, v_plus, 1);
+    mna.stampCurrentVoltage(aux_eq_idx, v_minus, -1);
 
     switch (voltage) {
-        .real => |v| mna.stampCurrentRHS(curr_idx, v),
-        .complex => |v| mna.stampCurrentRHSComplex(curr_idx, v),
+        .real => |v| mna.stampCurrentRHS(aux_eq_idx, v),
+        .complex => |v| mna.stampCurrentRHSComplex(aux_eq_idx, v),
     }
 }
 

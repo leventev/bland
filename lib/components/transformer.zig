@@ -18,14 +18,31 @@ pub fn stampMatrix(
     turns_ratio: Float,
     terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?NetList.Group2Id,
+    aux_idx_counter: usize,
     stamp_opts: StampOptions,
 ) StampError!void {
+    const v_primary_plus = terminal_node_ids[0];
+    const v_primary_minus = terminal_node_ids[1];
+    const v_secondary_plus = terminal_node_ids[3];
+    const v_secondary_minus = terminal_node_ids[2];
+    _ = v_primary_plus;
+    _ = v_primary_minus;
+    const curr_idx = aux_idx_counter;
+    mna.stampVoltageCurrent(v_secondary_plus, curr_idx, 1);
+    mna.stampVoltageCurrent(v_secondary_minus, curr_idx, -1);
     _ = turns_ratio;
-    _ = terminal_node_ids;
-    _ = mna;
-    _ = current_group_2_idx;
     _ = stamp_opts;
+
+    // mna.stampVoltageCurrent(v_plus, curr_idx, 1);
+    // mna.stampVoltageCurrent(v_minus, curr_idx, -1);
+    //
+    // mna.stampCurrentVoltage(curr_idx, v_plus, 1);
+    // mna.stampCurrentVoltage(curr_idx, v_minus, -1);
+    //
+    // switch (voltage) {
+    //     .real => |v| mna.stampCurrentRHS(curr_idx, v),
+    //     .complex => |v| mna.stampCurrentRHSComplex(curr_idx, v),
+    // }
 }
 
 pub fn validate(

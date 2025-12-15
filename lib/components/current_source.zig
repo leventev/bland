@@ -21,7 +21,7 @@ pub fn stampMatrix(
     current_output: OutputFunction,
     terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?NetList.Group2Id,
+    aux_idx_counter: usize,
     stamp_opts: StampOptions,
 ) StampError!void {
     const v_plus = terminal_node_ids[0];
@@ -76,26 +76,14 @@ pub fn stampMatrix(
         },
     };
 
-    if (current_group_2_idx) |curr_idx| {
-        mna.stampVoltageCurrent(v_plus, curr_idx, 1);
-        mna.stampVoltageCurrent(v_minus, curr_idx, -1);
-        mna.stampCurrentCurrent(curr_idx, curr_idx, 1);
+    const aux_eq_idx = aux_idx_counter;
+    mna.stampVoltageCurrent(v_plus, aux_eq_idx, 1);
+    mna.stampVoltageCurrent(v_minus, aux_eq_idx, -1);
+    mna.stampCurrentCurrent(aux_eq_idx, aux_eq_idx, 1);
 
-        switch (current) {
-            .real => |c| mna.stampCurrentRHS(curr_idx, c),
-            .complex => |c| mna.stampCurrentRHSComplex(curr_idx, c),
-        }
-    } else {
-        switch (current) {
-            .real => |c| {
-                mna.stampVoltageRHS(v_plus, -c);
-                mna.stampVoltageRHS(v_minus, c);
-            },
-            .complex => |c| {
-                mna.stampVoltageRHSComplex(v_plus, c.neg());
-                mna.stampVoltageRHSComplex(v_minus, c);
-            },
-        }
+    switch (current) {
+        .real => |c| mna.stampCurrentRHS(aux_eq_idx, c),
+        .complex => |c| mna.stampCurrentRHSComplex(aux_eq_idx, c),
     }
 }
 

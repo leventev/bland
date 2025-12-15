@@ -120,7 +120,7 @@ pub fn deinit(self: *NetList, gpa: std.mem.Allocator) void {
 fn createMNAMatrix(
     self: *NetList,
     gpa: std.mem.Allocator,
-    group_2: []const Component.Id,
+    aux_count: usize,
     angular_frequency: Float,
     ac_analysis: bool,
 ) Error!MNA {
@@ -161,7 +161,7 @@ fn createMNAMatrix(
     var mna = MNA.init(
         gpa,
         self.nodes.items,
-        group_2,
+        aux_count,
         self.components.items.len,
         ac_analysis,
     ) catch |err| switch (err) {
@@ -176,124 +176,24 @@ fn createMNAMatrix(
     return mna;
 }
 
-pub const Group2Id = enum(usize) { _ };
-
-const Group2 = struct {
-    arr: std.ArrayList(Component.Id),
-
-    fn addComponents(
-        self: *Group2,
-        gpa: std.mem.Allocator,
-        comp_ids: []const Component.Id,
-    ) !void {
-        for (comp_ids) |comp_id| {
-            _ = try self.addComponent(gpa, comp_id);
-        }
-    }
-
-    fn addComponent(
-        self: *Group2,
-        gpa: std.mem.Allocator,
-        comp_id: Component.Id,
-    ) !Group2Id {
-        const idx = std.mem.indexOf(Component.Id, self.arr.items, &.{comp_id});
-        if (idx) |i| {
-            return @enumFromInt(i);
-        }
-
-        const group_2_id = self.arr.items.len;
-        try self.arr.append(gpa, comp_id);
-
-        return @enumFromInt(group_2_id);
-    }
-
-    fn init() Group2 {
-        return Group2{ .arr = std.ArrayList(Component.Id){} };
-    }
-
-    fn deinit(self: *Group2, gpa: std.mem.Allocator) void {
-        self.arr.deinit(gpa);
-    }
-};
-
-fn createGroup2(
-    self: *NetList,
-    gpa: std.mem.Allocator,
-    currents_watched: ?[]const Component.Id,
-) !Group2 {
-    // group edges:
-    // - group 1(i1): all elements whose current will be eliminated
-    // - group 2(i2): all other elements
-
-    var group_2 = Group2.init();
-
-    if (currents_watched) |currs| {
-        try group_2.addComponents(gpa, currs);
-
-        for (0.., self.components.items) |comp_id_int, *comp| {
-            const comp_id: Component.Id = @enumFromInt(comp_id_int);
-            switch (comp.device) {
-                .voltage_source, .inductor => {
-                    _ = try group_2.addComponent(gpa, comp_id);
-                },
-                .ccvs => |*inner| {
-                    // controller's current
-                    _ = try group_2.addComponent(gpa, inner.controller_comp_id);
-
-                    // ccvs's current
-                    _ = try group_2.addComponent(gpa, comp_id);
-                },
-                .cccs => |*inner| {
-                    // controller's current
-                    _ = try group_2.addComponent(gpa, inner.controller_comp_id);
-
-                    // ccvs's current
-                    _ = try group_2.addComponent(gpa, comp_id);
-                },
-                else => {},
-            }
-        }
-    } else {
-        for (0..self.components.items.len) |comp_id_int| {
-            const comp_id: Component.Id = @enumFromInt(comp_id_int);
-            // TODO: optimize
-            _ = try group_2.addComponent(gpa, comp_id);
-        }
-    }
-
-    return group_2;
-}
-
 pub fn analyseDC(
     self: *NetList,
     gpa: std.mem.Allocator,
-    currents_watched: ?[]const Component.Id,
 ) Error!MNA.RealAnalysisReport {
     const start_time: i64 = std.time.microTimestamp();
 
-    var group_2 = try self.createGroup2(gpa, currents_watched);
-    defer group_2.deinit(gpa);
-
+    const aux_count = self.auxEquationCount();
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // iterate over all elements and stamp them onto the matrix
-    var mna = try self.createMNAMatrix(gpa, group_2.arr.items, 0, false);
+    var mna = try self.createMNAMatrix(gpa, aux_count, 0, false);
     defer mna.deinit(gpa);
 
-    for (0.., self.components.items) |comp_id_int, comp| {
-        const comp_id: Component.Id = @enumFromInt(comp_id_int);
-        const current_group_2_id: ?NetList.Group2Id = if (std.mem.indexOf(
-            Component.Id,
-            group_2.arr.items,
-            &.{comp_id},
-        )) |id|
-            @enumFromInt(id)
-        else
-            null;
-
+    var aux_counter: usize = 0;
+    for (self.components.items) |comp| {
         comp.device.stampMatrix(
             comp.terminal_node_ids,
             &mna,
-            current_group_2_id,
+            aux_counter,
             .dc,
         ) catch |err| {
             switch (err) {
@@ -303,6 +203,8 @@ pub fn analyseDC(
             }
             return error.StampingFailed;
         };
+
+        aux_counter += comp.device.auxEquationCount();
     }
 
     // solve the matrix with Gauss elimination
@@ -325,19 +227,23 @@ pub fn analyseDC(
     return res;
 }
 
+pub fn auxEquationCount(self: *NetList) usize {
+    var count: usize = 0;
+    for (self.components.items) |comp| {
+        count += comp.device.auxEquationCount();
+    }
+    return count;
+}
+
 pub fn analyseTransient(
     self: *NetList,
     gpa: std.mem.Allocator,
-    currents_watched: ?[]const Component.Id,
     duration: Float,
 ) TransientResult.Error!TransientResult {
+    const aux_count = self.auxEquationCount();
+
     const start_time: i64 = std.time.microTimestamp();
-
-    var group_2 = try self.createGroup2(gpa, currents_watched);
-    defer group_2.deinit(gpa);
-
     const time_step: Float = 5e-5;
-
     const time_point_count: usize = @as(usize, @intFromFloat(duration / time_step)) + 1;
 
     // TODO: adaptive time steps
@@ -361,9 +267,10 @@ pub fn analyseTransient(
 
     // t0 = 0
     transient_report.time_values[0] = 0;
-    var mna = try self.createMNAMatrix(gpa, group_2.arr.items, 0, false);
+    var mna = try self.createMNAMatrix(gpa, aux_count, 0, false);
     defer mna.deinit(gpa);
 
+    var aux_counter: usize = 0;
     for (1..time_point_count) |time_idx| {
         const time = @as(Float, @floatFromInt(time_idx)) * time_step;
         //std.debug.print("{}/{}: {}\n", .{ time_idx, time_point_count, time });
@@ -373,14 +280,6 @@ pub fn analyseTransient(
 
         for (0.., self.components.items) |comp_id_int, comp| {
             const comp_id: Component.Id = @enumFromInt(comp_id_int);
-            const current_group_2_id: ?NetList.Group2Id = if (std.mem.indexOf(
-                Component.Id,
-                group_2.arr.items,
-                &.{comp_id},
-            )) |id|
-                @enumFromInt(id)
-            else
-                null;
 
             // TODO:
             const voltage_pos = (try transient_report.voltage(comp.terminal_node_ids[0]))[time_idx - 1];
@@ -388,7 +287,7 @@ pub fn analyseTransient(
             const voltage_prev = voltage_pos - voltage_neg;
             const current_prev = (try transient_report.current(comp_id))[time_idx - 1];
 
-            comp.device.stampMatrix(comp.terminal_node_ids, &mna, current_group_2_id, .{
+            comp.device.stampMatrix(comp.terminal_node_ids, &mna, aux_counter, .{
                 .transient = .{
                     .time = time,
                     .time_step = time_step,
@@ -403,6 +302,8 @@ pub fn analyseTransient(
                 }
                 return error.StampingFailed;
             };
+
+            aux_counter += comp.device.auxEquationCount();
         }
 
         // TODO: no allocation
@@ -468,34 +369,24 @@ pub fn analyseTransient(
 pub fn analyseSinusoidalSteadyState(
     self: *NetList,
     gpa: std.mem.Allocator,
-    currents_watched: ?[]const Component.Id,
     frequency: Float,
 ) Error!MNA.ComplexAnalysisReport {
     std.debug.assert(frequency >= 0);
     const angular_frequency = 2 * std.math.pi * frequency;
 
-    var group_2 = try self.createGroup2(gpa, currents_watched);
-    defer group_2.deinit(gpa);
+    const aux_count = self.auxEquationCount();
 
     // create matrix (|v| + |i2| X |v| + |i2| + 1)
     // iterate over all elements and stamp them onto the matrix
-    var mna = try self.createMNAMatrix(gpa, group_2.arr.items, angular_frequency, true);
+    var mna = try self.createMNAMatrix(gpa, aux_count, angular_frequency, true);
     defer mna.deinit(gpa);
 
-    for (0.., self.components.items) |comp_id_int, comp| {
-        const comp_id: Component.Id = @enumFromInt(comp_id_int);
-        const current_group_2_id: ?NetList.Group2Id = if (std.mem.indexOf(
-            Component.Id,
-            group_2.arr.items,
-            &.{comp_id},
-        )) |id|
-            @enumFromInt(id)
-        else
-            null;
+    var aux_counter: usize = 0;
+    for (self.components.items) |comp| {
         comp.device.stampMatrix(
             comp.terminal_node_ids,
             &mna,
-            current_group_2_id,
+            aux_counter,
             .{
                 .sin_steady_state = angular_frequency,
             },
@@ -507,6 +398,7 @@ pub fn analyseSinusoidalSteadyState(
             }
             return error.StampingFailed;
         };
+        aux_counter += comp.device.auxEquationCount();
     }
 
     // solve the matrix with Gauss elimination
@@ -737,7 +629,6 @@ pub fn analyseFrequencySweep(
     start_freq: Float,
     end_freq: Float,
     freq_count: usize,
-    currents_watched: ?[]const Component.Id,
 ) FrequencySweepResult.Error!FrequencySweepResult {
     const start_time: i64 = std.time.microTimestamp();
 
@@ -753,7 +644,7 @@ pub fn analyseFrequencySweep(
     // TODO:
     for (fw_report.frequency_values, 0..) |freq, freq_idx| {
         // TODO
-        var report = try self.analyseSinusoidalSteadyState(gpa, currents_watched, freq);
+        var report = try self.analyseSinusoidalSteadyState(gpa, freq);
         defer report.deinit(gpa);
 
         for (0..self.nodes.items.len) |node_idx| {

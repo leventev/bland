@@ -28,7 +28,7 @@ pub fn stampMatrix(
     model: Model,
     terminal_node_ids: []const NetList.Node.Id,
     mna: *MNA,
-    current_group_2_idx: ?NetList.Group2Id,
+    aux_idx_counter: usize,
     stamp_opts: StampOptions,
 ) StampError!void {
     const v_plus = terminal_node_ids[0];
@@ -36,7 +36,7 @@ pub fn stampMatrix(
 
     _ = model;
     _ = mna;
-    _ = current_group_2_idx;
+    _ = aux_idx_counter;
     _ = stamp_opts;
     _ = v_plus;
     _ = v_minus;

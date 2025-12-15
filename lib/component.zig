@@ -64,6 +64,20 @@ pub const Component = struct {
                 inline else => |x| return x.module().defaultValue(allocator),
             }
         }
+
+        pub fn nodeCount(self: DeviceType) usize {
+            return switch (self) {
+                .transformer => 4,
+                else => 2,
+            };
+        }
+
+        pub fn auxEquationCount(self: DeviceType) usize {
+            return switch (self) {
+                .transformer => 2,
+                else => 1,
+            };
+        }
     };
 
     pub const Device = union(DeviceType) {
@@ -109,7 +123,7 @@ pub const Component = struct {
             self: *const Device,
             terminal_node_ids: []const NetList.Node.Id,
             mna: *MNA,
-            current_group_2_idx: ?NetList.Group2Id,
+            aux_idx_counter: usize,
             stamp_opts: StampOptions,
         ) StampError!void {
             return switch (@as(DeviceType, self.*)) {
@@ -117,10 +131,14 @@ pub const Component = struct {
                     @field(self, @tagName(x)),
                     terminal_node_ids,
                     mna,
-                    current_group_2_idx,
+                    aux_idx_counter,
                     stamp_opts,
                 ),
             };
+        }
+
+        pub fn auxEquationCount(self: Device) usize {
+            return @as(DeviceType, self).auxEquationCount();
         }
     };
 };
