@@ -14,10 +14,6 @@ pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .transformer = 1 };
 }
 
-pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
-    return try bland.units.formatUnitBuf(buf, .resistance, value, 3);
-}
-
 pub fn stampMatrix(
     turns_ratio: Float,
     terminal_node_ids: []const NetList.Node.Id,

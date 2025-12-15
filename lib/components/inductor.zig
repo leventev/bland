@@ -15,10 +15,6 @@ pub fn defaultValue(_: std.mem.Allocator) !Component.Device {
     return Component.Device{ .inductor = 0.001 };
 }
 
-pub fn formatValue(value: Float, buf: []u8) !?[]const u8 {
-    return try bland.units.formatUnitBuf(buf, .inductance, value, 3);
-}
-
 pub fn stampMatrix(
     inductance: Float,
     terminal_node_ids: []const NetList.Node.Id,
