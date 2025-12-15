@@ -26,6 +26,7 @@ const inductor_graphics_module = @import("components/inductor.zig");
 const ccvs_graphics_module = @import("components/ccvs.zig");
 const cccs_graphics_module = @import("components/cccs.zig");
 const diode_graphics_module = @import("components/diode.zig");
+const transformer_graphics_module = @import("components/transformer.zig");
 
 fn graphics_module(comptime self: DeviceType) type {
     return switch (self) {
@@ -37,6 +38,7 @@ fn graphics_module(comptime self: DeviceType) type {
         .ccvs => ccvs_graphics_module,
         .cccs => cccs_graphics_module,
         .diode => diode_graphics_module,
+        .transformer => transformer_graphics_module,
     };
 }
 
@@ -89,7 +91,7 @@ fn renderDevice(
             .scale = .both(1),
             .rotate = @as(f32, @floatCast(rotation)),
         },
-        .{ .stroke_color = colors.component_color },
+        .{ .stroke_color = colors.component_color, .fill_color = colors.component_color },
     );
 }
 
@@ -401,6 +403,10 @@ pub const GraphicComponent = struct {
             controller_name_actual: []u8,
         },
         diode: struct {},
+        transformer: struct {
+            turns_ratio_buff: []u8,
+            turns_ratio_actual: []u8,
+        },
 
         pub fn init(gpa: std.mem.Allocator, device_type: Component.DeviceType) !@This() {
             return switch (device_type) {
@@ -492,6 +498,12 @@ pub const GraphicComponent = struct {
                 },
                 .diode => .{
                     .diode = .{},
+                },
+                .transformer => .{
+                    .transformer = .{
+                        .turns_ratio_buff = try gpa.alloc(u8, max_float_length),
+                        .turns_ratio_actual = &.{},
+                    },
                 },
             };
         }
@@ -629,6 +641,11 @@ pub const GraphicComponent = struct {
                     );
                 },
                 .diode => {},
+                .transformer => |*buf| buf.turns_ratio_actual = try bland.units.formatPrefixBuf(
+                    buf.turns_ratio_buff,
+                    dev.transformer,
+                    precision,
+                ),
             }
         }
 
@@ -672,6 +689,9 @@ pub const GraphicComponent = struct {
                     gpa.free(data.controller_name_buff);
                 },
                 .diode => {},
+                .transformer => |data| {
+                    gpa.free(data.turns_ratio_buff);
+                },
             }
         }
     };

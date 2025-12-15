@@ -99,3 +99,110 @@ pub fn twoTerminalCenterForMouse(
         .right => return GridPosition{ .x = pos.x - 1, .y = pos.y },
     }
 }
+
+pub fn fourTerminalOccupiedPoints(
+    pos: GridPosition,
+    rotation: Rotation,
+    occupied: []component.OccupiedGridPosition,
+) []component.OccupiedGridPosition {
+    std.debug.assert(occupied.len >= 9);
+    // TODO: there is some weirdness with collision detection
+    switch (rotation) {
+        .right => {
+            inline for (0..2) |row| {
+                inline for (0..2) |col| {
+                    const c: i32 = @intCast(col);
+                    const r: i32 = @intCast(row);
+                    occupied[row * 3 + col] = component.OccupiedGridPosition{
+                        .pos = GridPosition{ .x = pos.x + c, .y = pos.y + r },
+                        .terminal = (c == 0 or c == 2) and (r == 0 or r == 2),
+                    };
+                }
+            }
+        },
+        .bottom => {
+            inline for (0..2) |row| {
+                inline for (0..2) |col| {
+                    const c: i32 = @intCast(col);
+                    const r: i32 = @intCast(row);
+                    occupied[row * 3 + col] = component.OccupiedGridPosition{
+                        .pos = GridPosition{ .x = pos.x - c, .y = pos.y + r },
+                        .terminal = (c == 0 or c == 2) and (r == 0 or r == 2),
+                    };
+                }
+            }
+        },
+        .left => {
+            inline for (0..2) |row| {
+                inline for (0..2) |col| {
+                    const c: i32 = @intCast(col);
+                    const r: i32 = @intCast(row);
+                    occupied[row * 3 + col] = component.OccupiedGridPosition{
+                        .pos = GridPosition{ .x = pos.x - c, .y = pos.y - r },
+                        .terminal = (c == 0 or c == 2) and (r == 0 or r == 2),
+                    };
+                }
+            }
+        },
+        .top => {
+            inline for (0..2) |row| {
+                inline for (0..2) |col| {
+                    const c: i32 = @intCast(col);
+                    const r: i32 = @intCast(row);
+                    occupied[row * 3 + col] = component.OccupiedGridPosition{
+                        .pos = GridPosition{ .x = pos.x + c, .y = pos.y - r },
+                        .terminal = (c == 0 or c == 2) and (r == 0 or r == 2),
+                    };
+                }
+            }
+        },
+    }
+    return occupied[0..9];
+}
+
+pub fn fourTerminalTerminals(
+    pos: GridPosition,
+    rotation: Rotation,
+    terminals: []GridPosition,
+) []GridPosition {
+    // 0 --> +------+ <-- 3
+    //       |      |
+    //       |      |
+    // 1 --> +------+ <-- 2
+    terminals[0] = GridPosition{ .x = pos.x, .y = pos.y };
+    switch (rotation) {
+        .right => {
+            terminals[1] = GridPosition{ .x = pos.x, .y = pos.y + 2 };
+            terminals[2] = GridPosition{ .x = pos.x + 2, .y = pos.y + 2 };
+            terminals[3] = GridPosition{ .x = pos.x + 2, .y = pos.y };
+        },
+        .bottom => {
+            terminals[1] = GridPosition{ .x = pos.x - 2, .y = pos.y };
+            terminals[2] = GridPosition{ .x = pos.x - 2, .y = pos.y + 2 };
+            terminals[3] = GridPosition{ .x = pos.x, .y = pos.y + 2 };
+        },
+        .left => {
+            terminals[1] = GridPosition{ .x = pos.x, .y = pos.y - 2 };
+            terminals[2] = GridPosition{ .x = pos.x - 2, .y = pos.y - 2 };
+            terminals[3] = GridPosition{ .x = pos.x - 2, .y = pos.y };
+        },
+        .top => {
+            terminals[1] = GridPosition{ .x = pos.x + 2, .y = pos.y };
+            terminals[1] = GridPosition{ .x = pos.x + 2, .y = pos.y - 2 };
+            terminals[3] = GridPosition{ .x = pos.x, .y = pos.y - 2 };
+        },
+    }
+    return terminals[0..4];
+}
+
+pub fn fourTerminalCenterForMouse(
+    pos: GridPosition,
+    rotation: Rotation,
+) GridPosition {
+    switch (rotation) {
+        .top => return GridPosition{ .x = pos.x - 1, .y = pos.y + 1 },
+        .bottom => return GridPosition{ .x = pos.x + 1, .y = pos.y - 1 },
+        .left => return GridPosition{ .x = pos.x + 1, .y = pos.y + 1 },
+        .right => return GridPosition{ .x = pos.x - 1, .y = pos.y - 1 },
+    }
+}

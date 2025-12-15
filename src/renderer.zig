@@ -179,6 +179,12 @@ fn renderToolbox(parentSubwindowId: dvui.Id) bool {
             fw.close();
             close = true;
         }
+
+        if (dvui.menuItemLabel(@src(), "Transformer", .{}, .{ .expand = .horizontal }) != null) {
+            circuit.placement_mode = .{ .new_component = .{ .device_type = .transformer } };
+            fw.close();
+            close = true;
+        }
     }
 
     if (dvui.menuItemLabel(@src(), "Circuit", .{ .submenu = true }, .{})) |r| {
