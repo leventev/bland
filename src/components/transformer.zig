@@ -68,9 +68,9 @@ const dot_radius = 0.07;
 pub const clickable_shape: GraphicComponent.ClickableShape = .{
     .rect = .{
         .x = wire_len_per_side,
-        .y = -radius,
-        .width = 8 * radius,
-        .height = radius,
+        .y = 0,
+        .width = total_width - 2.0 * wire_len_per_side,
+        .height = total_height,
     },
 };
 
