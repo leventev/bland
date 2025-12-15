@@ -106,11 +106,10 @@ pub fn fourTerminalOccupiedPoints(
     occupied: []component.OccupiedGridPosition,
 ) []component.OccupiedGridPosition {
     std.debug.assert(occupied.len >= 9);
-    // TODO: there is some weirdness with collision detection
     switch (rotation) {
         .right => {
-            inline for (0..2) |row| {
-                inline for (0..2) |col| {
+            inline for (0..3) |row| {
+                inline for (0..3) |col| {
                     const c: i32 = @intCast(col);
                     const r: i32 = @intCast(row);
                     occupied[row * 3 + col] = component.OccupiedGridPosition{
@@ -121,8 +120,8 @@ pub fn fourTerminalOccupiedPoints(
             }
         },
         .bottom => {
-            inline for (0..2) |row| {
-                inline for (0..2) |col| {
+            inline for (0..3) |row| {
+                inline for (0..3) |col| {
                     const c: i32 = @intCast(col);
                     const r: i32 = @intCast(row);
                     occupied[row * 3 + col] = component.OccupiedGridPosition{
@@ -133,8 +132,8 @@ pub fn fourTerminalOccupiedPoints(
             }
         },
         .left => {
-            inline for (0..2) |row| {
-                inline for (0..2) |col| {
+            inline for (0..3) |row| {
+                inline for (0..3) |col| {
                     const c: i32 = @intCast(col);
                     const r: i32 = @intCast(row);
                     occupied[row * 3 + col] = component.OccupiedGridPosition{
@@ -145,8 +144,8 @@ pub fn fourTerminalOccupiedPoints(
             }
         },
         .top => {
-            inline for (0..2) |row| {
-                inline for (0..2) |col| {
+            inline for (0..3) |row| {
+                inline for (0..3) |col| {
                     const c: i32 = @intCast(col);
                     const r: i32 = @intCast(row);
                     occupied[row * 3 + col] = component.OccupiedGridPosition{
