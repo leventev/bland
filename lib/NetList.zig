@@ -270,7 +270,6 @@ pub fn analyseTransient(
     var mna = try self.createMNAMatrix(gpa, aux_count, 0, false);
     defer mna.deinit(gpa);
 
-    var aux_counter: usize = 0;
     for (1..time_point_count) |time_idx| {
         const time = @as(Float, @floatFromInt(time_idx)) * time_step;
         //std.debug.print("{}/{}: {}\n", .{ time_idx, time_point_count, time });
@@ -278,6 +277,7 @@ pub fn analyseTransient(
 
         mna.zero();
 
+        var aux_counter: usize = 0;
         for (0.., self.components.items) |comp_id_int, comp| {
             const comp_id: Component.Id = @enumFromInt(comp_id_int);
 
