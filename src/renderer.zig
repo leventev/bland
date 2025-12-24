@@ -342,14 +342,12 @@ pub fn renderDCReport(
     }
 
     for (currents, 0..) |current, i| {
-        if (current) |cur| {
-            const comp_name = report.component_names[i];
-            if (comp_name) |name| {
-                try values.append(arena, .{
-                    .display_name = try std.fmt.allocPrint(arena, "I({s})", .{name}),
-                    .value = try bland.units.formatUnitAlloc(arena, .current, cur, 3),
-                });
-            }
+        const comp_name = report.component_names[i];
+        if (comp_name) |name| {
+            try values.append(arena, .{
+                .display_name = try std.fmt.allocPrint(arena, "I({s})", .{name}),
+                .value = try bland.units.formatUnitAlloc(arena, .current, current, 3),
+            });
         }
     }
 

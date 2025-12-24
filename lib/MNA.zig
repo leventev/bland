@@ -324,7 +324,7 @@ pub fn solveReal(self: *MNA, gpa: std.mem.Allocator) !RealAnalysisReport {
 
     // null out currents
     for (0..self.component_count) |i| {
-        dc_results.currents[i] = null;
+        dc_results.currents[i] = mat.data[(self.nodes.len + i - 1) * mat.col_count + mat.col_count - 1];
     }
 
     return dc_results;
@@ -348,7 +348,7 @@ pub fn solveComplex(self: *MNA, gpa: std.mem.Allocator) !ComplexAnalysisReport {
 
     // null out currents
     for (0..self.component_count) |i| {
-        ac_results.currents[i] = null;
+        ac_results.currents[i] = mat.data[(self.nodes.len + i - 1)][mat.col_count - 1];
     }
 
     return ac_results;
@@ -356,7 +356,7 @@ pub fn solveComplex(self: *MNA, gpa: std.mem.Allocator) !ComplexAnalysisReport {
 
 pub const RealAnalysisReport = struct {
     voltages: []Float,
-    currents: []?Float,
+    currents: []Float,
 
     pub fn init(
         gpa: std.mem.Allocator,
@@ -369,7 +369,7 @@ pub const RealAnalysisReport = struct {
                 node_count,
             ),
             .currents = try gpa.alloc(
-                ?Float,
+                Float,
                 comp_count,
             ),
         };
@@ -401,7 +401,7 @@ pub const RealAnalysisReport = struct {
 
 pub const ComplexAnalysisReport = struct {
     voltages: []Complex,
-    currents: []?Complex,
+    currents: []Complex,
 
     pub fn init(
         gpa: std.mem.Allocator,
@@ -414,7 +414,7 @@ pub const ComplexAnalysisReport = struct {
                 node_count,
             ),
             .currents = try gpa.alloc(
-                ?Complex,
+                Complex,
                 comp_count,
             ),
         };
