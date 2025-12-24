@@ -44,7 +44,7 @@ pub const GridSubposition = struct {
 };
 
 pub const AnalysisReport = struct {
-    component_names: []?[]const u8,
+    component_names: [][]const u8,
     node_count: usize,
     result: Result,
     pinned_nodes: []GraphicCircuit.PinnedNode,
@@ -54,6 +54,91 @@ pub const AnalysisReport = struct {
         frequency_sweep: NetList.FrequencySweepResult,
         transient: NetList.TransientResult,
     };
+
+    pub fn exportToFile(self: *const AnalysisReport, file_name: []const u8) !void {
+        const file = try std.fs.cwd().createFile(file_name, .{});
+        defer file.close();
+
+        var buffer: [4 * 4096]u8 = undefined;
+        var file_writer = file.writer(&buffer);
+        const writer = &file_writer.interface;
+
+        switch (self.result) {
+            .dc => |res| {
+                for (self.pinned_nodes) |pinned_node| {
+                    const voltage = res.voltages[@intFromEnum(pinned_node.node_id)];
+                    _ = try writer.print("V({s}),{d}\n", .{ pinned_node.name, voltage });
+                }
+
+                for (self.component_names, 0..) |name, i| {
+                    _ = try writer.print("I({s}),{d}\n", .{ name, res.currents[i] });
+                }
+                try writer.flush();
+            },
+            .frequency_sweep => |res| {
+                for (self.pinned_nodes) |pinned_node| {
+                    const voltages = res.voltage(pinned_node.node_id) catch unreachable;
+                    _ = try writer.print("V({s}),", .{pinned_node.name});
+                    for (voltages, 0..) |voltage, i| {
+                        if (i < voltages.len - 1) {
+                            @branchHint(.likely);
+                            _ = try writer.print("{d},", .{voltage.magnitude()});
+                        } else {
+                            _ = try writer.print("{d}", .{voltage.magnitude()});
+                        }
+                    }
+                    _ = try writer.write("\n");
+                }
+
+                for (self.component_names, 0..) |name, i| {
+                    const currents = res.current(@enumFromInt(i)) catch unreachable;
+                    _ = try writer.print("I({s}),", .{name});
+                    for (currents, 0..) |cur, j| {
+                        const current = cur orelse unreachable;
+                        if (j < currents.len - 1) {
+                            @branchHint(.likely);
+                            _ = try writer.print("{d},", .{current.magnitude()});
+                        } else {
+                            _ = try writer.print("{d}", .{current.magnitude()});
+                        }
+                    }
+                    _ = try writer.write("\n");
+                }
+                try writer.flush();
+            },
+            .transient => |res| {
+                for (self.pinned_nodes) |pinned_node| {
+                    const voltages = res.voltage(pinned_node.node_id) catch unreachable;
+                    _ = try writer.print("V({s}),", .{pinned_node.name});
+                    for (voltages, 0..) |voltage, i| {
+                        if (i < voltages.len - 1) {
+                            @branchHint(.likely);
+                            _ = try writer.print("{d},", .{voltage});
+                        } else {
+                            _ = try writer.print("{d}", .{voltage});
+                        }
+                    }
+                    _ = try writer.write("\n");
+                }
+
+                for (self.component_names, 0..) |name, i| {
+                    const currents = res.current(@enumFromInt(i)) catch unreachable;
+                    _ = try writer.print("I({s}),", .{name});
+                    for (currents, 0..) |cur, j| {
+                        const current = cur orelse unreachable;
+                        if (j < currents.len - 1) {
+                            @branchHint(.likely);
+                            _ = try writer.print("{d},", .{current});
+                        } else {
+                            _ = try writer.print("{d}", .{current});
+                        }
+                    }
+                    _ = try writer.write("\n");
+                }
+                try writer.flush();
+            },
+        }
+    }
 };
 
 pub var analysis_reports: std.ArrayList(AnalysisReport) = .{};
@@ -730,7 +815,7 @@ pub const GraphicCircuit = struct {
 
     const SimulationParams = struct {
         netlist: NetList,
-        comp_names: []?[]const u8,
+        comp_names: [][]const u8,
         pinned_nodes: []PinnedNode,
     };
 
@@ -862,15 +947,13 @@ pub const GraphicCircuit = struct {
         return null;
     }
 
-    fn copyComponentNames(self: *const GraphicCircuit) ![]?[]const u8 {
+    fn copyComponentNames(self: *const GraphicCircuit) ![][]const u8 {
         const comps = self.graphic_components.items;
-        const names = try self.allocator.alloc(?[]const u8, comps.len);
+        const names = try self.allocator.alloc([]const u8, comps.len);
         var idx: usize = 0;
         errdefer {
             for (0..idx) |i| {
-                if (names[i]) |name| {
-                    self.allocator.free(name);
-                }
+                self.allocator.free(names[i]);
             }
             self.allocator.free(names);
         }

@@ -343,12 +343,10 @@ pub fn renderDCReport(
 
     for (currents, 0..) |current, i| {
         const comp_name = report.component_names[i];
-        if (comp_name) |name| {
-            try values.append(arena, .{
-                .display_name = try std.fmt.allocPrint(arena, "I({s})", .{name}),
-                .value = try bland.units.formatUnitAlloc(arena, .current, current, 3),
-            });
-        }
+        try values.append(arena, .{
+            .display_name = try std.fmt.allocPrint(arena, "I({s})", .{comp_name}),
+            .value = try bland.units.formatUnitAlloc(arena, .current, current, 3),
+        });
     }
 
     const col_width = (grid.data().contentRect().w - dvui.GridWidget.scrollbar_padding_defaults.w) / 2.0;
@@ -458,15 +456,7 @@ pub fn renderFWReport(
     defer arena_allocator.deinit();
     const arena = arena_allocator.allocator();
 
-    var comp_idxs = try arena.alloc(usize, report.component_names.len);
-
-    var component_entry_count: usize = 0;
-    for (report.component_names, 0..) |name, comp_idx| {
-        if (name != null) {
-            comp_idxs[component_entry_count] = comp_idx;
-            component_entry_count += 1;
-        }
-    }
+    const component_entry_count: usize = report.component_names.len;
 
     // TODO: allocate less or use arena or something else
     var var_entries = try arena.alloc([]u8, report.pinned_nodes.len + component_entry_count);
@@ -477,10 +467,8 @@ pub fn renderFWReport(
 
     var idx: usize = report.pinned_nodes.len;
     for (report.component_names) |name| {
-        if (name) |str| {
-            var_entries[idx] = try std.fmt.allocPrint(arena, "I({s})", .{str});
-            idx += 1;
-        }
+        var_entries[idx] = try std.fmt.allocPrint(arena, "I({s})", .{name});
+        idx += 1;
     }
 
     if (report_changed) {
@@ -513,7 +501,7 @@ pub fn renderFWReport(
 
     if (S.var_choice >= report.pinned_nodes.len) {
         const comp_entry_idx = S.var_choice - report.pinned_nodes.len;
-        const comp_idx: bland.Component.Id = @enumFromInt(comp_idxs[comp_entry_idx]);
+        const comp_idx: bland.Component.Id = @enumFromInt(comp_entry_idx);
         const current = fw_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
             if (c) |c_val| {
@@ -579,15 +567,7 @@ pub fn renderTransientReport(
     defer arena_allocator.deinit();
     const arena = arena_allocator.allocator();
 
-    var comp_idxs = try arena.alloc(usize, report.component_names.len);
-
-    var component_entry_count: usize = 0;
-    for (report.component_names, 0..) |name, comp_idx| {
-        if (name != null) {
-            comp_idxs[component_entry_count] = comp_idx;
-            component_entry_count += 1;
-        }
-    }
+    const component_entry_count: usize = report.component_names.len;
 
     var var_entries = try arena.alloc([]u8, report.pinned_nodes.len + component_entry_count);
 
@@ -597,10 +577,8 @@ pub fn renderTransientReport(
 
     var idx: usize = report.pinned_nodes.len;
     for (report.component_names) |name| {
-        if (name) |str| {
-            var_entries[idx] = try std.fmt.allocPrint(arena, "I({s})", .{str});
-            idx += 1;
-        }
+        var_entries[idx] = try std.fmt.allocPrint(arena, "I({s})", .{name});
+        idx += 1;
     }
 
     if (report_changed) {
@@ -633,7 +611,7 @@ pub fn renderTransientReport(
 
     if (S.var_choice >= report.pinned_nodes.len) {
         const comp_entry_idx = S.var_choice - report.pinned_nodes.len;
-        const comp_idx: bland.Component.Id = @enumFromInt(comp_idxs[comp_entry_idx]);
+        const comp_idx: bland.Component.Id = @enumFromInt(comp_entry_idx);
         const current = trans_result.current(comp_idx) catch @panic("TODO");
         for (current, 0..) |c, i| {
             if (c) |c_val| {
@@ -688,7 +666,22 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
         }
     }
 
+    var control_box: dvui.FlexBoxWidget = undefined;
+    control_box.init(@src(), .{
+        .justify_content = .start,
+    }, .{
+        .expand = .horizontal,
+    });
+
     _ = dvui.dropdown(@src(), result_entries, &analysis_report_choice, .{});
+    const chosen = circuit.analysis_reports.items[analysis_report_choice];
+
+    if (dvui.button(@src(), "Export", .{}, .{})) {
+        chosen.exportToFile("temp.csv") catch |err| {
+            std.log.err("Failed to export to file '{s}': {t}", .{ "temp.csv", err });
+        };
+    }
+    control_box.deinit();
 
     const changed = prev_analysis_report_choice != analysis_report_choice;
     prev_analysis_report_choice = analysis_report_choice;
@@ -701,7 +694,6 @@ pub fn renderAnalysisResults(gpa: std.mem.Allocator) !void {
     });
     defer report_box.deinit();
 
-    const chosen = circuit.analysis_reports.items[analysis_report_choice];
     switch (chosen.result) {
         .dc => try renderDCReport(gpa, chosen, changed),
         .frequency_sweep => try renderFWReport(gpa, chosen, changed),
